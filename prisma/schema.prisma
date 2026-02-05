@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "mysql"
-
 }
 
 model user {
@@ -12,4 +11,56 @@ model user {
   email     String   @unique(map: "User_email_key")
   name      String?
   createdAt DateTime @default(now())
+}
+
+// ÉNUMÉRATION: Type de Client
+enum TypeClient {
+  ENTREPRENEUR
+  RESIDENTIEL
+  DISTRIBUTEUR
+  AMBASSADEUR
+}
+
+// TABLE: clients
+model Client {
+  id String @id @default(cuid())
+
+  // Informations principales
+  nom  String     @db.VarChar(255)
+  type TypeClient @default(ENTREPRENEUR)
+
+  // Adresse complète (format: "123 Rue Principale, Montréal, QC, H2X 1A1")
+  adresse String @db.Text
+
+  // Coordonnées
+  telephone  String  @db.VarChar(20)
+  cellulaire String? @db.VarChar(20)
+  fax        String? @db.VarChar(20)
+
+  // Contact principal
+  personne_Contact String @db.VarChar(255)
+
+  // Emails (stockés en JSON car peut avoir plusieurs)
+  emails Json // ["email1@test.com", "email2@test.com"]
+
+  // Préférences de communication
+  communicationTexto     Boolean @default(false)
+  communicationCourriel  Boolean @default(true)
+  communicationTelephone Boolean @default(false)
+
+  // Notes
+  commentaires String? @db.Text
+
+  // Métadonnées
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ============================================
+  // RELATIONS (à activer quand les autres tables existent)
+  // ============================================
+  // commandes             Commande[]
+  // reprises              Reprise[]
+
+  @@map("clients") // Nom de la table en base de données
 }
