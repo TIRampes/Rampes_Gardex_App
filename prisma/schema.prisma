@@ -6,14 +6,10 @@ datasource db {
   provider = "mysql"
 }
 
-model user {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique(map: "User_email_key")
-  name      String?
-  createdAt DateTime @default(now())
-}
+// ╔══════════════════════════════════════════╗
+// ║            ÉNUMÉRATIONS                  ║
+// ╚══════════════════════════════════════════╝
 
-// ÉNUMÉRATION: Type de Client
 enum TypeClient {
   ENTREPRENEUR
   RESIDENTIEL
@@ -21,46 +17,1046 @@ enum TypeClient {
   AMBASSADEUR
 }
 
-// TABLE: clients
+enum UserRole {
+  ADMIN
+  GESTIONNAIRE
+  EMPLOYE
+  CHAUFFEUR
+  INSTALLATEUR
+  MESUREUR
+  CLIENT
+  REPRESENTANT
+  PRODUCTEUR
+}
+
+enum TypeCommande {
+  STANDARD
+  COMMERCIAL
+  MULTI_PHASE
+  MULTIPLAN
+}
+
+enum ServiceCommande {
+  INSTALLATION
+  LIVRAISON
+  CUEILLETTE
+  TRANSPORT
+  MESURE
+}
+
+enum StatutCommande {
+  ACTIVE
+  EN_ATTENTE
+  COMPLETEE
+  ANNULEE
+}
+
+enum TypeActivite {
+  INSTALLATION
+  LIVRAISON
+  CUEILLETTE
+  TRANSPORT
+}
+
+enum StatutPlanification {
+  PLANIFIEE
+  CONFIRMEE
+  EN_COURS
+  COMPLETEE
+  REPORTEE
+  ANNULEE
+}
+
+enum StatutProduction {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+  EN_PAUSE
+}
+
+enum CodeProduction {
+  COMPLETE // √ Étape complétée
+  ATTENTE_CLIENT // At.C En attente d'une réponse du client
+  NON_APPLICABLE // N/A Non applicable
+  PARTIEL // P Étape partiellement complétée
+  DOSSIER_MESUREUR // D Dossier donné au mesureur
+  MODIFICATION // M Modification d'un dossier
+  ATTENTE_CAROL_CONFIRM // C-C Attente confirmation Carol pour prise de mesure
+  ATTENTE_CAROL_MESURE // C-RM Attente Carol pour retourner prendre des mesures
+  BACK_ORDER // B/O Commande d'achat avec des back order
+  ATTENTE_REPRESENTANT // At. Rep Attente d'une réponse d'un représentant
+}
+
+enum TypeIntervention {
+  INSTALLATION
+  LIVRAISON
+  CUEILLETTE
+  TRANSPORT
+}
+
+enum StatutIntervention {
+  PLANIFIEE
+  EN_COURS
+  COMPLETEE
+  REPORTEE
+  ANNULEE
+}
+
+enum TypePhoto {
+  AVANT
+  APRES
+  PREUVE
+  AUTRE
+}
+
+enum TypeAchat {
+  FIBRE
+  LIMONS
+  VERRES
+  COLONNES
+  PEINTURE
+  ATTACHES
+  PLANCHER_ALUMINIUM
+  AUTRE
+}
+
+enum StatutAchat {
+  A_FAIRE // ① Achat à faire
+  FAIT // √ Achat fait
+  RECEPTIONNE // R Achat réceptionné
+  PRET_A_RAMASSER // P Achat prêt à ramasser
+  BACK_ORDER // B/O Achat reçu partiellement (Item back/order)
+}
+
+enum TypeMouvement {
+  ENTREE
+  SORTIE
+  AJUSTEMENT
+  TRANSFERT
+  RETOUR
+}
+
+enum TypeReprise {
+  MAUVAISE_COULEUR
+  QUINCAILLERIE_MANQUANTE
+  MAIN_TROP_COURTE
+  SECTIONS_MANQUANTES
+  MAINS_MANQUANTES
+  POTEAUX_MANQUANTS
+  PIECES_GRAFIGNEES
+  ERREURS_MESURE
+  ERREURS_PRODUCTION
+  CHANGEMENT_CLIENT
+  BARRIERE
+  POTEAUX
+  DESCENTES
+  CAPSULES_MANQUANTES
+  MURS_INTIMITE
+  ERREUR_LIMON
+  VERRES
+  AUTRE
+}
+
+enum StatutReprise {
+  PLANIFIEE
+  EN_COURS
+  EN_ATTENTE_PIECES
+  COMPLETEE
+}
+
+enum AvertissementMesure {
+  PRESENCE_CLIENT // Présence client requise
+  PRESENCE_REPRESENTANT // Présence représentant requise
+}
+
+enum AvertissementClient {
+  CONF_REP // Conf.Rep - Confirmé par représentant
+  CONF_CLIENT // Conf.Client - Confirmé par client
+  ATT_REP_CLIENT // Att.Rep.Client - Attente réponse représentant/client
+}
+
+enum PrioriteReprise {
+  HAUTE
+  MOYENNE
+  BASSE
+}
+
+enum StatutNonConformite {
+  OUVERT
+  EN_COURS
+  RESOLU
+  FERME
+}
+
+enum GraviteNC {
+  MINEURE
+  MAJEURE
+  CRITIQUE
+}
+
+enum TypeProjetMulti {
+  COMMERCIAL
+  MULTI_PHASE
+}
+
+enum StatutProjet {
+  EN_COURS
+  EN_PAUSE
+  COMPLETE
+}
+
+enum StatutPhase {
+  PLANIFIEE
+  EN_COURS
+  COMPLETEE
+}
+
+enum StatutBatiment {
+  PLANIFIE
+  EN_COURS
+  COMPLETE
+}
+
+enum StatutVehicule {
+  DISPONIBLE
+  EN_ROUTE
+  MAINTENANCE
+}
+
+enum StatutChauffeur {
+  ACTIF
+  EN_LIVRAISON
+  CONGE
+}
+
+enum TypeNotification {
+  INFO
+  ALERTE
+  RAPPEL
+  URGENT
+}
+
+enum TypeAttente {
+  CLIENT
+  REPRESENTANT
+}
+
+// ╔══════════════════════════════════════════╗
+// ║              MODÈLES                     ║
+// ╚══════════════════════════════════════════╝
+
+// ============================================
+// 01. CLIENT
+// ============================================
 model Client {
-  id String @id @default(cuid())
+  id                     String     @id @default(cuid())
+  nom                    String     @db.VarChar(255)
+  type                   TypeClient @default(ENTREPRENEUR)
+  adresse                String     @db.Text
+  telephone              String     @db.VarChar(20)
+  cellulaire             String?    @db.VarChar(20)
+  fax                    String?    @db.VarChar(20)
+  personne_Contact       String     @db.VarChar(255)
+  emails                 Json
+  communicationTexto     Boolean    @default(false)
+  communicationCourriel  Boolean    @default(true)
+  communicationTelephone Boolean    @default(false)
+  pays                   String?    @db.VarChar(100)
+  commentaires           String?    @db.Text
+  actif                  Boolean    @default(true)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
 
-  // Informations principales
-  nom  String     @db.VarChar(255)
-  type TypeClient @default(ENTREPRENEUR)
+  commandes Commande[]
+  reprises  Reprise[]
 
-  // Adresse complète (format: "123 Rue Principale, Montréal, QC, H2X 1A1")
-  adresse String @db.Text
+  @@index([nom])
+  @@index([type])
+  @@index([actif])
+  @@index([telephone])
+  @@map("clients")
+}
 
-  // Coordonnées
-  telephone  String  @db.VarChar(20)
-  cellulaire String? @db.VarChar(20)
-  fax        String? @db.VarChar(20)
-
-  // Contact principal
-  personne_Contact String @db.VarChar(255)
-
-  // Emails (stockés en JSON car peut avoir plusieurs)
-  emails Json // ["email1@test.com", "email2@test.com"]
-
-  // Préférences de communication
-  communicationTexto     Boolean @default(false)
-  communicationCourriel  Boolean @default(true)
-  communicationTelephone Boolean @default(false)
-
-  // Notes
-  commentaires String? @db.Text
-
-  // Métadonnées
+// ============================================
+// 02. REPRESENTANT
+// ============================================
+model Representant {
+  id        String   @id @default(cuid())
+  nom       String   @db.VarChar(255)
+  email     String?  @db.VarChar(255)
+  telephone String?  @db.VarChar(20)
   actif     Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // ============================================
-  // RELATIONS (à activer quand les autres tables existent)
-  // ============================================
-  // commandes             Commande[]
-  // reprises              Reprise[]
+  commandes Commande[]
 
-  @@map("clients") // Nom de la table en base de données
+  @@index([nom])
+  @@index([actif])
+  @@map("representants")
+}
+
+// ============================================
+// 03. EQUIPE
+// ============================================
+model Equipe {
+  id        String   @id @default(cuid())
+  nom       String   @unique @db.VarChar(100)
+  couleur   String   @default("bg-blue-500") @db.VarChar(50)
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  membres        User[]
+  planifications Planification[]
+  interventions  Intervention[]
+  reprises       Reprise[]
+
+  @@index([nom])
+  @@index([actif])
+  @@map("equipes")
+}
+
+// ============================================
+// 04. USER
+// ============================================
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  nom       String   @db.VarChar(100)
+  prenom    String   @db.VarChar(100)
+  role      UserRole @default(EMPLOYE)
+  telephone String?  @db.VarChar(20)
+  equipeId  String?
+  equipe    Equipe?  @relation(fields: [equipeId], references: [id])
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  interventions Intervention[]
+  notifications Notification[]
+
+  @@index([email])
+  @@index([nom])
+  @@index([role])
+  @@index([equipeId])
+  @@index([actif])
+  @@map("users")
+}
+
+// ============================================
+// 05. FOURNISSEUR
+// ============================================
+model Fournisseur {
+  id        String   @id @default(cuid())
+  nom       String   @db.VarChar(255)
+  contact   String?  @db.VarChar(255)
+  telephone String?  @db.VarChar(20)
+  email     String?  @db.VarChar(255)
+  adresse   String?  @db.Text
+  notes     String?  @db.Text
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  produits FournisseurProduit[]
+  achats   Achat[]
+  delais   DelaiLivraison[]
+
+  @@index([nom])
+  @@index([actif])
+  @@map("fournisseurs")
+}
+
+// ============================================
+// 06. PRODUIT
+// ============================================
+model Produit {
+  id           String   @id @default(cuid())
+  nom          String   @db.VarChar(255)
+  description  String?  @db.Text
+  categorie    String   @db.VarChar(100)
+  unite        String   @db.VarChar(50)
+  quantite     Int      @default(0)
+  seuilMin     Int      @default(0)
+  seuilMax     Int?
+  prixUnitaire Decimal? @db.Decimal(10, 2)
+  emplacement  String?  @db.VarChar(100)
+  actif        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  fournisseurs FournisseurProduit[]
+  mouvements   MouvementStock[]
+  lignesAchat  AchatLigne[]
+
+  @@index([nom])
+  @@index([categorie])
+  @@index([quantite])
+  @@index([actif])
+  @@map("produits")
+}
+
+// ============================================
+// 06b. FOURNISSEUR_PRODUIT (Liaison)
+// ============================================
+model FournisseurProduit {
+  id              String      @id @default(cuid())
+  fournisseurId   String
+  fournisseur     Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Cascade)
+  produitId       String
+  produit         Produit     @relation(fields: [produitId], references: [id], onDelete: Cascade)
+  codeFournisseur String?     @db.VarChar(50)
+  prixAchat       Decimal?    @db.Decimal(10, 2)
+  delaiLivraison  Int?
+  favori          Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([fournisseurId, produitId])
+  @@index([fournisseurId])
+  @@index([produitId])
+  @@map("fournisseur_produits")
+}
+
+// ============================================
+// 07. COMMANDE
+// ============================================
+model Commande {
+  id             String          @id @default(cuid())
+  numero         String          @unique @db.VarChar(50)
+  clientId       String
+  client         Client          @relation(fields: [clientId], references: [id])
+  representantId String?
+  representant   Representant?   @relation(fields: [representantId], references: [id])
+  reference      String?         @db.VarChar(100)
+  typeCommande   TypeCommande    @default(STANDARD)
+  service        ServiceCommande @default(INSTALLATION)
+  statut         StatutCommande  @default(ACTIVE)
+  activite       TypeActivite    @default(INSTALLATION)
+  adresse        String          @db.Text
+
+  // Dates
+  dateEntree      DateTime  @default(now())
+  datePrevue      DateTime?
+  dateProduction  DateTime?
+  datePriseMesure DateTime?
+  dateLivraison   DateTime?
+  dateCompletion  DateTime?
+
+  // Prix
+  prixVenteMateriaux    Decimal @default(0) @db.Decimal(10, 2)
+  prixVenteInstallation Decimal @default(0) @db.Decimal(10, 2)
+  prixTotal             Decimal @default(0) @db.Decimal(10, 2) // Prix total calculé
+
+  // Mesures
+  tempsEstimeInstallation        Int  @default(0)
+  piedsCarresFibre               Int?
+  piedsRampesBarrotin            Int  @default(0)
+  piedsRampesVerre               Int  @default(0)
+  piedsRampesMurIntimite         Int  @default(0)
+  piedsRampesMainDouble          Int  @default(0)
+  piedsRampesGardexVision        Int  @default(0)
+  piedsRampesGardexVisionUrbaine Int  @default(0)
+  piedsRampesGardexVisionOptimum Int  @default(0)
+  piedsLineairesRampes           Int  @default(0)
+  nombrePoteaux                  Int  @default(0)
+
+  // Commercial / Multiplan / Multiphase
+  nombreBalcons        Int? // Pour COMMERCIAL
+  nombrePhases         Int? // Pour MULTI_PHASE et MULTIPLAN
+  piedsLineairesEstime Int?
+  piedsLineairesReels  Int?
+
+  // Production
+  structure          Boolean         @default(false)
+  couleur            String?         @db.VarChar(50)
+  mesure             CodeProduction?
+  mesureDonneeLe     DateTime?
+  plan               CodeProduction?
+  envoyeProduction   CodeProduction?
+  productionTerminee CodeProduction?
+  termine            CodeProduction?
+
+  // Achats
+  achatFibre                     StatutAchat?
+  dateReceptionFibre             DateTime?
+  achatLimons                    StatutAchat?
+  dateReceptionLimons            DateTime?
+  achatVerres                    StatutAchat?
+  dateReceptionVerre             DateTime?
+  achatColonnes                  StatutAchat?
+  dateReceptionColonnes          DateTime?
+  achatPeinture                  StatutAchat?
+  dateReceptionPeinture          DateTime?
+  achatAttaches                  StatutAchat?
+  dateReceptionAttaches          DateTime?
+  achatPlancherAluminium         StatutAchat?
+  dateReceptionPlancherAluminium DateTime?
+
+  // Avertissements
+  avertissementClient          AvertissementClient?
+  dateAvertissement            DateTime?
+  avertissementPriseMesure     AvertissementMesure?
+  dateAvertissementPriseMesure DateTime?
+
+  // Livraison et flags
+  livraison          String? @db.VarChar(50)
+  reprise            Boolean @default(false)
+  enProduction       Boolean @default(false)
+  clientPresent      Boolean @default(false)
+  formulaireComplete Boolean @default(false)
+
+  commentaire String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  balcons         Balcon[] // Utilisé pour Commercial, Multiplan, Multiphase
+  planifications  Planification[]
+  productions     Production[]
+  interventions   Intervention[]
+  achats          Achat[]
+  reprises        Reprise[]
+  nonConformites  NonConformite[]
+  mouvementsStock MouvementStock[]
+
+  @@index([numero])
+  @@index([clientId])
+  @@index([representantId])
+  @@index([statut])
+  @@index([typeCommande])
+  @@index([service])
+  @@index([dateEntree])
+  @@index([datePrevue])
+  @@index([enProduction])
+  @@map("commandes")
+}
+
+/// ============================================
+// 08. BALCON / PHASE / PLAN
+// ============================================
+// Utilisé pour:
+// - COMMERCIAL: détails par balcon
+// - MULTI_PHASE: détails par phase
+// - MULTIPLAN: détails par plan
+model Balcon {
+  id         String   @id @default(cuid())
+  commandeId String
+  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+
+  // Identification
+  nom         String @db.VarChar(100) // "Balcon 201", "Phase 1", "Plan A"
+  numeroPhase Int? // Numéro de phase/plan (1, 2, 3...)
+
+  // Mesures et coûts
+  piedsLineaires Int     @default(0)
+  poteaux        Int     @default(0)
+  coutBalcon     Decimal @default(0) @db.Decimal(10, 2)
+  prixTotal      Decimal @default(0) @db.Decimal(10, 2) // Prix total pour ce balcon/phase
+
+  // Statuts
+  produit              Boolean @default(false) // Produit en usine?
+  installationTerminee Boolean @default(false)
+  reprise              Boolean @default(false)
+
+  // Notes
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commandeId])
+  @@index([numeroPhase])
+  @@index([installationTerminee])
+  @@map("balcons")
+}
+
+// ============================================
+// 09. PLANIFICATION
+// ============================================
+model Planification {
+  id                  String              @id @default(cuid())
+  commandeId          String
+  commande            Commande            @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  equipeId            String
+  equipe              Equipe              @relation(fields: [equipeId], references: [id])
+  datePlanifiee       DateTime
+  heureDebut          String?             @db.VarChar(10)
+  heureFin            String?             @db.VarChar(10)
+  clientPresent       Boolean             @default(false)
+  representantPresent Boolean             @default(false)
+  envoyerAvis         Boolean             @default(false)
+  avisEnvoye          Boolean             @default(false)
+  statut              StatutPlanification @default(PLANIFIEE)
+  notes               String?             @db.Text
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([commandeId])
+  @@index([equipeId])
+  @@index([datePlanifiee])
+  @@index([statut])
+  @@map("planifications")
+}
+
+// ============================================
+// 10. PRODUCTION
+// ============================================
+model Production {
+  id              String           @id @default(cuid())
+  commandeId      String
+  commande        Commande         @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  semaine         Int
+  annee           Int
+  dateProduction  DateTime
+  coupe           String?          @db.VarChar(20)
+  soudure         String?          @db.VarChar(20)
+  peinture        String?          @db.VarChar(20)
+  vitrage         String?          @db.VarChar(20)
+  assemblage      String?          @db.VarChar(20)
+  controleQualite String?          @db.VarChar(20)
+  statut          StatutProduction @default(EN_ATTENTE)
+  notes           String?          @db.Text
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([commandeId])
+  @@index([semaine, annee])
+  @@index([dateProduction])
+  @@index([statut])
+  @@map("productions")
+}
+
+// ============================================
+// 11. INTERVENTION
+// ============================================
+model Intervention {
+  id            String             @id @default(cuid())
+  commandeId    String
+  commande      Commande           @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  equipeId      String?
+  equipe        Equipe?            @relation(fields: [equipeId], references: [id])
+  responsableId String?
+  responsable   User?              @relation(fields: [responsableId], references: [id])
+  type          TypeIntervention
+  datePrevue    DateTime
+  heureDebut    String?            @db.VarChar(10)
+  heureFin      String?            @db.VarChar(10)
+  statut        StatutIntervention @default(PLANIFIEE)
+
+  // Formulaire commun
+  heureArrivee      String? @db.VarChar(10)
+  heureDepart       String? @db.VarChar(10)
+  personneRessource String? @db.VarChar(255)
+  telephone         String? @db.VarChar(20)
+
+  // Installation - Avant
+  accessibiliteBalcon  String? @db.VarChar(10)
+  balconEncombre       String? @db.VarChar(10)
+  niveauBalconConforme String? @db.VarChar(10)
+  backingConforme      String? @db.VarChar(10)
+  colonneCapage        String? @db.VarChar(10)
+  noteAvant            String? @db.Text
+
+  // Installation - Travaux
+  travauxNonComplete     Boolean @default(false)
+  travauxNonCompleteNote String? @db.Text
+
+  // Installation - Fin
+  mainsInstallees    String? @db.VarChar(10)
+  cacheVisInstallees String? @db.VarChar(10)
+  capsulesPoteaux    String? @db.VarChar(10)
+  vuEnsemble         String? @db.VarChar(10)
+  noteApres          String? @db.Text
+
+  // Livraison
+  materielComplet      String? @db.VarChar(10)
+  etatMateriel         String? @db.VarChar(50)
+  quantiteConforme     String? @db.VarChar(10)
+  emplacementLivraison String? @db.VarChar(255)
+  accessibilite        String? @db.VarChar(10)
+  noteLivraison        String? @db.Text
+
+  // Cueillette
+  materielIdentifie     String? @db.VarChar(10)
+  etatMaterielRecupere  String? @db.VarChar(100)
+  quantiteRecuperee     Int?
+  emplacementCueillette String? @db.VarChar(255)
+  difficulteAcces       String? @db.VarChar(10)
+  noteCueillette        String? @db.Text
+  listeMateriels        Json?
+
+  // Transport
+  adresseDepart         String? @db.Text
+  adresseArrivee        String? @db.Text
+  vehiculeInspecte      String? @db.VarChar(10)
+  chargementSecurise    String? @db.VarChar(10)
+  documentationComplete String? @db.VarChar(10)
+  kmDepart              Int?
+  kmArrivee             Int?
+  membresEquipe         Json?
+  materielTransporte    String? @db.Text
+  noteTransport         String? @db.Text
+
+  // Signatures
+  signatureInstallateur String?   @db.LongText
+  signatureClient       String?   @db.LongText
+  signatureLivreur      String?   @db.LongText
+  signatureChauffeur    String?   @db.LongText
+  dateSignature         DateTime?
+
+  formulaireComplete Boolean  @default(false)
+  notes              String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  photos Photo[]
+
+  @@index([commandeId])
+  @@index([equipeId])
+  @@index([responsableId])
+  @@index([type])
+  @@index([datePrevue])
+  @@index([statut])
+  @@map("interventions")
+}
+
+// ============================================
+// 12. PHOTO
+// ============================================
+model Photo {
+  id             String       @id @default(cuid())
+  interventionId String
+  intervention   Intervention @relation(fields: [interventionId], references: [id], onDelete: Cascade)
+  type           TypePhoto
+  url            String       @db.VarChar(500)
+  description    String?      @db.VarChar(255)
+  createdAt      DateTime     @default(now())
+
+  @@index([interventionId])
+  @@index([type])
+  @@map("photos")
+}
+
+// ============================================
+// 13. ACHAT
+// ============================================
+model Achat {
+  id            String      @id @default(cuid())
+  numero        String      @unique @db.VarChar(50)
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id])
+  commandeId    String?
+  commande      Commande?   @relation(fields: [commandeId], references: [id])
+  typeAchat     TypeAchat
+  statut        StatutAchat @default(A_FAIRE)
+  dateCommande  DateTime?
+  datePrevue    DateTime?
+  dateReception DateTime?
+  montantTotal  Decimal?    @db.Decimal(10, 2)
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  lignes AchatLigne[]
+
+  @@index([numero])
+  @@index([fournisseurId])
+  @@index([commandeId])
+  @@index([statut])
+  @@index([dateCommande])
+  @@map("achats")
+}
+
+// ============================================
+// 13b. ACHAT_LIGNE
+// ============================================
+model AchatLigne {
+  id            String   @id @default(cuid())
+  achatId       String
+  achat         Achat    @relation(fields: [achatId], references: [id], onDelete: Cascade)
+  produitId     String
+  produit       Produit  @relation(fields: [produitId], references: [id])
+  quantite      Int
+  quantiteRecue Int      @default(0)
+  recu          Boolean  @default(false)
+  prixUnitaire  Decimal? @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([achatId])
+  @@index([produitId])
+  @@map("achat_lignes")
+}
+
+// ============================================
+// 14. MOUVEMENT_STOCK
+// ============================================
+model MouvementStock {
+  id            String        @id @default(cuid())
+  produitId     String
+  produit       Produit       @relation(fields: [produitId], references: [id])
+  commandeId    String?
+  commande      Commande?     @relation(fields: [commandeId], references: [id])
+  type          TypeMouvement
+  quantite      Int
+  quantiteAvant Int
+  quantiteApres Int
+  reference     String?       @db.VarChar(100)
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now())
+
+  @@index([produitId])
+  @@index([commandeId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("mouvements_stock")
+}
+
+// ============================================
+// 15. REPRISE
+// ============================================
+model Reprise {
+  id             String          @id @default(cuid())
+  commandeId     String
+  commande       Commande        @relation(fields: [commandeId], references: [id])
+  clientId       String
+  client         Client          @relation(fields: [clientId], references: [id])
+  equipeId       String?
+  equipe         Equipe?         @relation(fields: [equipeId], references: [id])
+  typeReprise    TypeReprise
+  raison         String          @db.Text
+  dateReprise    DateTime
+  dateOrigine    DateTime?
+  dateCompletion DateTime?
+  nombreReprises Int             @default(1)
+  coutEstime     Decimal?        @db.Decimal(10, 2)
+  tempsEstime    Int?
+  statut         StatutReprise   @default(PLANIFIEE)
+  priorite       PrioriteReprise @default(MOYENNE)
+  responsable    String?         @db.VarChar(255)
+  notes          String?         @db.Text
+  completee      Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([commandeId])
+  @@index([clientId])
+  @@index([equipeId])
+  @@index([typeReprise])
+  @@index([statut])
+  @@index([dateReprise])
+  @@index([completee])
+  @@map("reprises")
+}
+
+// ============================================
+// 16. NON_CONFORMITE
+// ============================================
+model NonConformite {
+  id               String              @id @default(cuid())
+  commandeId       String
+  commande         Commande            @relation(fields: [commandeId], references: [id])
+  description      String              @db.Text
+  departement      String              @db.VarChar(100)
+  dateDetection    DateTime            @default(now())
+  dateResolution   DateTime?
+  statut           StatutNonConformite @default(OUVERT)
+  gravite          GraviteNC           @default(MINEURE)
+  actionCorrective String?             @db.Text
+  responsable      String?             @db.VarChar(255)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([commandeId])
+  @@index([statut])
+  @@index([gravite])
+  @@index([departement])
+  @@index([dateDetection])
+  @@map("non_conformites")
+}
+
+// ============================================
+// 17. PROJET_MULTI
+// ============================================
+model ProjetMulti {
+  id          String          @id @default(cuid())
+  nom         String          @db.VarChar(255)
+  client      String          @db.VarChar(255)
+  ville       String          @db.VarChar(100)
+  typeProjet  TypeProjetMulti
+  numCommande String          @db.VarChar(50)
+  dateDebut   DateTime
+  dateFin     DateTime?
+  responsable String?         @db.VarChar(255)
+  notes       String?         @db.Text
+  statut      StatutProjet    @default(EN_COURS)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  batiments Batiment[]
+  phases    Phase[]
+
+  @@index([nom])
+  @@index([client])
+  @@index([typeProjet])
+  @@index([statut])
+  @@index([numCommande])
+  @@map("projets_multi")
+}
+
+// ============================================
+// 18. PHASE
+// ============================================
+model Phase {
+  id          String      @id @default(cuid())
+  projetId    String
+  projet      ProjetMulti @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  nom         String      @db.VarChar(255)
+  description String?     @db.Text
+  ordre       Int
+  dateDebut   DateTime?
+  dateFin     DateTime?
+  statut      StatutPhase @default(PLANIFIEE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  batiments Batiment[]
+
+  @@index([projetId])
+  @@index([ordre])
+  @@index([statut])
+  @@map("phases")
+}
+
+// ============================================
+// 19. BATIMENT
+// ============================================
+model Batiment {
+  id              String         @id @default(cuid())
+  projetId        String
+  projet          ProjetMulti    @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  phaseId         String?
+  phase           Phase?         @relation(fields: [phaseId], references: [id])
+  nom             String         @db.VarChar(100)
+  piedsLineaires  Int            @default(0)
+  nombrePoteaux   Int            @default(0)
+  nombreBarrotins Int            @default(0)
+  nombreVerres    Int            @default(0)
+  couleur         String?        @db.VarChar(50)
+  typeRampe       String?        @db.VarChar(100)
+  statut          StatutBatiment @default(PLANIFIE)
+  dateCompletion  DateTime?
+  notes           String?        @db.Text
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([projetId])
+  @@index([phaseId])
+  @@index([statut])
+  @@map("batiments")
+}
+
+// ============================================
+// 20. VEHICULE
+// ============================================
+model Vehicule {
+  id        String         @id @default(cuid())
+  nom       String         @db.VarChar(100)
+  type      String         @db.VarChar(100)
+  plaque    String         @db.VarChar(20)
+  statut    StatutVehicule @default(DISPONIBLE)
+  actif     Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([nom])
+  @@index([statut])
+  @@index([actif])
+  @@map("vehicules")
+}
+
+// ============================================
+// 21. CHAUFFEUR
+// ============================================
+model Chauffeur {
+  id        String          @id @default(cuid())
+  nom       String          @db.VarChar(255)
+  telephone String?         @db.VarChar(20)
+  permis    String?         @db.VarChar(20)
+  statut    StatutChauffeur @default(ACTIF)
+  actif     Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([nom])
+  @@index([statut])
+  @@index([actif])
+  @@map("chauffeurs")
+}
+
+// ============================================
+// 22. NOTIFICATION
+// ============================================
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      TypeNotification
+  titre     String           @db.VarChar(255)
+  message   String           @db.Text
+  lu        Boolean          @default(false)
+  lien      String?          @db.VarChar(500)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([lu])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ============================================
+// 23. ATTENTE
+// ============================================
+model Attente {
+  id             String      @id @default(cuid())
+  type           TypeAttente
+  client         String?     @db.VarChar(255)
+  representant   String?     @db.VarChar(255)
+  commandeNumero String?     @db.VarChar(50)
+  raison         String      @db.Text
+  depuis         DateTime    @default(now())
+  dateResolution DateTime?
+  resolue        Boolean     @default(false)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([type])
+  @@index([resolue])
+  @@index([depuis])
+  @@map("attentes")
+}
+
+// ============================================
+// 24. DELAI_LIVRAISON
+// ============================================
+model DelaiLivraison {
+  id            String      @id @default(cuid())
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id])
+  produit       String      @db.VarChar(255)
+  delaiInitial  DateTime
+  nouveauDelai  DateTime?
+  raison        String?     @db.Text
+  resolu        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([fournisseurId])
+  @@index([resolu])
+  @@index([delaiInitial])
+  @@map("delais_livraison")
 }
