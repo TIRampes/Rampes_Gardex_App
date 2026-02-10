@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { signOut } from "next-auth/react";
 import { X } from "lucide-react";
 
 import {
@@ -26,29 +27,23 @@ import {
   LogOut,
 } from "lucide-react";
 
-interface MenuItem {
-  name: string;
-  href: string;
-  icon: React.ReactNode;
-}
-
-const menuItems: MenuItem[] = [
-  { name: "Tableau de bord", href: "/dashboard", icon: <LayoutDashboard size={18} /> },
-  { name: "Clients", href: "/clients", icon: <Users size={18} /> },
-  { name: "Commandes", href: "/commandes", icon: <ClipboardList size={18} /> },
-  { name: "Production", href: "/production", icon: <Factory size={18} /> },
-  { name: "Planification", href: "/planification", icon: <Calendar size={18} /> },
-  { name: "Interventions", href: "/interventions", icon: <Wrench size={18} /> },
-  { name: "Cueillettes /Transport", href: "/cueillettes", icon: <Truck size={18} /> },
-  { name: "Inventaire", href: "/inventaire", icon: <Package size={18} /> },
-  { name: "Achats", href: "/achats", icon: <ShoppingCart size={18} /> },
-  { name: "Rentabilité", href: "/rentabilite", icon: <TrendingUp size={18} /> },
-  { name: "Attentes", href: "/attentes", icon: <Clock size={18} /> },
-  { name: "Non-conformités", href: "/non-conformites", icon: <AlertTriangle size={18} /> },
-  { name: "Multi-logements", href: "/multi-logements", icon: <Building2 size={18} /> },
-  { name: "Reprises", href: "/reprises", icon: <RotateCcw size={18} /> },
-  { name: "Rapports", href: "/rapports", icon: <FileBarChart size={18} /> },
-  { name: "Paramètres", href: "/parametres", icon: <Settings size={18} /> },
+const menuItems = [
+  { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Clients", href: "/clients", icon: Users },
+  { name: "Commandes", href: "/commandes", icon: ClipboardList },
+  { name: "Production", href: "/production", icon: Factory },
+  { name: "Planification", href: "/planification", icon: Calendar },
+  { name: "Interventions", href: "/interventions", icon: Wrench },
+  { name: "Cueillettes /Transport", href: "/cueillettes", icon: Truck },
+  { name: "Inventaire", href: "/inventaire", icon: Package },
+  { name: "Achats", href: "/achats", icon: ShoppingCart },
+  { name: "Rentabilité", href: "/rentabilite", icon: TrendingUp },
+  { name: "Attentes", href: "/attentes", icon: Clock },
+  { name: "Non-conformités", href: "/non-conformites", icon: AlertTriangle },
+  { name: "Multi-logements", href: "/multi-logements", icon: Building2 },
+  { name: "Reprises", href: "/reprises", icon: RotateCcw },
+  { name: "Rapports", href: "/rapports", icon: FileBarChart },
+  { name: "Paramètres", href: "/parametres", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -59,12 +54,10 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  // Fermer le sidebar quand on change de page (mobile)
   useEffect(() => {
     onClose();
   }, [pathname, onClose]);
 
-  // Empêcher le scroll du body quand le sidebar est ouvert sur mobile
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
@@ -76,12 +69,16 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     };
   }, [isOpen]);
 
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/Auth/login" });
+  };
+
   return (
     <>
-      {/* Overlay pour mobile */}
+      {/* Overlay mobile */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={onClose}
         />
       )}
@@ -89,29 +86,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed left-0 top-0 h-full w-64 bg-gardex-black text-white z-50 flex flex-col
+          fixed left-0 top-0 h-full w-64 z-50 flex flex-col
+          bg-gradient-to-b from-[#1a2332] to-[#0f1419]
           transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0
+          lg:translate-x-0 shadow-2xl
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Logo + Bouton fermer (mobile) */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-white/10">
+        {/* Header avec Logo */}
+        <div className="h-20 flex items-center justify-between px-4 border-b border-white/10">
           <Link href="/dashboard" className="flex items-center">
             <Image
               src="/images/logo-gardex.png"
               alt="Rampes Gardex"
-              width={140}
-              height={45}
+              width={160}
+              height={53}
               className="object-contain"
               priority
             />
           </Link>
-
-          {/* Bouton fermer (mobile seulement) */}
           <button
             onClick={onClose}
-            className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors"
+            className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
           >
             <X size={20} />
           </button>
@@ -119,27 +115,28 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 overflow-y-auto custom-scrollbar">
-          <ul className="space-y-0.5 px-3">
+          <ul className="space-y-1 px-3">
             {menuItems.map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + "/");
+              const Icon = item.icon;
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
 
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-200
-                      ${
-                        isActive
-                          ? "bg-gardex-orange/20 text-gardex-orange font-medium"
-                          : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium
+                      transition-all duration-200 group
+                      ${isActive
+                        ? "bg-gradient-to-r from-gardex-orange to-[#e6951f] text-white shadow-lg shadow-gardex-orange/25"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
                       }
                     `}
                   >
-                    <span className={isActive ? "text-gardex-orange" : "text-gray-500"}>
-                      {item.icon}
-                    </span>
+                    <Icon 
+                      size={20} 
+                      className={`transition-transform group-hover:scale-110 ${isActive ? 'text-white' : ''}`} 
+                    />
                     <span>{item.name}</span>
                   </Link>
                 </li>
@@ -149,14 +146,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </nav>
 
         {/* Déconnexion */}
-        <div className="p-3 border-t border-white/10">
+        <div className="p-4 border-t border-white/10">
           <button
-            onClick={() => {
-              window.location.href = "/login";
-            }}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-all duration-200"
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200 group"
           >
-            <LogOut size={18} className="text-gray-500" />
+            <LogOut size={20} className="transition-transform group-hover:scale-110" />
             <span>Déconnexion</span>
           </button>
         </div>
