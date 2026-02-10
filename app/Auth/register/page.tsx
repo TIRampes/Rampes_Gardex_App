@@ -246,7 +246,7 @@ export default function RegisterPage() {
 
               <p className="text-center text-sm text-gray-600 mt-6">
                 Déjà un compte ?{" "}
-                <Link href="/login" className="text-gardex-orange hover:underline font-semibold">
+                <Link href="/Auth/login" className="text-gardex-orange hover:underline font-semibold">
                   Se connecter
                 </Link>
               </p>
