@@ -233,7 +233,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Thème</span>
                         <button
-                          onClick={handleToggleTheme}
+                          onClick={toggleTheme}
                           className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
                         >
                           {darkMode ? (
@@ -386,7 +386,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   {/* Boutons thème pour mobile */}
                   <div className="px-4 py-2 border-b border-gray-100">
                     <button
-                      onClick={handleToggleTheme}
+                      onClick={toggleTheme}
                       className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors rounded-lg"
                     >
                       {darkMode ? <Sun size={18} /> : <Moon size={18} />}
