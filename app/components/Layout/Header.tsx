@@ -7,10 +7,10 @@ import { Bell, Menu, Search, ChevronDown, User, Settings, LogOut } from "lucide-
 
 
 const quickServices = [
-  { name: "Livraison", href: "/interventions/new?type=livraison", color: "bg-blue-500 hover:bg-blue-600", dotColor: "bg-blue-500" },
-  { name: "Cueillette", href: "/interventions/new?type=cueillette", color: "bg-emerald-500 hover:bg-emerald-600", dotColor: "bg-emerald-500" },
-  { name: "Intervention", href: "/interventions/new?type=intervention", color: "bg-red-500 hover:bg-red-600", dotColor: "bg-red-500" },
-  { name: "Transport", href: "/interventions/new?type=transport", color: "bg-purple-500 hover:bg-purple-600", dotColor: "bg-purple-500" },
+  { name: "Livraison",color: "bg-blue-500 hover:bg-blue-600", dotColor: "bg-blue-500" },
+  { name: "Cueillette", color: "bg-yellow-500 hover:bg-yellow-600", dotColor: "bg-yellow-500" },
+  { name: "Intervention", color: "bg-red-500 hover:bg-red-600", dotColor: "bg-red-500" },
+  { name: "Transport", color: "bg-green-500 hover:bg-green-600", dotColor: "bg-green-500" },
 ];
 
 interface HeaderProps {
@@ -38,8 +38,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   return (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 h-16 bg-white border-b border-gray-200 z-30 shadow-sm">
-      <div className="flex items-center justify-between h-full px-4 lg:px-6">
+    // couleur de fond modifiée pour correspondre à l'identité visuelle
+    <header className="fixed top-0 left-0 right-0 lg:left-64 h-16 bg-gradient-to-b from-[#1a2332] to-[#0f1419] border-b border-gray-200 z-30 bg-color-gbadex-white shadow-sm">
+
+        {/* Conteneur principal du header */}
+      <div className="flex items-center justify-between h-full px-4 lg:px-6 color-gray-900">
         {/* Gauche */}
         <div className="flex items-center gap-3">
           {/* Menu hamburger mobile */}
@@ -50,18 +53,17 @@ export default function Header({ onMenuClick }: HeaderProps) {
             <Menu size={24} />
           </button>
 
-          {/* Services rapides - Desktop */}
-          <div className="hidden md:flex items-center gap-2">
-            {quickServices.map((service) => (
-              <Link
-                key={service.name}
-                href={service.href}
-                className={`px-4 py-2 rounded-full text-sm font-semibold text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${service.color}`}
-              >
-                {service.name}
-              </Link>
-            ))}
-          </div>
+{/* Services rapides - Desktop */}
+<div className="hidden md:flex items-center gap-2">
+  {quickServices.map((service) => (
+    <div
+      key={service.name}
+      className={`px-4 py-2 rounded text-sm font-semibold text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 ${service.color} cursor-default`}
+    >
+      {service.name}
+    </div>
+  ))}
+</div>
 
           {/* Services rapides - Mobile */}
           <div className="relative md:hidden">
@@ -80,7 +82,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   {quickServices.map((service) => (
                     <Link
                       key={service.name}
-                      href={service.href}
+                        href="#"
                       className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                       onClick={() => setShowMobileServices(false)}
                     >
@@ -97,16 +99,17 @@ export default function Header({ onMenuClick }: HeaderProps) {
         {/* Droite */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Recherche - Desktop */}
-          <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-xl text-gray-500 hover:bg-gray-200 transition-colors">
+         {/* <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-xl text-gray-500 hover:bg-gray-200 transition-colors">
             <Search size={18} />
             <span className="text-sm">Rechercher...</span>
             <kbd className="hidden xl:inline-flex px-2 py-0.5 bg-white rounded text-xs text-gray-400 border">⌘K</kbd>
-          </button>
+          </button> */}
 
           {/* Notifications */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
+              
               className="relative p-2.5 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors"
             >
               <Bell size={22} />

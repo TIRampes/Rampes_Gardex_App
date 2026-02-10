@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 const menuItems = [
-  { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Tableau de bord", href: "/dashboard/dashboard", icon: LayoutDashboard },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Commandes", href: "/commandes", icon: ClipboardList },
   { name: "Production", href: "/production", icon: Factory },
@@ -95,7 +95,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Header avec Logo */}
         <div className="h-20 flex items-center justify-between px-4 border-b border-white/10">
-          <Link href="/dashboard" className="flex items-center">
+          <Link href="/dashboard/dashboard" className="flex items-center">
             <Image
               src="/images/logo-gardex.png"
               alt="Rampes Gardex"
