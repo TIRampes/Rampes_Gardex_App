@@ -7,6 +7,8 @@ import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { X } from "lucide-react";
 
+import { useTheme } from "../../hooks/useTheme";
+
 import {
   LayoutDashboard,
   Users,
@@ -29,21 +31,21 @@ import {
 
 const menuItems = [
   { name: "Tableau de bord", href: "/dashboard/dashboard", icon: LayoutDashboard },
-  { name: "Clients", href: "/clients", icon: Users },
-  { name: "Commandes", href: "/commandes", icon: ClipboardList },
-  { name: "Production", href: "/production", icon: Factory },
-  { name: "Planification", href: "/planification", icon: Calendar },
-  { name: "Interventions", href: "/interventions", icon: Wrench },
-  { name: "Cueillettes /Transport", href: "/cueillettes", icon: Truck },
-  { name: "Inventaire", href: "/inventaire", icon: Package },
-  { name: "Achats", href: "/achats", icon: ShoppingCart },
-  { name: "Rentabilité", href: "/rentabilite", icon: TrendingUp },
-  { name: "Attentes", href: "/attentes", icon: Clock },
-  { name: "Non-conformités", href: "/non-conformites", icon: AlertTriangle },
-  { name: "Multi-logements", href: "/multi-logements", icon: Building2 },
-  { name: "Reprises", href: "/reprises", icon: RotateCcw },
-  { name: "Rapports", href: "/rapports", icon: FileBarChart },
-  { name: "Paramètres", href: "/parametres", icon: Settings },
+  { name: "Clients", href: "/dashboard/clients", icon: Users },
+  { name: "Commandes", href: "/dashboard/commandes", icon: ClipboardList },
+  { name: "Production", href: "/dashboard/production", icon: Factory },
+  { name: "Planification", href: "/dashboard/planification", icon: Calendar },
+  { name: "Interventions", href: "/dashboard/interventions", icon: Wrench },
+  { name: "Inventaire", href: "/dashboard/inventaire", icon: Package },
+  { name: "Achats", href: "/dashboard/achats", icon: ShoppingCart },
+  { name: "Rentabilité", href: "/dashboard/rentabilite", icon: TrendingUp },
+  {name: "Cueillettes/Transport", href: "/dashboard/cueille_trans_livraison", icon: Truck },
+  { name: "Attentes", href: "/dashboard/attentes", icon: Clock },
+  { name: "Non-conformités", href: "/dashboard/non_conformite", icon: AlertTriangle },
+  { name: "Multi-logements", href: "/dashboard/multi_logements", icon: Building2 },
+  { name: "Reprises", href: "/dashboard/reprises", icon: RotateCcw },
+  { name: "Rapports", href: "/dashboard/rapports", icon: FileBarChart },
+  { name: "Paramètres", href: "/dashboard/parametres", icon: Settings },
 ];
 
 interface SidebarProps {
@@ -52,6 +54,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+    const { theme, toggleTheme, selectPalette } = useTheme();
   const pathname = usePathname();
 
   useEffect(() => {

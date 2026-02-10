@@ -8,6 +8,8 @@ import {
   Sun, Moon, Palette, ChevronRight
 } from "lucide-react";
 
+import { useTheme } from "../../hooks/useTheme";
+
 const quickServices = [
   { name: "Livraison", color: "bg-blue-500", dotColor: "bg-blue-500" },
   { name: "Cueillette", color: "bg-yellow-500", dotColor: "bg-yellow-500" },
@@ -16,36 +18,87 @@ const quickServices = [
 ];
 
 // Palettes de couleurs disponibles
+// Dans Header.tsx, remplacez le tableau colorPalettes par :
 const colorPalettes = [
   { 
     name: "Orange Gardex", 
     primary: "#f97316", 
     gradient: "from-[#f97316] to-[#e6951f]",
-    bgSidebar: "from-[#1a2332] to-[#0f1419]"
+    bgSidebar: "from-[#1a2332] to-[#0f1419]",
+    light: {
+      bg: "#ffffff",
+      text: "#0f172a",
+      sidebar: "from-[#f8fafc] to-[#e2e8f0]",
+    },
+    dark: {
+      bg: "#0f1419",
+      text: "#f8fafc",
+      sidebar: "from-[#1a2332] to-[#0f1419]",
+    }
   },
   { 
     name: "Bleu Professionnel", 
     primary: "#3b82f6", 
     gradient: "from-[#3b82f6] to-[#1d4ed8]",
-    bgSidebar: "from-[#1e293b] to-[#0f172a]"
+    bgSidebar: "from-[#1e293b] to-[#0f172a]",
+    light: {
+      bg: "#f0f7ff",
+      text: "#1e3a8a",
+      sidebar: "from-[#eff6ff] to-[#dbeafe]",
+    },
+    dark: {
+      bg: "#0f172a",
+      text: "#e0f2fe",
+      sidebar: "from-[#1e293b] to-[#0f172a]",
+    }
   },
   { 
     name: "Vert Naturel", 
     primary: "#10b981", 
     gradient: "from-[#10b981] to-[#059669]",
-    bgSidebar: "from-[#1a2c2a] to-[#0f1f1d]"
+    bgSidebar: "from-[#1a2c2a] to-[#0f1f1d]",
+    light: {
+      bg: "#f0fdf4",
+      text: "#064e3b",
+      sidebar: "from-[#f0fdf4] to-[#dcfce7]",
+    },
+    dark: {
+      bg: "#0f1f1d",
+      text: "#d1fae5",
+      sidebar: "from-[#1a2c2a] to-[#0f1f1d]",
+    }
   },
   { 
     name: "Violet Créatif", 
     primary: "#8b5cf6", 
     gradient: "from-[#8b5cf6] to-[#7c3aed]",
-    bgSidebar: "from-[#2a1b4d] to-[#1a1033]"
+    bgSidebar: "from-[#2a1b4d] to-[#1a1033]",
+    light: {
+      bg: "#faf5ff",
+      text: "#4c1d95",
+      sidebar: "from-[#faf5ff] to-[#f3e8ff]",
+    },
+    dark: {
+      bg: "#1a1033",
+      text: "#ede9fe",
+      sidebar: "from-[#2a1b4d] to-[#1a1033]",
+    }
   },
   { 
     name: "Rouge Énergique", 
     primary: "#ef4444", 
     gradient: "from-[#ef4444] to-[#dc2626]",
-    bgSidebar: "from-[#2c1a1a] to-[#1a0f0f]"
+    bgSidebar: "from-[#2c1a1a] to-[#1a0f0f]",
+    light: {
+      bg: "#fef2f2",
+      text: "#7f1d1d",
+      sidebar: "from-[#fef2f2] to-[#fee2e2]",
+    },
+    dark: {
+      bg: "#1a0f0f",
+      text: "#fee2e2",
+      sidebar: "from-[#2c1a1a] to-[#1a0f0f]",
+    }
   },
 ];
 
@@ -54,6 +107,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
+  const { theme, palette, toggleTheme, selectPalette, colorPalettes } = useTheme(); 
   const { data: session } = useSession();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -61,6 +115,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [selectedPalette, setSelectedPalette] = useState(colorPalettes[0]);
+ 
 
   const user = {
     name: session?.user?.name || "Utilisateur",
@@ -96,13 +151,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
-  const toggleDarkMode = () => {
-    const newMode = !darkMode;
-    setDarkMode(newMode);
-    localStorage.setItem('theme-mode', newMode ? 'dark' : 'light');
+ const handleToggleTheme = () => {
+    toggleTheme();
   };
 
   const handlePaletteSelect = (palette: any) => {
+    selectPalette(palette);
     setSelectedPalette(palette);
     localStorage.setItem('theme-palette', JSON.stringify(palette));
     // Émettre un événement pour informer les autres composants
@@ -141,7 +195,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
           <div className="hidden lg:flex items-center gap-2">
             {/* Bouton Dark/Light Mode */}
             <button
-              onClick={toggleDarkMode}
+              onClick={handleToggleTheme}
               className="p-2.5 rounded-xl hover:bg-white/10 transition-colors text-white relative group"
               title={darkMode ? "Passer en mode clair" : "Passer en mode sombre"}
             >
@@ -179,7 +233,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Thème</span>
                         <button
-                          onClick={toggleDarkMode}
+                          onClick={handleToggleTheme}
                           className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
                         >
                           {darkMode ? (
@@ -332,7 +386,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   {/* Boutons thème pour mobile */}
                   <div className="px-4 py-2 border-b border-gray-100">
                     <button
-                      onClick={toggleDarkMode}
+                      onClick={handleToggleTheme}
                       className="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors rounded-lg"
                     >
                       {darkMode ? <Sun size={18} /> : <Moon size={18} />}
