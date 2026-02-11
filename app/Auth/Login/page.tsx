@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState,FormEvent } from "react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ export default function LoginPage() {
   };
 
   // Connexion email/mot de passe
-  const handleCredentialsLogin = async (e: React.FormEvent) => {
+  const handleCredentialsLogin = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoadingCredentials(true);
     setError("");
