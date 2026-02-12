@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:clients": "tsx scripts/migrate-clients.ts",
-    "migrate:clients:cleanup": "tsx scripts/cleanup-clients-duplicates.ts"
+    "migrate:clients:cleanup": "tsx scripts/cleanup-clients-duplicates.ts",
+    "migrate:representants": "tsx scripts/migrate-representants.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
