@@ -8,7 +8,7 @@ const prisma = new PrismaClient()
 //  Nettoie le numéro de téléphone
 const cleanPhone = (phone: string): string | null => {
   if (!phone) return null
-  return phone.replace(/\s/g, '') // Enlève seulement les espaces, GARDE les tirets
+  return phone.replace(/\s/g, '') 
 }
 // Normalise le nom pour la recherche
 const normalizeName = (name: string): string => {
@@ -71,7 +71,7 @@ async function migrateRepresentants() {
       }
 
       if (!nomFinal) {
-        console.log(`⚠️ [${index + 1}] Ligne ignorée: aucun nom trouvé`)
+        console.log(` [${index + 1}] Ligne ignorée: aucun nom trouvé`)
         skippedCount++
         continue
       }
