@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/client": "^7.3.0",
+    "@prisma/client": "^7.4.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.563.0",
     "next": "^15.5.12",
@@ -28,16 +28,17 @@
     "@types/react-dom": "^18",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "prisma": "^6.19.2",
+    "prisma": "^7.4.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   },
-
-  
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "schema": "prisma/schema.prisma",
+    "migrations": {
+      "path": "prisma/migrations",
+      "seed": "tsx prisma/seed.ts"
+    }
   }
-
-
 }
