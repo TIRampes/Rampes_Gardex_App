@@ -13,7 +13,7 @@ import { useTheme } from "../../hooks/useTheme";
 const quickServices = [
   { name: "Livraison", color: "bg-blue-500", dotColor: "bg-blue-500" },
   { name: "Cueillette", color: "bg-yellow-500", dotColor: "bg-yellow-500" },
-  { name: "Intervention", color: "bg-red-500", dotColor: "bg-red-500" },
+  { name: "Installation", color: "bg-red-500", dotColor: "bg-red-500" },
   { name: "Transport", color: "bg-green-500", dotColor: "bg-green-500" },
 ];
 
