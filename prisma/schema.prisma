@@ -254,6 +254,8 @@ model Client {
   nom                    String     @db.VarChar(255)
   type                   TypeClient @default(ENTREPRENEUR)
   adresse                String     @db.Text
+  ville                  String?    @db.VarChar(100)
+  codePostal             String?    @db.VarChar(20)
   telephone              String     @db.VarChar(20)
   cellulaire             String?    @db.VarChar(20)
   fax                    String?    @db.VarChar(20)
@@ -1077,4 +1079,3 @@ model HistoriqueStatut {
   @@index([dateChangement])
   @@map("historique_statuts")
 }
-
