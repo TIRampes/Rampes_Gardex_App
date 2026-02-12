@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:clients": "tsx scripts/migrate-clients.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
@@ -43,4 +44,6 @@
       "seed": "tsx prisma/seed.ts"
     }
   }
+  
+
 }
