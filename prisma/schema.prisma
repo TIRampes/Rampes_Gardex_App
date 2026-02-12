@@ -1,10 +1,13 @@
 generator client {
   provider = "prisma-client-js"
-  engineType = "binary"
+  engineType = "library"
 }
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
+
+ 
  
 }
 
@@ -257,6 +260,7 @@ model Client {
   adresse                String     @db.Text
   ville                  String?    @db.VarChar(100)
   codePostal             String?    @db.VarChar(20)
+  province               String?    @db.VarChar(100)
   telephone              String     @db.VarChar(20)
   cellulaire             String?    @db.VarChar(20)
   fax                    String?    @db.VarChar(20)
