@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse,NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TypeClient } from "@prisma/client";
 
 // GET - Récupérer un client par ID
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -48,7 +48,7 @@ export async function GET(
 
 // PUT - Mettre à jour un client
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -123,7 +123,7 @@ export async function PUT(
 
 // DELETE - Supprimer un client (soft delete)
 export async function DELETE(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

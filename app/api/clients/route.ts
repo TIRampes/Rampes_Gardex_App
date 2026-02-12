@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse,NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TypeClient } from "@prisma/client";
+import { clientSchema } from "./schema";
 
 // GET - Liste tous les clients
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const clients = await prisma.client.findMany({
       where: { actif: true },
@@ -26,7 +27,7 @@ export async function GET() {
 }
 
 // POST - Créer un nouveau client
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
@@ -47,14 +48,34 @@ export async function POST(request: Request) {
     const communicationTelephone: boolean = body.communicationTelephone || false;
     const commentaires: string | null = body.commentaires || null;
 
-    // Validation
-    if (!nom || !type || !adresse || !telephone || !personne_Contact) {
+    // Validation des données
+    const validation = clientSchema.safeParse({
+      nom,
+      type,
+      adresse,
+      ville,
+      province,
+      codePostal,
+      pays,
+      telephone,
+      cellulaire,
+      fax,
+      personne_Contact,
+      emails,
+      communicationTexto,
+      communicationCourriel,
+      communicationTelephone,
+      commentaires,
+    });
+
+    if (!validation.success) {
       return NextResponse.json(
         { error: "Champs obligatoires manquants (nom, type, adresse, telephone, personne_Contact)" },
         { status: 400 }
       );
     }
-
+    
+   // CREATION DU CLIENT
     const client = await prisma.client.create({
       data: {
         nom,
