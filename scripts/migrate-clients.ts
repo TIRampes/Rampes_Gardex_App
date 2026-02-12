@@ -5,7 +5,7 @@ import csv from 'csv-parser'
 
 const prisma = new PrismaClient()
 
-// Permet de mapper les types de clients du CSV vers les valeurs de l'enum TypeClient
+// Mapping des types de clients du CSV vers l'enum Prisma
 const mapTypeClient = (type: string): TypeClient => {
   const mapping: Record<string, TypeClient> = {
     'Entrepreneur': TypeClient.ENTREPRENEUR,
@@ -23,7 +23,7 @@ const mapBoolean = (value: string): boolean => {
 }
 
 async function migrateClients() {
-  console.log(' Début de la migration des clients...')
+  console.log('🚀 Début de la migration des clients...')
   
   const results: any[] = []
   let successCount = 0
@@ -33,7 +33,7 @@ async function migrateClients() {
   const csvPath = path.join(__dirname, '../data/Logistique_Clients.csv')
   
   if (!fs.existsSync(csvPath)) {
-    console.error(`Fichier non trouvé: ${csvPath}`)
+    console.error(` Fichier non trouvé: ${csvPath}`)
     console.log(' Assurez-vous que le fichier CSV est dans le dossier "data" à la racine')
     return
   }
@@ -46,24 +46,55 @@ async function migrateClients() {
       .on('error', reject)
   })
 
-  console.log(` ${results.length} clients trouvés dans le CSV`)
+  console.log(`📊 ${results.length} clients trouvés dans le CSV`)
+
+  //  DEBUG: Afficher les 3 premières lignes brutes
+  console.log('\n🔍 DEBUG - Aperçu des 3 premières lignes:')
+  for (let i = 0; i < 3 && i < results.length; i++) {
+    console.log(`\n--- Ligne ${i + 1} ---`)
+    console.log('Clés disponibles:', Object.keys(results[i]))
+    console.log('Valeur de "Titre":', results[i]["Titre"])
+    console.log('Valeur de "titre":', results[i].titre)
+    console.log('Valeur de "Title":', results[i].Title)
+    console.log('Valeur de "Nom":', results[i].Nom)
+    console.log('Valeur de "nom":', results[i].nom)
+    console.log('Contenu complet:', JSON.stringify(results[i]).substring(0, 200) + '...')
+  }
 
   for (const [index, row] of results.entries()) {
     try {
-      if (!row.Titre || row.Titre.trim() === '') {
+      //  ESSAYER TOUTES LES VARIANTES POSSIBLES
+      const nom = row["Titre"] || 
+                  row.titre || 
+                  row.Titre || 
+                  row["Title"] || 
+                  row.title || 
+                  row["Nom"] || 
+                  row.nom || 
+                  row["NAME"] || 
+                  row.name || 
+                  Object.values(row)[0] // Première colonne en dernier recours
+      
+      //  DEBUG: Afficher toutes les 100 lignes
+      if (index % 100 === 0) {
+        console.log(`🔍 Ligne ${index + 1}: nom = "${nom}"`)
+      }
+      
+      if (!nom || nom.trim() === '') {
         skippedCount++
         continue
       }
 
+      // ✅ Utiliser les crochets pour TOUS les accès
       const emails = []
-      if (row.Email && row.Email.trim() !== '') emails.push(row.Email.trim())
-      if (row.Email2 && row.Email2.trim() !== '') emails.push(row.Email2.trim())
-      if (row.Email3 && row.Email3.trim() !== '') emails.push(row.Email3.trim())
+      if (row["Email"] && row["Email"].trim() !== '') emails.push(row["Email"].trim())
+      if (row["Email2"] && row["Email2"].trim() !== '') emails.push(row["Email2"].trim())
+      if (row["Email3"] && row["Email3"].trim() !== '') emails.push(row["Email3"].trim())
 
-      const telephone = row.Telephone ? row.Telephone.replace(/\s/g, '') : ''
-      const cellulaire = row.Cellulaire ? row.Cellulaire.replace(/\s/g, '') : null
-      const fax = row.Fax ? row.Fax.replace(/\s/g, '') : null
-      const pays = row.Pays || 'Canada'
+      const telephone = row["Telephone"] ? row["Telephone"].replace(/\s/g, '') : ''
+      const cellulaire = row["Cellulaire"] ? row["Cellulaire"].replace(/\s/g, '') : null
+      const fax = row["Fax"] ? row["Fax"].replace(/\s/g, '') : null
+      const pays = row["Pays"] || 'Canada'
 
       // Vérifier si le client existe déjà
       let existingClient = null
@@ -81,30 +112,29 @@ async function migrateClients() {
       if (!existingClient && telephone) {
         existingClient = await prisma.client.findFirst({
           where: {
-            nom: row.Titre.trim(),
+            nom: nom.trim(),
             telephone: telephone
           }
         })
       }
 
-      // Utilisation de TypeClient.XXX au lieu de strings
       const clientData = {
-        nom: row.Titre?.trim() || '',
-        type: mapTypeClient(row['Type client']), 
-        adresse: row.Adresse?.trim() || 'Adresse non spécifiée',
-        ville: row.Ville?.trim() || null,
-        codePostal: row.CodePostal?.trim() || null,
-        province: row.Province?.trim() || null,
+        nom: nom.trim(),
+        type: mapTypeClient(row["Type client"] || row["Type_client"] || row["Type"]), 
+        adresse: row["Adresse"]?.trim() || 'Adresse non spécifiée',
+        ville: row["Ville"]?.trim() || null,
+        codePostal: row["CodePostal"]?.trim() || row["Code Postal"]?.trim() || null,
+        province: row["Province"]?.trim() || null,
         telephone: telephone || 'Non spécifié',
         cellulaire: cellulaire,
         fax: fax,
-        personne_Contact: row.Contact?.trim() || 'Non spécifié',
+        personne_Contact: row["Contact"]?.trim() || row["Personne contact"]?.trim() || 'Non spécifié',
         emails: emails,
-        communicationTexto: mapBoolean(row.Communication_Texto),
-        communicationCourriel: mapBoolean(row.Communication_Email),
-        communicationTelephone: mapBoolean(row.Communication_Telephone),
+        communicationTexto: mapBoolean(row["Communication_Texto"] || row["Communication_Text"]),
+        communicationCourriel: mapBoolean(row["Communication_Email"] || row["Communication_Courriel"]),
+        communicationTelephone: mapBoolean(row["Communication_Telephone"] || row["Communication_Tel"]),
         pays: pays,
-        commentaires: row.Commentaires?.trim() || null,
+        commentaires: row["Commentaires"]?.trim() || null,
         actif: true,
       }
 
@@ -113,27 +143,27 @@ async function migrateClients() {
           where: { id: existingClient.id },
           data: clientData
         })
-        console.log(` [${index + 1}/${results.length}] Client mis à jour: ${row.Titre}`)
+        console.log(`✅ [${index + 1}/${results.length}] Client mis à jour: ${nom}`)
       } else {
         await prisma.client.create({
           data: clientData
         })
-        console.log(` [${index + 1}/${results.length}] Client créé: ${row.Titre}`)
+        console.log(`✅ [${index + 1}/${results.length}] Client créé: ${nom}`)
       }
 
       successCount++
 
     } catch (error: any) {
       errorCount++
-      console.error(` [${index + 1}] Erreur pour ${row.Titre}:`, error.message)
+      console.error(` [${index + 1}] Erreur pour ${row["Titre"] || row.titre || 'inconnu'}:`, error.message)
     }
   }
 
-  console.log('\n RÉSUMÉ DE LA MIGRATION:')
-  console.log(` Succès: ${successCount}`)
-  console.log(` Erreurs: ${errorCount}`)
-  console.log(` Ignorés: ${skippedCount}`)
-  console.log(` Total: ${results.length}`)
+  console.log('\n📊 RÉSUMÉ DE LA MIGRATION:')
+  console.log(`✅ Succès: ${successCount}`)
+  console.log(`❌ Erreurs: ${errorCount}`)
+  console.log(`⏭️  Ignorés: ${skippedCount}`)
+  console.log(`📋 Total: ${results.length}`)
 }
 
 migrateClients()
