@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Script from "next/script";
+//import Script from "next/script";
 import { ArrowLeft, Save, MapPin, Loader2, X, Phone, Mail, User, Building2, MessageSquare, CheckCircle2, AlertCircle } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -188,14 +188,7 @@ export default function NouveauClientPage() {
 
   return (
     <>
-      {GOOGLE_MAPS_API_KEY && (
-        <Script 
-          // v=weekly est OBLIGATOIRE pour la nouvelle API
-          src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&v=weekly`} 
-          onLoad={handleGoogleMapsLoad} 
-          strategy="lazyOnload" 
-        />
-      )}
+    
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-4 sm:px-0 pb-8">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
