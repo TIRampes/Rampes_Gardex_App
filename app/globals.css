@@ -92,3 +92,63 @@ input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
   -webkit-text-fill-color: #f9fafb !important;
 }
+
+/* ===== MODE LIGHT ===== */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+/* Main content en light */
+html.light main {
+  background-color: #f3f4f6;
+}
+
+/* Override dark: classes en light mode */
+html.light .dark\:bg-gray-800 {
+  background-color: #ffffff !important;
+}
+
+html.light .dark\:bg-gray-900 {
+  background-color: #f9fafb !important;
+}
+
+html.light .dark\:bg-gray-700 {
+  background-color: #f3f4f6 !important;
+}
+
+html.light .dark\:text-white {
+  color: #111827 !important;
+}
+
+html.light .dark\:text-gray-100,
+html.light .dark\:text-gray-200,
+html.light .dark\:text-gray-300 {
+  color: #374151 !important;
+}
+
+html.light .dark\:text-gray-400 {
+  color: #6b7280 !important;
+}
+
+html.light .dark\:border-gray-700,
+html.light .dark\:border-gray-600 {
+  border-color: #e5e7eb !important;
+}
+
+/* Gardex Orange pour utilisation avec classe */
+.text-gardex-orange {
+  color: #F5A623;
+}
+
+.bg-gardex-orange {
+  background-color: #F5A623;
+}
+
+.border-t-gardex-orange {
+  border-top-color: #F5A623;
+}

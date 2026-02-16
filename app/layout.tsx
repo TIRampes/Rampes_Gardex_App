@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Providers from "./providers";
 import GoogleMapsScript from "./components/Map/GoogleMapScript";
+import { SessionProvider } from "next-auth/react";;
+//import { ThemeProvider } from "./hooks/useTheme";
+import Header from "./components/Layout/Header";
+import Sidebar from "./components/Layout/Sidebar";
 import "./globals.css";
 
 const geistSans = Geist({

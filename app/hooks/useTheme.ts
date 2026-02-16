@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -48,63 +47,55 @@ const colorPalettes: ColorPalette[] = [
 ];
 
 export function useTheme() {
-  // État pour le mode dark/light
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('theme-mode') as ThemeMode) || 'dark';
-    }
-    return 'dark';
-  });
+  const [theme, setTheme] = useState<ThemeMode>('dark');
+  const [palette, setPalette] = useState<ColorPalette>(defaultPalette);
 
-  // État pour la palette
-  const [palette, setPalette] = useState<ColorPalette>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme-palette');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          return defaultPalette;
-        }
-      }
-    }
-    return defaultPalette;
-  });
-
-  // Appliquer le thème au document
+  // Charger au montage
   useEffect(() => {
-    const root = document.documentElement;
+    const savedTheme = localStorage.getItem('theme-mode') as ThemeMode;
+    const savedPalette = localStorage.getItem('theme-palette');
     
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
+    if (savedTheme === 'light' || savedTheme === 'dark') {
+      setTheme(savedTheme);
+      document.documentElement.classList.remove('light', 'dark');
+      document.documentElement.classList.add(savedTheme);
     } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
+      document.documentElement.classList.add('dark');
     }
     
-    // Sauvegarder dans localStorage
-    localStorage.setItem('theme-mode', theme);
+    if (savedPalette) {
+      try {
+        const parsed = JSON.parse(savedPalette);
+        const found = colorPalettes.find(p => p.name === parsed.name);
+        if (found) {
+          setPalette(found);
+          document.documentElement.style.setProperty('--color-primary', found.primary);
+        }
+      } catch {}
+    }
+  }, []);
+
+  // Toggle thème
+  const toggleTheme = useCallback(() => {
+    const newTheme: ThemeMode = theme === 'dark' ? 'light' : 'dark';
+    
+    // Mettre à jour l'état
+    setTheme(newTheme);
+    
+    // Appliquer au DOM immédiatement
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(newTheme);
+    
+    // Sauvegarder
+    localStorage.setItem('theme-mode', newTheme);
   }, [theme]);
 
-  // Appliquer la palette
-  useEffect(() => {
-    const root = document.documentElement;
-    
-    // Définir la couleur primaire comme variable CSS
-    root.style.setProperty('--primary-color', palette.primary);
-    
-    // Sauvegarder dans localStorage
-    localStorage.setItem('theme-palette', JSON.stringify(palette));
-  }, [palette]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
-
-  const selectPalette = (newPalette: ColorPalette) => {
+  // Sélectionner palette
+  const selectPalette = useCallback((newPalette: ColorPalette) => {
     setPalette(newPalette);
-  };
+    document.documentElement.style.setProperty('--color-primary', newPalette.primary);
+    localStorage.setItem('theme-palette', JSON.stringify(newPalette));
+  }, []);
 
   return {
     theme,
@@ -112,5 +103,6 @@ export function useTheme() {
     toggleTheme,
     selectPalette,
     colorPalettes,
+    isDark: theme === 'dark',
   };
 }
