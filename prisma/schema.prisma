@@ -300,7 +300,8 @@ model Representant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  commandes Commande[]
+  commandes   Commande[]
+  commissions Commission[]
 
   @@index([nom])
   @@index([actif])
@@ -534,6 +535,7 @@ model Commande {
   nonConformites    NonConformite[]
   mouvementsStock   MouvementStock[]
   historiqueStatuts HistoriqueStatut[]
+  commission        Commission?
 
   @@index([numero])
   @@index([clientId])
@@ -1086,4 +1088,103 @@ model HistoriqueStatut {
   @@index([commandeId])
   @@index([dateChangement])
   @@map("historique_statuts")
+}
+
+// ============================================
+// 25. COMMISSION
+// ============================================
+enum StatutCommission {
+  EN_ATTENTE
+  CALCULEE
+  PAYEE
+  ANNULEE
+}
+
+enum TypeCommission {
+  SOUMISSION
+  VENTE
+  INSTALLATION
+}
+
+model Commission {
+  id             String       @id @default(cuid())
+  commandeId     String       @unique // Une commission par commande
+  commande       Commande     @relation(fields: [commandeId], references: [id])
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id])
+
+  // Montants
+  montantSoumission Decimal @db.Decimal(10, 2) // Montant total de la soumission
+  pourcentage       Float // Pourcentage de commission (ex: 5 pour 5%)
+  montantCommission Decimal @db.Decimal(10, 2) // Montant calculé
+
+  // Statuts
+  statut         StatutCommission @default(EN_ATTENTE)
+  typeCommission TypeCommission   @default(SOUMISSION)
+
+  // Paiement
+  paye          Boolean   @default(false)
+  datePaiement  DateTime?
+  numeroFacture String?   @db.VarChar(50)
+  depotGarantie Decimal?  @db.Decimal(10, 2)
+
+  // Suivi
+  motifDeficience String? @db.Text // CAA, etc.
+  notes           String? @db.Text
+
+  // Dates
+  dateSoumission       DateTime
+  dateCalcul           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  deficienceCommission DeficienceCommission?
+
+  @@index([commandeId])
+  @@index([representantId])
+  @@index([statut])
+  @@index([paye])
+  @@index([dateSoumission])
+  @@map("commissions")
+}
+
+// ============================================
+// 26. DEFICIENCE_COMMISSION
+// ============================================
+enum TypeDeficience {
+  MESURES
+  VENTES
+  FABRICATION
+  FOURNISSEUR
+  INSTALLATION
+  PRODUCTION
+  LIVRAISON
+  CLIENT
+  MULTIPLE
+  PRODUIT
+  AUTRE
+}
+
+enum SecteurDeficience {
+  ANNULE_REPRESENTANT
+  SAUTE_ERREUR
+  SERVICE_APRES_VENTE
+  DEMANDE_PRISE_MESURES
+}
+
+model DeficienceCommission {
+  id           String     @id @default(cuid())
+  commissionId String     @unique
+  commission   Commission @relation(fields: [commissionId], references: [id])
+
+  type        TypeDeficience
+  secteur     SecteurDeficience?
+  description String             @db.Text
+  raison      String?            @db.Text // MOTIF-RAISON-DÉFIC (CAA, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commissionId])
+  @@index([type])
+  @@map("deficiences_commission")
 }
