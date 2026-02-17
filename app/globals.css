@@ -2,59 +2,325 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* Variables CSS pour les couleurs dynamiques */
+/* ============================================
+   VARIABLES CSS - COULEURS DYNAMIQUES
+   ============================================ */
 :root {
+  /* Couleur primaire (changée par la palette) */
   --color-primary: #F5A623;
   --color-primary-light: #FFBD4A;
   --color-primary-dark: #D4890F;
+  
+  /* Gardex colors fixes */
+  --gardex-orange: #F5A623;
+  --gardex-gold: #D4A84B;
 }
 
-/* Dark mode par défaut pour les variables */
-.dark {
-  color-scheme: dark;
-}
-
-/* Base styles */
+/* ============================================
+   BASE STYLES
+   ============================================ */
 body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-/* Selection */
+/* Selection avec couleur primaire */
 ::selection {
   background-color: var(--color-primary);
   color: white;
-  opacity: 0.3;
 }
 
-/* Custom scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* ============================================
+    DARK MODE - DÉFAUT
+   ============================================ */
+html.dark {
+  color-scheme: dark;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+html.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 9999px;
+/* Conteneur principal */
+html.dark main {
+  background-color: #0f172a;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+/* Cards et conteneurs */
+html.dark .bg-white,
+html.dark [class*="bg-white"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #4b5563;
+html.dark .bg-gray-50 {
+  background-color: #1e293b !important;
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+html.dark .bg-gray-100 {
+  background-color: #334155 !important;
 }
 
-/* Animation fade-in */
+html.dark .bg-gray-200 {
+  background-color: #475569 !important;
+}
+
+/* Texte */
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-gray-700 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-gray-400 {
+  color: #64748b !important;
+}
+
+html.dark .text-black {
+  color: #f8fafc !important;
+}
+
+/* Bordures */
+html.dark .border-gray-200,
+html.dark .border-gray-100,
+html.dark .border-gray-300 {
+  border-color: #334155 !important;
+}
+
+html.dark .divide-gray-200 > * + * {
+  border-color: #334155 !important;
+}
+
+/* Tables */
+html.dark table {
+  background-color: #1e293b;
+}
+
+html.dark thead {
+  background-color: #334155;
+}
+
+html.dark th {
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+html.dark td {
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+html.dark tbody tr:hover {
+  background-color: #334155 !important;
+}
+
+/* Inputs et formulaires */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: var(--color-primary) !important;
+  outline-color: var(--color-primary) !important;
+}
+
+/* Boutons secondaires */
+html.dark .bg-gray-100:hover,
+html.dark .hover\:bg-gray-100:hover {
+  background-color: #475569 !important;
+}
+
+html.dark .bg-gray-50:hover,
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #334155 !important;
+}
+
+/* Shadows en dark */
+html.dark .shadow-sm,
+html.dark .shadow,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ============================================
+   ☀️ LIGHT MODE
+   ============================================ */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light main {
+  background-color: #f1f5f9;
+}
+
+/* Cards et conteneurs en light */
+html.light .bg-white {
+  background-color: #ffffff;
+}
+
+html.light .bg-gray-50 {
+  background-color: #f8fafc;
+}
+
+html.light .bg-gray-100 {
+  background-color: #f1f5f9;
+}
+
+/* Texte en light - normal */
+html.light .text-gray-900 {
+  color: #0f172a;
+}
+
+html.light .text-gray-700 {
+  color: #334155;
+}
+
+html.light .text-gray-600 {
+  color: #475569;
+}
+
+html.light .text-gray-500 {
+  color: #64748b;
+}
+
+/* Tables en light */
+html.light table {
+  background-color: #ffffff;
+}
+
+html.light thead {
+  background-color: #f8fafc;
+}
+
+html.light tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+/* Inputs en light */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #ffffff;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+
+/* ============================================
+   🎨 COULEUR PRIMAIRE DYNAMIQUE
+   ============================================ */
+
+/* Utiliser la couleur primaire partout */
+.text-primary,
+.text-gardex-orange {
+  color: var(--color-primary) !important;
+}
+
+.bg-primary,
+.bg-gardex-orange {
+  background-color: var(--color-primary) !important;
+}
+
+.border-primary,
+.border-gardex-orange {
+  border-color: var(--color-primary) !important;
+}
+
+.border-t-primary,
+.border-t-gardex-orange {
+  border-top-color: var(--color-primary) !important;
+}
+
+/* Gradient avec couleur primaire */
+.from-gardex-orange {
+  --tw-gradient-from: var(--color-primary) !important;
+}
+
+.to-gardex-orange-dark,
+.to-\[\#e6951f\] {
+  --tw-gradient-to: var(--color-primary-dark) !important;
+}
+
+/* Hover states */
+.hover\:text-primary:hover,
+.hover\:text-gardex-orange:hover {
+  color: var(--color-primary) !important;
+}
+
+.hover\:bg-primary:hover {
+  background-color: var(--color-primary) !important;
+}
+
+/* Focus ring */
+.focus\:ring-primary:focus,
+.ring-primary {
+  --tw-ring-color: var(--color-primary) !important;
+}
+
+/* Boutons avec gradient primaire */
+.bg-gradient-to-r.from-gardex-orange,
+.bg-gradient-to-br.from-gardex-orange {
+  background: linear-gradient(to right, var(--color-primary), var(--color-primary-dark)) !important;
+}
+
+/* ============================================
+   COMPOSANTS SPÉCIFIQUES
+   ============================================ */
+
+/* Sidebar - toujours dark */
+aside,
+.sidebar,
+nav[class*="bg-gradient"] {
+  /* Le sidebar garde son style dark */
+}
+
+/* Header - toujours dark */
+header {
+  /* Le header garde son style dark */
+}
+
+/* Badges de statut */
+.badge-active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+html.dark .badge-active {
+  background-color: #166534;
+  color: #dcfce7;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;
 }
@@ -70,85 +336,66 @@ body {
   }
 }
 
-/* Smooth scrolling */
+/* Pulse animation */
+@keyframes pulse-primary {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(var(--color-primary), 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(var(--color-primary), 0);
+  }
+}
+
+/* ============================================
+   SCROLLBAR PERSONNALISÉ
+   ============================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============================================
+   FORM AUTOFILL
+   ============================================ */
+html.dark input:-webkit-autofill,
+html.dark input:-webkit-autofill:hover,
+html.dark input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+}
+
+html.light input:-webkit-autofill,
+html.light input:-webkit-autofill:hover,
+html.light input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+/* ============================================
+   SMOOTH SCROLLING
+   ============================================ */
 html {
   scroll-behavior: smooth;
-}
-
-/* Remove autofill background */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px white inset !important;
-  -webkit-text-fill-color: #111827 !important;
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-.dark input:-webkit-autofill,
-.dark input:-webkit-autofill:hover,
-.dark input:-webkit-autofill:focus,
-.dark input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
-  -webkit-text-fill-color: #f9fafb !important;
-}
-
-/* ===== MODE LIGHT ===== */
-html.light {
-  color-scheme: light;
-}
-
-html.light body {
-  background-color: #f3f4f6;
-  color: #111827;
-}
-
-/* Main content en light */
-html.light main {
-  background-color: #f3f4f6;
-}
-
-/* Override dark: classes en light mode */
-html.light .dark\:bg-gray-800 {
-  background-color: #ffffff !important;
-}
-
-html.light .dark\:bg-gray-900 {
-  background-color: #f9fafb !important;
-}
-
-html.light .dark\:bg-gray-700 {
-  background-color: #f3f4f6 !important;
-}
-
-html.light .dark\:text-white {
-  color: #111827 !important;
-}
-
-html.light .dark\:text-gray-100,
-html.light .dark\:text-gray-200,
-html.light .dark\:text-gray-300 {
-  color: #374151 !important;
-}
-
-html.light .dark\:text-gray-400 {
-  color: #6b7280 !important;
-}
-
-html.light .dark\:border-gray-700,
-html.light .dark\:border-gray-600 {
-  border-color: #e5e7eb !important;
-}
-
-/* Gardex Orange pour utilisation avec classe */
-.text-gardex-orange {
-  color: #F5A623;
-}
-
-.bg-gardex-orange {
-  background-color: #F5A623;
-}
-
-.border-t-gardex-orange {
-  border-top-color: #F5A623;
 }

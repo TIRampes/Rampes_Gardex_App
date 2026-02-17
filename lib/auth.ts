@@ -1,4 +1,4 @@
-// src/lib/auth.ts
+// /lib/auth.ts
 import NextAuth from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
