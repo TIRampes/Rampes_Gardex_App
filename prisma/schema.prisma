@@ -1,14 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "library"
 }
 
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
-
- 
- 
 }
 
 // ╔══════════════════════════════════════════╗
@@ -246,6 +243,11 @@ enum TypeAttente {
   REPRESENTANT
 }
 
+enum ZoneResidentielle {
+  RIVE_NORD
+  RIVE_SUD
+}
+
 // ╔══════════════════════════════════════════╗
 // ║              MODÈLES                     ║
 // ╚══════════════════════════════════════════╝
@@ -254,26 +256,27 @@ enum TypeAttente {
 // 01. CLIENT
 // ============================================
 model Client {
-  id                     String     @id @default(cuid())
-  nom                    String     @db.VarChar(255)
-  type                   TypeClient @default(ENTREPRENEUR)
-  adresse                String     @db.Text
-  ville                  String?    @db.VarChar(100)
-  codePostal             String?    @db.VarChar(20)
-  province               String?    @db.VarChar(100)
-  telephone              String     @db.VarChar(20)
-  cellulaire             String?    @db.VarChar(20)
-  fax                    String?    @db.VarChar(20)
-  personne_Contact       String     @db.VarChar(255)
+  id                     String             @id @default(cuid())
+  nom                    String             @db.VarChar(255)
+  zoneResidentielle      ZoneResidentielle? // Nullable car seulement pour résidentiel
+  type                   TypeClient         @default(ENTREPRENEUR)
+  adresse                String             @db.Text
+  ville                  String?            @db.VarChar(100)
+  codePostal             String?            @db.VarChar(20)
+  province               String?            @db.VarChar(100)
+  telephone              String             @db.VarChar(20)
+  cellulaire             String?            @db.VarChar(20)
+  fax                    String?            @db.VarChar(20)
+  personne_Contact       String             @db.VarChar(255)
   emails                 Json
-  communicationTexto     Boolean    @default(false)
-  communicationCourriel  Boolean    @default(true)
-  communicationTelephone Boolean    @default(false)
-  pays                   String?    @db.VarChar(100)
-  commentaires           String?    @db.Text
-  actif                  Boolean    @default(true)
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
+  communicationTexto     Boolean            @default(false)
+  communicationCourriel  Boolean            @default(true)
+  communicationTelephone Boolean            @default(false)
+  pays                   String?            @db.VarChar(100)
+  commentaires           String?            @db.Text
+  actif                  Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   commandes Commande[]
   reprises  Reprise[]

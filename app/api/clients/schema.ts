@@ -12,9 +12,8 @@ export const clientSchema = z.object({
   nom: z.string().min(1, "Le nom est obligatoire"),
 
   type: TypeClient,
-
   adresse: z.string().min(1, "L'adresse est obligatoire"),
-
+  zoneResidentielle: z.enum(["RIVE_NORD", "RIVE_SUD"]).nullable().optional(),
   ville: z.string().nullable().optional(),
 
   province: z.string().nullable().optional(),
