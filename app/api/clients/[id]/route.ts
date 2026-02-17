@@ -201,3 +201,19 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     );
   }
 }
+// PATCH - Mise à jour partielle (ex: zone résidentielle)
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    
+    const client = await prisma.client.update({
+      where: { id },
+      data: { zoneResidentielle: body.zoneResidentielle }
+    });
+    
+    return NextResponse.json(client);
+  } catch (error) {
+    return NextResponse.json({ error: "Erreur" }, { status: 500 });
+  }
+}
