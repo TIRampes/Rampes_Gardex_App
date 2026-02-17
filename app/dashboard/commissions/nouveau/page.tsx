@@ -27,7 +27,7 @@ interface Representant {
   telephone?: string;
 }
 
-// Types de déficiences (basés sur les images)
+// Types de déficiences
 const TYPES_DEFICIENCE = [
   { value: "MESURES", label: "Déf: Mesures" },
   { value: "VENTES", label: "Déf: Ventes" },
