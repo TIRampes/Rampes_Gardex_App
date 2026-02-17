@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { X } from "lucide-react";
-
 import { useTheme } from "../../hooks/useTheme";
 
 import {
@@ -28,7 +27,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
-
+// Ajoutez d'autres icônes nécessaires
 const menuItems = [
   { name: "Tableau de bord", href: "/dashboard/dashboard", icon: LayoutDashboard },
   { name: "Clients", href: "/dashboard/clients", icon: Users },
@@ -43,6 +42,7 @@ const menuItems = [
   { name: "Attentes", href: "/dashboard/attentes", icon: Clock },
   { name: "Non-conformités", href: "/dashboard/non_conformite", icon: AlertTriangle },
   { name: "Multi-logements", href: "/dashboard/multi_logements", icon: Building2 },
+  {name:"Commissions", href: "/dashboard/commissions", icon: ClipboardList },
   { name: "Reprises", href: "/dashboard/reprises", icon: RotateCcw },
   { name: "Rapports", href: "/dashboard/rapports", icon: FileBarChart },
   { name: "Paramètres", href: "/dashboard/parametres", icon: Settings },
