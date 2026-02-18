@@ -3,17 +3,10 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      nodejs: 18
-    commands:
-      - npm install
+      nodejs: 20
   build:
     commands:
-      - npm run build
-  post_build:
-    commands:
-      - echo "Build completed on `date`"
-
+      - echo "Build stage - nothing to compile"
 artifacts:
   files:
     - '**/*'
-  discard-paths: no
