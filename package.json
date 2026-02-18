@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p $PORT",
     "lint": "eslint",
     "migrate:clients": "tsx scripts/migrate-clients.ts",
     "migrate:clients:cleanup": "tsx scripts/cleanup-clients-duplicates.ts",
