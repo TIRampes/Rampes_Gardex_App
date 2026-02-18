@@ -1,41 +1,12 @@
 version: 0.2
 
-env:
-  variables:
-    NODE_ENV: production
-    NEXT_PUBLIC_API_URL: "https://mon-api.example.com" # variables publiques exposées à Next.js
-  parameter-store:
-    NEXTAUTH_SECRET: "/myapp/nextauth-secret"  # stocké dans AWS SSM Parameter Store
-    DATABASE_URL: "/myapp/database-url"       # stocké dans AWS SSM Parameter Store
-
 phases:
   install:
     runtime-versions:
       nodejs: 20
-    commands:
-      - echo "Installing dependencies..."
-      - npm ci
-  pre_build:
-    commands:
-      - echo "Pre-build phase"
-      # Vérifie que les variables sensibles sont présentes
-      - echo "NEXTAUTH_SECRET is $NEXTAUTH_SECRET"
-      - echo "DATABASE_URL is $DATABASE_URL"
   build:
     commands:
-      - echo "Building Next.js application..."
-      - npm run build
-  post_build:
-    commands:
-      - echo "Build completed"
-
+      - echo "Build stage - nothing to compile"
 artifacts:
   files:
-    - '.next/**'
-    - 'package.json'
-    - 'package-lock.json'
-  discard-paths: yes
-
-cache:
-  paths:
-    - node_modules/**/*
+    - '**/*'
