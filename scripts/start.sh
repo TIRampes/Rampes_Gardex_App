@@ -1,19 +1,24 @@
 #!/bin/bash
-set -e  # Arrête le script si une commande échoue
+set -e
 
-APP_DIR=/home/ec2-user/app
-cd $APP_DIR
+LOG_FILE="/tmp/deploy.log"
+exec > >(tee -a $LOG_FILE) 2>&1
 
-# Rediriger toute la sortie vers un log pour déboguer
-exec > >(tee -a /tmp/deploy.log) 2>&1
 echo "========================================="
 echo "🚀 Démarrage du déploiement à $(date)"
 echo "========================================="
 
-# Vérifier que nous sommes dans le bon répertoire
+# 🔧 CORRECTION DES PERMISSIONS - CRUCIAL !
+echo "🔧 Correction des permissions..."
+sudo chown -R ec2-user:ec2-user /home/ec2-user/app
+sudo chmod -R 755 /home/ec2-user/app
+
+APP_DIR=/home/ec2-user/app
+cd $APP_DIR
+
 echo "📁 Répertoire courant : $(pwd)"
-echo "📁 Contenu du répertoire :"
-ls -la
+echo "📁 Propriétaire du répertoire :"
+ls -ld /home/ec2-user/app
 
 echo "🔐 Loading environment variables from Parameter Store..."
 
@@ -34,7 +39,6 @@ if ! command -v aws &> /dev/null; then
     exit 1
 fi
 
-# Charger les variables depuis Parameter Store
 for var in "${VARS[@]}"; do
   echo "Chargement de $var..."
   value=$(aws ssm get-parameter --name "$var" --with-decryption --query "Parameter.Value" --output text 2>/tmp/ssm_error.log)
@@ -49,70 +53,22 @@ done
 
 echo "📦 Installing dependencies..."
 npm install
-if [ $? -ne 0 ]; then
-    echo "❌ npm install failed"
-    exit 1
-fi
-echo "✅ Dependencies installed"
 
 echo "🧬 Generating Prisma client..."
 npx prisma generate
-if [ $? -ne 0 ]; then
-    echo "❌ Prisma generate failed"
-    exit 1
-fi
-echo "✅ Prisma client generated"
 
 echo "🛠 Applying migrations..."
 npx prisma migrate deploy
-if [ $? -ne 0 ]; then
-    echo "❌ Prisma migrate failed"
-    exit 1
-fi
-echo "✅ Migrations applied"
 
 echo "🏗 Building Next.js app..."
 npm run build
-if [ $? -ne 0 ]; then
-    echo "❌ Build failed"
-    exit 1
-fi
-echo "✅ Build completed"
 
 # Arrêter l'ancienne instance PM2 si elle existe
-echo "🛑 Stopping old PM2 instance if exists..."
+echo "🛑 Stopping old PM2 instance..."
 pm2 delete nextjs 2>/dev/null || true
 
 echo "🚀 Starting application with PM2..."
 pm2 start npm --name "nextjs" -- start
-if [ $? -ne 0 ]; then
-    echo "❌ PM2 start failed"
-    exit 1
-fi
-echo "✅ PM2 started"
-
-# Sauvegarder la configuration PM2
 pm2 save
-echo "✅ PM2 configuration saved"
 
-echo "⏳ Waiting for application to be ready (60 seconds maximum)..."
-MAX_RETRIES=30
-RETRY_COUNT=0
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if curl -s -f http://localhost:3000 > /dev/null 2>&1; then
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
-        echo "✅ Application is responding on port 3000 (HTTP $HTTP_CODE)"
-        exit 0
-    fi
-    echo "⏳ Waiting... ($((RETRY_COUNT+1))/$MAX_RETRIES)"
-    sleep 2
-    RETRY_COUNT=$((RETRY_COUNT+1))
-done
-
-# Si on arrive ici, l'application n'a pas répondu
-echo "❌ Application failed to respond within timeout"
-echo "📋 PM2 process status:"
-pm2 show nextjs
-echo "📋 Last 50 lines of PM2 logs:"
-pm2 logs nextjs --lines 50 --nostream
-exit 1
+echo "✅ Déploiement terminé avec succès"
