@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse,NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { commandeSchema } from "./schema";
 
 // GET - Liste toutes les commandes avec filtres et stats
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
@@ -85,7 +85,7 @@ export async function GET(request: Request) {
 }
 
 // POST - Créer une nouvelle commande
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     

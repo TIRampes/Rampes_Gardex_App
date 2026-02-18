@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse ,NextRequest} from "next/server";
 import { prisma } from "@/lib/prisma";
 import { commandeSchema } from "../schema";
 
 // GET - Récupérer une commande par ID
 export async function GET(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -66,7 +66,7 @@ export async function GET(
 
 // PUT - Mettre à jour une commande
 export async function PUT(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

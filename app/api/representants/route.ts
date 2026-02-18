@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse,NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // GET - Liste tous les représentants actifs
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const representants = await prisma.representant.findMany({
       where: { actif: true },
@@ -26,7 +26,7 @@ export async function GET() {
 }
 
 // POST - Créer un nouveau représentant
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 

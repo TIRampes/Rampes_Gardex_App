@@ -164,7 +164,7 @@ async function migrateRepresentants() {
 // 🚀 EXÉCUTION
 migrateRepresentants()
   .catch((e) => {
-    console.error('💥 Erreur fatale:', e)
+    console.error(' Erreur fatale:', e)
     process.exit(1)
   })
   .finally(async () => {
