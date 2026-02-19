@@ -433,21 +433,28 @@ model FournisseurProduit {
 }
 
 // ============================================
-// 07. COMMANDE
+// 07. COMMANDE (VERSION COMPLÈTE AVEC TOUS LES NOUVEAUX CHAMPS)
 // ============================================
 model Commande {
-  id             String          @id @default(cuid())
-  numero         String          @unique @db.VarChar(50)
-  clientId       String
-  client         Client          @relation(fields: [clientId], references: [id])
-  representantId String?
-  representant   Representant?   @relation(fields: [representantId], references: [id])
-  reference      String?         @db.VarChar(100)
-  typeCommande   TypeCommande    @default(STANDARD)
-  service        ServiceCommande @default(INSTALLATION)
-  statut         StatutCommande  @default(ACTIVE)
-  activite       TypeActivite    @default(INSTALLATION)
-  adresse        String          @db.Text
+  id                 String          @id @default(cuid())
+  numero             String          @unique @db.VarChar(50)
+  clientId           String
+  client             Client          @relation(fields: [clientId], references: [id])
+  representantId     String?
+  representant       Representant?   @relation(fields: [representantId], references: [id])
+  reference          String?         @db.VarChar(100)
+  typeCommande       TypeCommande    @default(STANDARD)
+  service            ServiceCommande @default(INSTALLATION)
+  statut             StatutCommande  @default(ACTIVE)
+  adresse            String          @db.Text
+  commentaireAdresse String?         @db.Text // NOUVEAU: Commentaire sur l'adresse
+
+  // --- NOUVEAUX CHAMPS COULEUR ---
+  couleur String? @db.VarChar(50) // Déplacé de Production
+
+  // --- NOUVEAUX CHAMPS REPRISE ---
+  reprise                Boolean @default(false)
+  ancienneCommandeNumero String? @db.VarChar(50)
 
   // Dates
   dateEntree      DateTime  @default(now())
@@ -457,13 +464,29 @@ model Commande {
   dateLivraison   DateTime?
   dateCompletion  DateTime?
   dateAnnulation  DateTime?
+  semainePrevue   String?   @db.VarChar(10) // NOUVEAU: Semaine prévue (ex: "S22-2024")
 
   // Prix
   prixVenteMateriaux    Decimal @default(0) @db.Decimal(10, 2)
   prixVenteInstallation Decimal @default(0) @db.Decimal(10, 2)
-  prixTotal             Decimal @default(0) @db.Decimal(10, 2) // Prix total calculé
+  prixTotal             Decimal @default(0) @db.Decimal(10, 2)
 
-  // Mesures
+  // --- NOUVEAUX CHAMPS TEMPS INSTALLATION AUTO ---
+  tempsInstallationAuto Decimal @default(0) @db.Decimal(10, 2)
+  utiliserCalculAuto    Boolean @default(false)
+
+  // --- NOUVEAUX CHAMPS PIEDS LINÉAIRES (PAR TYPE) ---
+  piedsLineairesBarrotin      Int @default(0)
+  piedsLineairesVerre         Int @default(0)
+  piedsLineairesMur           Int @default(0)
+  piedsLineairesMainDouble    Int @default(0)
+  piedsLineairesGardexVision  Int @default(0)
+  piedsLineairesGardexUrbaine Int @default(0)
+  piedsLineairesGardexOptimum Int @default(0)
+  piedsLineairesRampes        Int @default(0) // Total calculé
+  nombrePoteaux               Int @default(0)
+
+  // Anciens champs de mesures (conservés pour compatibilité)
   tempsEstimeInstallation        Int  @default(0)
   piedsCarresFibre               Int?
   piedsRampesBarrotin            Int  @default(0)
@@ -473,40 +496,65 @@ model Commande {
   piedsRampesGardexVision        Int  @default(0)
   piedsRampesGardexVisionUrbaine Int  @default(0)
   piedsRampesGardexVisionOptimum Int  @default(0)
-  piedsLineairesRampes           Int  @default(0)
-  nombrePoteaux                  Int  @default(0)
 
   // Commercial / Multiplan / Multiphase
-  nombreBalcons        Int? // Pour COMMERCIAL
-  nombrePhases         Int? // Pour MULTI_PHASE et MULTIPLAN
+  nombreBalcons        Int?
+  nombrePhases         Int?
   piedsLineairesEstime Int?
   piedsLineairesReels  Int?
 
   // Production
   structure          Boolean         @default(false)
-  couleur            String?         @db.VarChar(50)
   mesure             CodeProduction?
   mesureDonneeLe     DateTime?
   plan               CodeProduction?
   envoyeProduction   CodeProduction?
   productionTerminee CodeProduction?
   termine            CodeProduction?
+  statutLivraison    String?         @default("N_A") @db.VarChar(20) // NOUVEAU: "N/A" ou "LIVRE"
 
-  // Achats
-  achatFibre                     StatutAchat?
-  dateReceptionFibre             DateTime?
-  achatLimons                    StatutAchat?
-  dateReceptionLimons            DateTime?
-  achatVerres                    StatutAchat?
-  dateReceptionVerre             DateTime?
-  achatColonnes                  StatutAchat?
-  dateReceptionColonnes          DateTime?
-  achatPeinture                  StatutAchat?
-  dateReceptionPeinture          DateTime?
-  achatAttaches                  StatutAchat?
-  dateReceptionAttaches          DateTime?
-  achatPlancherAluminium         StatutAchat?
-  dateReceptionPlancherAluminium DateTime?
+  // --- NOUVEAUX CHAMPS ACHATS AVEC DATES D'ENVOI ET QUANTITÉS NON REÇUES ---
+  // Fibre
+  achatFibre            StatutAchat?
+  dateEnvoieFibre       DateTime? // NOUVEAU
+  dateReceptionFibre    DateTime?
+  quantiteNonRecueFibre Int? // NOUVEAU
+
+  // Limons
+  achatLimons            StatutAchat?
+  dateEnvoieLimons       DateTime? // NOUVEAU
+  dateReceptionLimons    DateTime?
+  quantiteNonRecueLimons Int? // NOUVEAU
+
+  // Verres
+  achatVerres            StatutAchat?
+  dateEnvoieVerres       DateTime? // NOUVEAU
+  dateReceptionVerre     DateTime?
+  quantiteNonRecueVerres Int? // NOUVEAU
+
+  // Colonnes (avec nouveaux champs)
+  achatColonnes            StatutAchat?
+  dateEnvoieColonnes       DateTime? // NOUVEAU
+  dateReceptionColonnes    DateTime?
+  quantiteNonRecueColonnes Int? // NOUVEAU
+
+  // Peinture (avec nouveaux champs)
+  achatPeinture            StatutAchat?
+  dateEnvoiePeinture       DateTime? // NOUVEAU
+  dateReceptionPeinture    DateTime?
+  quantiteNonRecuePeinture Int? // NOUVEAU
+
+  // Attaches (avec nouveaux champs)
+  achatAttaches            StatutAchat?
+  dateEnvoieAttaches       DateTime? // NOUVEAU
+  dateReceptionAttaches    DateTime?
+  quantiteNonRecueAttaches Int? // NOUVEAU
+
+  // Plancher Aluminium (avec nouveaux champs)
+  achatPlancherAluminium            StatutAchat?
+  dateEnvoiePlancherAluminium       DateTime? // NOUVEAU
+  dateReceptionPlancherAluminium    DateTime?
+  quantiteNonRecuePlancherAluminium Int? // NOUVEAU
 
   // Avertissements
   avertissementClient          AvertissementClient?
@@ -514,9 +562,7 @@ model Commande {
   avertissementPriseMesure     AvertissementMesure?
   dateAvertissementPriseMesure DateTime?
 
-  // Livraison et flags
-  livraison          String? @db.VarChar(50)
-  reprise            Boolean @default(false)
+  // Flags
   enProduction       Boolean @default(false)
   clientPresent      Boolean @default(false)
   formulaireComplete Boolean @default(false)
@@ -526,7 +572,8 @@ model Commande {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  balcons           Balcon[] // Utilisé pour Commercial, Multiplan, Multiphase
+  balcons           Balcon[]
+  structuresAchat   StructureAchat[] // NOUVEAU: Relations avec les structures d'achat
   planifications    Planification[]
   productions       Production[]
   interventions     Intervention[]
@@ -546,33 +593,30 @@ model Commande {
   @@index([dateEntree])
   @@index([datePrevue])
   @@index([enProduction])
+  @@index([reprise]) // NOUVEAU
   @@map("commandes")
 }
 
 /// ============================================
 // 08. BALCON / PHASE / PLAN
 // ============================================
-// Utilisé pour:
-// - COMMERCIAL: détails par balcon
-// - MULTI_PHASE: détails par phase
-// - MULTIPLAN: détails par plan
 model Balcon {
   id         String   @id @default(cuid())
   commandeId String
   commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
 
   // Identification
-  nom         String @db.VarChar(100) // "Balcon 201", "Phase 1", "Plan A"
-  numeroPhase Int? // Numéro de phase/plan (1, 2, 3...)
+  nom         String @db.VarChar(100)
+  numeroPhase Int?
 
   // Mesures et coûts
   piedsLineaires Int     @default(0)
   poteaux        Int     @default(0)
   coutBalcon     Decimal @default(0) @db.Decimal(10, 2)
-  prixTotal      Decimal @default(0) @db.Decimal(10, 2) // Prix total pour ce balcon/phase
+  prixTotal      Decimal @default(0) @db.Decimal(10, 2)
 
   // Statuts
-  produit              Boolean @default(false) // Produit en usine?
+  produit              Boolean @default(false)
   installationTerminee Boolean @default(false)
   reprise              Boolean @default(false)
 
@@ -756,24 +800,26 @@ model Photo {
 }
 
 // ============================================
-// 13. ACHAT
+// 13. ACHAT (AVEC NOUVEAUX CHAMPS)
 // ============================================
 model Achat {
-  id            String      @id @default(cuid())
-  numero        String      @unique @db.VarChar(50)
-  fournisseurId String
-  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id])
-  commandeId    String?
-  commande      Commande?   @relation(fields: [commandeId], references: [id])
-  typeAchat     TypeAchat
-  statut        StatutAchat @default(A_FAIRE)
-  dateCommande  DateTime?
-  datePrevue    DateTime?
-  dateReception DateTime?
-  montantTotal  Decimal?    @db.Decimal(10, 2)
-  notes         String?     @db.Text
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  numero           String      @unique @db.VarChar(50)
+  fournisseurId    String
+  fournisseur      Fournisseur @relation(fields: [fournisseurId], references: [id])
+  commandeId       String?
+  commande         Commande?   @relation(fields: [commandeId], references: [id])
+  typeAchat        TypeAchat
+  statut           StatutAchat @default(A_FAIRE)
+  dateCommande     DateTime?
+  datePrevue       DateTime?
+  dateReception    DateTime?
+  dateEnvoie       DateTime? // NOUVEAU
+  quantiteNonRecue Int? // NOUVEAU
+  montantTotal     Decimal?    @db.Decimal(10, 2)
+  notes            String?     @db.Text
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   lignes AchatLigne[]
 
@@ -1076,6 +1122,9 @@ model DelaiLivraison {
   @@map("delais_livraison")
 }
 
+// ============================================
+// 25. HISTORIQUE_STATUT
+// ============================================
 model HistoriqueStatut {
   id             String         @id @default(cuid())
   commandeId     String
@@ -1091,7 +1140,7 @@ model HistoriqueStatut {
 }
 
 // ============================================
-// 25. COMMISSION
+// 26. COMMISSION
 // ============================================
 enum StatutCommission {
   EN_ATTENTE
@@ -1108,15 +1157,15 @@ enum TypeCommission {
 
 model Commission {
   id             String       @id @default(cuid())
-  commandeId     String       @unique // Une commission par commande
+  commandeId     String       @unique
   commande       Commande     @relation(fields: [commandeId], references: [id])
   representantId String
   representant   Representant @relation(fields: [representantId], references: [id])
 
   // Montants
-  montantSoumission Decimal @db.Decimal(10, 2) // Montant total de la soumission
-  pourcentage       Float // Pourcentage de commission (ex: 5 pour 5%)
-  montantCommission Decimal @db.Decimal(10, 2) // Montant calculé
+  montantSoumission Decimal @db.Decimal(10, 2)
+  pourcentage       Float
+  montantCommission Decimal @db.Decimal(10, 2)
 
   // Statuts
   statut         StatutCommission @default(EN_ATTENTE)
@@ -1129,7 +1178,7 @@ model Commission {
   depotGarantie Decimal?  @db.Decimal(10, 2)
 
   // Suivi
-  motifDeficience String? @db.Text // CAA, etc.
+  motifDeficience String? @db.Text
   notes           String? @db.Text
 
   // Dates
@@ -1148,7 +1197,7 @@ model Commission {
 }
 
 // ============================================
-// 26. DEFICIENCE_COMMISSION
+// 27. DEFICIENCE_COMMISSION
 // ============================================
 enum TypeDeficience {
   MESURES
@@ -1179,7 +1228,7 @@ model DeficienceCommission {
   type        TypeDeficience
   secteur     SecteurDeficience?
   description String             @db.Text
-  raison      String?            @db.Text // MOTIF-RAISON-DÉFIC (CAA, etc.)
+  raison      String?            @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1187,4 +1236,26 @@ model DeficienceCommission {
   @@index([commissionId])
   @@index([type])
   @@map("deficiences_commission")
+}
+
+// ============================================
+// 28. STRUCTURE_ACHAT (NOUVEAU MODÈLE)
+// ============================================
+model StructureAchat {
+  id         String   @id @default(cuid())
+  commandeId String
+  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+
+  nom         String      @db.VarChar(255)
+  statutAchat StatutAchat @default(A_FAIRE)
+
+  dateEnvoie       DateTime?
+  dateReception    DateTime?
+  quantiteNonRecue Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commandeId])
+  @@map("structures_achat")
 }
