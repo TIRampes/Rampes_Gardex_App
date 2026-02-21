@@ -6,33 +6,58 @@ import { useRouter } from "next/navigation";
 import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
   ChevronDown, MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
-  CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers
+  CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers,
+  MessageCircle, User, Users, FilterX
 } from "lucide-react";
 
 // Types
 interface Client { id: string; nom: string; type: string; telephone: string; personne_Contact: string; }
 interface Representant { id: string; nom: string; }
 interface Balcon { id: string; nom: string; numeroPhase: number; piedsLineaires: number; poteaux: number; }
+interface StructureAchat { id: string; nom: string; statutAchat: string; }
 interface Commande {
   id: string; numero: string; reference: string | null;
-  typeCommande: string; service: string; statut: string; activite: string;
+  typeCommande: string; service: string; statut: string;
   adresse: string; client: Client; representant: Representant | null;
   dateEntree: string; datePrevue: string | null; dateProduction: string | null;
+  datePriseMesure: string | null; dateLivraison: string | null;
   prixTotal: number; prixVenteMateriaux: number; prixVenteInstallation: number;
   enProduction: boolean; reprise: boolean;
   piedsLineairesRampes: number; nombrePoteaux: number;
+  // Production
   mesure: string | null; plan: string | null; envoyeProduction: string | null;
   productionTerminee: string | null; termine: string | null;
+  statutLivraison: string; installation: string | null;
+  // Achats
   achatFibre: string | null; achatLimons: string | null; achatVerres: string | null;
-  balcons: Balcon[]; _count: { interventions: number; reprises: number };
+  achatColonnes: string | null; achatPeinture: string | null; achatAttaches: string | null;
+  achatPlancherAluminium: string | null;
+  dateReceptionFibre: string | null; dateReceptionLimons: string | null;
+  dateReceptionVerre: string | null;
+  quantiteNonRecueFibre: number | null; quantiteNonRecueLimons: number | null;
+  quantiteNonRecueVerres: number | null;
+  // Autres
+  commentaire: string | null; couleur: string | null;
+  balcons: Balcon[]; structuresAchat: StructureAchat[];
+  _count: { interventions: number; reprises: number; achats: number };
 }
 interface Stats {
   total: number;
   parStatut: Record<string, number>;
   parType: Record<string, number>;
   parService: Record<string, number>;
+  parRepresentant: Record<string, number>;
+  parClient: Record<string, number>;
   enProduction: number;
   enRetard: number;
+  actives: number;
+  completees: number;
+  avecCommentaires: number;
+  reprises: number;
+}
+interface Config {
+  coutHeureInstallation: number;
+  facteurTempsInstallation: number;
 }
 
 // Mappings
@@ -69,7 +94,6 @@ const SERVICE_CONFIG: Record<string, { label: string; color: string; icon: React
   LIVRAISON: { label: "Livraison", color: "bg-green-500", icon: <Truck size={14} /> },
   CUEILLETTE: { label: "Cueillette", color: "bg-yellow-500", icon: <Package size={14} /> },
   TRANSPORT: { label: "Transport", color: "bg-purple-500", icon: <Truck size={14} /> },
-  MESURE: { label: "Mesure", color: "bg-orange-500", icon: <Ruler size={14} /> },
 };
 
 const STATUT_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
@@ -77,6 +101,14 @@ const STATUT_CONFIG: Record<string, { label: string; color: string; bgColor: str
   EN_ATTENTE: { label: "En attente", color: "text-yellow-700", bgColor: "bg-yellow-100 dark:bg-yellow-900/30", icon: <Clock size={14} /> },
   COMPLETEE: { label: "Complétée", color: "text-blue-700", bgColor: "bg-blue-100 dark:bg-blue-900/30", icon: <CheckCircle2 size={14} /> },
   ANNULEE: { label: "Annulée", color: "text-red-700", bgColor: "bg-red-100 dark:bg-red-900/30", icon: <XCircle size={14} /> },
+};
+
+// NOUVEAU: Couleurs pour les activités
+const ACTIVITE_COULEURS: Record<string, { bg: string; text: string; border: string }> = {
+  INSTALLATION: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
+  LIVRAISON: { bg: "bg-blue-500", text: "text-white", border: "border-blue-600" },
+  CUEILLETTE: { bg: "bg-yellow-500", text: "text-white", border: "border-yellow-600" },
+  TRANSPORT: { bg: "bg-green-500", text: "text-white", border: "border-green-600" },
 };
 
 // Fonction pour formater les dates
@@ -101,18 +133,55 @@ const CodeSymbol = ({ code, type = "production" }: { code: string | null; type?:
   return <span className={`font-bold ${config.color}`}>{config.symbol}</span>;
 };
 
+// Composant pour afficher la couleur
+const CouleurBadge = ({ couleur, personnalisee }: { couleur: string | null; personnalisee?: string | null }) => {
+  if (!couleur) return <span className="text-gray-400">—</span>;
+  
+  const couleursMap: Record<string, { bg: string; text: string; label: string }> = {
+    NOIR: { bg: "bg-gray-900", text: "text-white", label: "Noir" },
+    BLANC: { bg: "bg-gray-100", text: "text-gray-900", label: "Blanc" },
+    BRUN_COMMERCIALE: { bg: "bg-amber-800", text: "text-white", label: "Brun commerciale" },
+    GRIS_CHARBON: { bg: "bg-gray-700", text: "text-white", label: "Gris charbon" },
+    ARGILE: { bg: "bg-amber-200", text: "text-amber-900", label: "Argile" },
+    SPECIALE: { bg: "bg-purple-600", text: "text-white", label: "Spéciale" },
+    GRIS_METALLIQUE: { bg: "bg-gray-400", text: "text-gray-900", label: "Gris métallique" },
+    AUTRE: { bg: "bg-blue-400", text: "text-white", label: personnalisee || "Autre" },
+  };
+
+  const config = couleursMap[couleur] || { bg: "bg-gray-300", text: "text-gray-900", label: couleur };
+  
+  return (
+    <span className={`inline-block px-2 py-1 rounded-lg text-xs font-medium ${config.bg} ${config.text}`}>
+      {config.label}
+    </span>
+  );
+};
+
 export default function CommandesPage() {
   const router = useRouter();
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ statut: "", type: "", service: "" });
+  const [filters, setFilters] = useState({ 
+    statut: "", 
+    type: "", 
+    service: "",
+    representantId: "",
+    clientId: "" 
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenu, setActionMenu] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<Commande | null>(null);
+  const [representants, setRepresentants] = useState<{ id: string; nom: string }[]>([]);
+  const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
 
-  useEffect(() => { fetchCommandes(); }, [search, filters]);
+  useEffect(() => { 
+    fetchCommandes(); 
+    fetchRepresentants();
+    fetchClients();
+  }, [search, filters.statut, filters.type, filters.service, filters.representantId, filters.clientId]);
 
   const fetchCommandes = async () => {
     try {
@@ -121,15 +190,36 @@ export default function CommandesPage() {
       if (filters.statut) params.append("statut", filters.statut);
       if (filters.type) params.append("type", filters.type);
       if (filters.service) params.append("service", filters.service);
+      if (filters.representantId) params.append("representantId", filters.representantId);
+      if (filters.clientId) params.append("clientId", filters.clientId);
       
       const res = await fetch(`/api/commandes?${params.toString()}`);
       const data = await res.json();
       setCommandes(data.commandes || []);
       setStats(data.stats || null);
+      setConfig(data.config || null);
     } catch (error) {
       console.error("Erreur:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRepresentants = async () => {
+    try {
+      const res = await fetch("/api/representants");
+      if (res.ok) setRepresentants(await res.json());
+    } catch (error) {
+      console.error("Erreur chargement représentants:", error);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await fetch("/api/clients");
+      if (res.ok) setClients(await res.json());
+    } catch (error) {
+      console.error("Erreur chargement clients:", error);
     }
   };
 
@@ -142,6 +232,15 @@ export default function CommandesPage() {
       console.error("Erreur suppression:", error);
     }
   };
+
+  const resetFilters = () => {
+    setFilters({ statut: "", type: "", service: "", representantId: "", clientId: "" });
+    setSearch("");
+  };
+
+  // NOUVEAU: Filtrer les commandes actives et complètes pour les stats
+  const commandesActives = commandes.filter(c => c.statut === "ACTIVE");
+  const commandesCompletees = commandes.filter(c => c.statut === "COMPLETEE");
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -163,28 +262,70 @@ export default function CommandesPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          <StatCard icon={<Package />} label="Total" value={stats.total} color="blue" />
-          <StatCard icon={<CheckCircle2 />} label="Actives" value={stats.parStatut.ACTIVE || 0} color="green" />
-          <StatCard icon={<Clock />} label="En attente" value={stats.parStatut.EN_ATTENTE || 0} color="yellow" />
-          <StatCard icon={<TrendingUp />} label="En production" value={stats.enProduction} color="purple" />
-          <StatCard icon={<AlertTriangle />} label="En retard" value={stats.enRetard} color="red" />
-          <StatCard icon={<CheckCircle2 />} label="Complétées" value={stats.parStatut.COMPLETEE || 0} color="emerald" />
-        </div>
-      )}
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <StatCard icon={<Package />} label="Total" value={stats.total} color="blue" />
+            <StatCard icon={<CheckCircle2 />} label="Actives" value={stats.actives} color="green" />
+            <StatCard icon={<Clock />} label="En attente" value={stats.parStatut.EN_ATTENTE || 0} color="yellow" />
+            <StatCard icon={<TrendingUp />} label="En production" value={stats.enProduction} color="purple" />
+            <StatCard icon={<AlertTriangle />} label="En retard" value={stats.enRetard} color="red" />
+            <StatCard icon={<CheckCircle2 />} label="Complétées" value={stats.completees} color="emerald" />
+          </div>
 
-      {/* Stats par Type */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {Object.entries(TYPE_CONFIG).map(([key, config]) => (
-            <div key={key} className={`${config.bgColor} rounded-xl p-4 border border-transparent`}>
+          {/* NOUVEAU: Stats par service avec couleurs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
               <div className="flex items-center justify-between">
-                <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
-                <span className={`text-2xl font-bold ${config.color}`}>{stats.parType[key] || 0}</span>
+                <span className="text-sm font-medium text-red-700 dark:text-red-300">Installation</span>
+                <span className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.parService.INSTALLATION || 0}</span>
               </div>
             </div>
-          ))}
-        </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Livraison</span>
+                <span className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.parService.LIVRAISON || 0}</span>
+              </div>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Cueillette</span>
+                <span className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{stats.parService.CUEILLETTE || 0}</span>
+              </div>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">Transport</span>
+                <span className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.parService.TRANSPORT || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* NOUVEAU: Commandes actives et complètes */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-green-700 dark:text-green-300">Commandes actives</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.actives}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">Commandes complètes</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.completees}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Search & Filters */}
@@ -203,24 +344,33 @@ export default function CommandesPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-colors ${
-              showFilters || filters.statut || filters.type || filters.service
+              showFilters || Object.values(filters).some(v => v)
                 ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
                 : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
             }`}
           >
             <Filter size={20} />
             <span className="hidden sm:inline">Filtres</span>
-            {(filters.statut || filters.type || filters.service) && (
+            {Object.values(filters).filter(Boolean).length > 0 && (
               <span className="w-5 h-5 bg-white text-[var(--color-primary)] rounded-full text-xs font-bold flex items-center justify-center">
-                {[filters.statut, filters.type, filters.service].filter(Boolean).length}
+                {Object.values(filters).filter(Boolean).length}
               </span>
             )}
           </button>
+          {Object.values(filters).some(v => v) && (
+            <button
+              onClick={resetFilters}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+            >
+              <FilterX size={20} />
+              <span className="hidden sm:inline">Réinitialiser</span>
+            </button>
+          )}
         </div>
 
         {/* Filtres déroulants */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <select
               value={filters.statut}
               onChange={(e) => setFilters({ ...filters, statut: e.target.value })}
@@ -251,6 +401,26 @@ export default function CommandesPage() {
                 <option key={key} value={key}>{config.label}</option>
               ))}
             </select>
+            <select
+              value={filters.representantId}
+              onChange={(e) => setFilters({ ...filters, representantId: e.target.value })}
+              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="">Tous les représentants</option>
+              {representants.map(r => (
+                <option key={r.id} value={r.id}>{r.nom}</option>
+              ))}
+            </select>
+            <select
+              value={filters.clientId}
+              onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
+              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="">Tous les clients</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
           </div>
         )}
       </div>
@@ -268,19 +438,30 @@ export default function CommandesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[2000px]">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Commande</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">Client</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Service</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Mesure</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Plan</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell">Prod.</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">Fibre</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">Limons</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden xl:table-cell">Verres</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">Date prévue</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Client</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Représentant</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Service</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Couleur</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Mesure</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Plan</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Prod.</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Term.</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Install.</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Fibre</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Limons</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Verres</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Colonnes</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Peinture</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Attaches</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Plancher</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date entrée</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date prévue</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date prod.</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date mesure</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Statut</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase w-16">Actions</th>
                 </tr>
@@ -302,37 +483,85 @@ export default function CommandesPage() {
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-gray-900 dark:text-white">{commande.numero}</span>
-                            {commande.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">REPRISE</span>}
-                            {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded">RETARD</span>}
+                            {commande.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">R</span>}
+                            {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded">!</span>}
+                            {commande.commentaire && (
+                              <span className="relative group">
+                                <MessageCircle size={14} className="text-blue-500" />
+                                <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap z-50">
+                                  {commande.commentaire}
+                                </span>
+                              </span>
+                            )}
                           </div>
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit mt-1 ${typeConfig.bgColor} ${typeConfig.color}`}>
                             {typeConfig.label}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-4 hidden sm:table-cell">
+                      <td className="px-4 py-4">
                         <div className="flex flex-col">
                           <span className="font-medium text-gray-900 dark:text-white text-sm">{commande.client.nom}</span>
                           <span className="text-xs text-gray-500">{commande.client.telephone}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-4 hidden md:table-cell">
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {commande.representant?.nom || "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
                         <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white text-xs font-medium ${serviceConfig.color}`}>
                           {serviceConfig.icon}
                           {serviceConfig.label}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-center hidden lg:table-cell"><CodeSymbol code={commande.mesure} /></td>
-                      <td className="px-4 py-4 text-center hidden lg:table-cell"><CodeSymbol code={commande.plan} /></td>
-                      <td className="px-4 py-4 text-center hidden lg:table-cell"><CodeSymbol code={commande.envoyeProduction} /></td>
-                      <td className="px-4 py-4 text-center hidden xl:table-cell"><CodeSymbol code={commande.achatFibre} type="achat" /></td>
-                      <td className="px-4 py-4 text-center hidden xl:table-cell"><CodeSymbol code={commande.achatLimons} type="achat" /></td>
-                      <td className="px-4 py-4 text-center hidden xl:table-cell"><CodeSymbol code={commande.achatVerres} type="achat" /></td>
-                      <td className="px-4 py-4 hidden md:table-cell">
+                      <td className="px-4 py-4 text-center">
+                        <CouleurBadge couleur={commande.couleur} />
+                      </td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.mesure} /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.plan} /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.envoyeProduction} /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.termine} /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.installation} /></td>
+                      <td className="px-4 py-4 text-center">
+                        <CodeSymbol code={commande.achatFibre} type="achat" />
+                        {commande.quantiteNonRecueFibre && commande.quantiteNonRecueFibre > 0 && (
+                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueFibre})</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <CodeSymbol code={commande.achatLimons} type="achat" />
+                        {commande.quantiteNonRecueLimons && commande.quantiteNonRecueLimons > 0 && (
+                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueLimons})</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <CodeSymbol code={commande.achatVerres} type="achat" />
+                        {commande.quantiteNonRecueVerres && commande.quantiteNonRecueVerres > 0 && (
+                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueVerres})</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatColonnes} type="achat" /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatPeinture} type="achat" /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatAttaches} type="achat" /></td>
+                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatPlancherAluminium} type="achat" /></td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.dateEntree)}</span>
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="flex flex-col">
-                          <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.datePrevue)}</span>
+                          <span className={`text-sm ${isLate ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}`}>
+                            {formatDate(commande.datePrevue)}
+                          </span>
                           <span className="text-xs text-gray-500">{formatSemaine(commande.datePrevue)}</span>
                         </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.dateProduction)}</span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.datePriseMesure)}</span>
                       </td>
                       <td className="px-4 py-4">
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${statutConfig.bgColor} ${statutConfig.color}`}>
