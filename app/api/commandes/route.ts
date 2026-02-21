@@ -2,6 +2,13 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { commandeSchema, calculateDates, calculatePiedsLineairesTotaux, calculateTempsInstallationAuto } from "./schema";
 
+
+
+function parseDate(date?: string | null): Date | null {
+  if (!date) return null;
+  const d = new Date(date);
+  return isNaN(d.getTime()) ? null : d;
+}
 // GET - Liste toutes les commandes avec filtres et stats
 export async function GET(request: NextRequest) {
   try {
@@ -134,6 +141,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+
+
 // POST - Créer une nouvelle commande
 export async function POST(request: NextRequest) {
   try {
@@ -218,6 +227,7 @@ export async function POST(request: NextRequest) {
         dateProduction,
         semainePrevue,
         dateEntree: data.dateEntree ? new Date(data.dateEntree) : new Date(),
+        dateLivraison: data.dateLivraison ? new Date(data.dateLivraison) : null,
         datePriseMesure: data.datePriseMesure ? new Date(data.datePriseMesure) : null,
         mesureDonneeLe: data.mesureDonneeLe ? new Date(data.mesureDonneeLe) : null,
         dateReceptionFibre: data.dateReceptionFibre ? new Date(data.dateReceptionFibre) : null,

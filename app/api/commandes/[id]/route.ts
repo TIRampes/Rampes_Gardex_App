@@ -185,6 +185,7 @@ if (utiliserCalculAuto && Number(prixVenteInstallation ?? 0) > 0) {
         prixTotal,
         piedsLineairesRampes,
         tempsInstallationAuto,
+        dateEntree: data.dateEntree ? new Date(data.dateEntree) : undefined,
         datePrevue: data.datePrevue ? new Date(data.datePrevue) : undefined,
         dateLivraison: data.dateLivraison ? new Date(data.dateLivraison) : undefined,
         dateProduction: data.dateProduction ? new Date(data.dateProduction) : undefined,

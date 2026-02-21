@@ -28,7 +28,7 @@ body {
 /* Selection avec couleur primaire */
 ::selection {
   background-color: var(--color-primary);
-  color: white;
+  color: rgb(223, 213, 213);
 }
 
 /* ============================================
@@ -40,7 +40,7 @@ html.dark {
 
 html.dark body {
   background-color: #0f172a;
-  color: #f1f5f9;
+  color: #e3e7eb;
 }
 
 /* Conteneur principal */
@@ -87,7 +87,7 @@ html.dark .text-gray-400 {
 }
 
 html.dark .text-black {
-  color: #f8fafc !important;
+  color: #e5ebf0 !important;
 }
 
 /* Bordures */
