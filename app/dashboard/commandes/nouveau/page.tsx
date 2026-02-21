@@ -6,15 +6,33 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Package, User, MapPin, Calendar, DollarSign,
   Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Plus, Trash2,
-  Building2, Layers, ChevronDown, CheckCircle2, Info
+  Building2, Layers, ChevronDown, CheckCircle2, Info, Paintbrush,
+  Truck, Wrench, Clock, MessageCircle, RefreshCw, Hash
 } from "lucide-react";
 
 // Types
 interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; }
 interface Representant { id: string; nom: string; }
 interface Balcon {
-  nom: string; numeroPhase: number; piedsLineaires: number; poteaux: number;
-  tempsInstallation: number; produit: boolean; installationTerminee: boolean;
+  id?: string;
+  nom: string; 
+  numeroPhase: number; 
+  piedsLineaires: number; 
+  poteaux: number;
+  coutBalcon: number;
+  prixTotal: number;
+  produit: boolean; 
+  installationTerminee: boolean;
+  reprise: boolean;
+  notes?: string;
+}
+interface StructureAchat {
+  id?: string;
+  nom: string;
+  statutAchat: string;
+  dateEnvoie?: string;
+  dateReception?: string;
+  quantiteNonRecue?: number;
 }
 
 // Mappings des codes de production
@@ -66,14 +84,36 @@ const SERVICE_OPTIONS = [
   { value: "LIVRAISON", label: "Livraison", icon: "🚚" },
   { value: "CUEILLETTE", label: "Cueillette", icon: "📦" },
   { value: "TRANSPORT", label: "Transport", icon: "🚛" },
-  { value: "MESURE", label: "Mesure", icon: "📏" },
 ];
 
-const ACTIVITE_OPTIONS = [
-  { value: "INSTALLATION", label: "Installation" },
-  { value: "LIVRAISON", label: "Livraison" },
-  { value: "CUEILLETTE", label: "Cueillette" },
-  { value: "TRANSPORT", label: "Transport" },
+// NOUVEAU: Options de couleur
+const COULEUR_OPTIONS = [
+  { value: "", label: "— Sélectionner —" },
+  { value: "NOIR", label: "Noir", bg: "bg-gray-900", text: "text-white" },
+  { value: "BLANC", label: "Blanc", bg: "bg-gray-100", text: "text-gray-900" },
+  { value: "BRUN_COMMERCIALE", label: "Brun commerciale", bg: "bg-amber-800", text: "text-white" },
+  { value: "GRIS_CHARBON", label: "Gris charbon", bg: "bg-gray-700", text: "text-white" },
+  { value: "ARGILE", label: "Argile", bg: "bg-amber-200", text: "text-amber-900" },
+  { value: "SPECIALE", label: "Spéciale", bg: "bg-purple-600", text: "text-white" },
+  { value: "GRIS_METALLIQUE", label: "Gris métallique", bg: "bg-gray-400", text: "text-gray-900" },
+  { value: "AUTRE", label: "Autre", bg: "bg-blue-400", text: "text-white" },
+];
+
+// NOUVEAU: Options pour statut livraison
+const STATUT_LIVRAISON_OPTIONS = [
+  { value: "N_A", label: "N/A" },
+  { value: "LIVRE", label: "Livré" },
+];
+
+// NOUVEAU: Facteurs pour pieds linéaires
+const PIEDS_LINEAIRES_FACTEURS = [
+  { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
+  { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
+  { key: "piedsLineairesMur", label: "Mur", facteur: 4 },
+  { key: "piedsLineairesMainDouble", label: "Main double", facteur: 2.25 },
+  { key: "piedsLineairesGardexVision", label: "Gardex Vision", facteur: 1 },
+  { key: "piedsLineairesGardexUrbaine", label: "Gardex Urbaine", facteur: 2 },
+  { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
 ];
 
 export default function NouvelleCommandePage() {
@@ -83,7 +123,8 @@ export default function NouvelleCommandePage() {
   const [representants, setRepresentants] = useState<Representant[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>("general");
+  const [config, setConfig] = useState({ coutHeureInstallation: 160, facteurTempsInstallation: 0.7 });
 
   // Form data
   const [formData, setFormData] = useState({
@@ -94,24 +135,45 @@ export default function NouvelleCommandePage() {
     reference: "",
     typeCommande: "STANDARD",
     service: "INSTALLATION",
-    activite: "INSTALLATION",
     adresse: "",
+    commentaireAdresse: "",
+
+    // NOUVEAU: Couleur
+    couleur: "",
+    couleurPersonnalisee: "",
+
+    // NOUVEAU: Reprise
+    reprise: false,
+    ancienneCommandeNumero: "",
 
     // Commercial / Multi-Phase / Multiplan
     nombreBalcons: 0,
     nombrePhases: 0,
+    piedsLineairesEstime: 0,
+    piedsLineairesReels: 0,
 
     // Dates
     dateEntree: new Date().toISOString().split("T")[0],
     dateProduction: "",
     datePrevue: "",
+    datePriseMesure: "",
     dateLivraison: "",
 
     // Prix
     prixVenteMateriaux: 0,
     prixVenteInstallation: 0,
 
-    // Rampes
+    // NOUVEAU: Pieds linéaires par type
+    piedsLineairesBarrotin: 0,
+    piedsLineairesVerre: 0,
+    piedsLineairesMur: 0,
+    piedsLineairesMainDouble: 0,
+    piedsLineairesGardexVision: 0,
+    piedsLineairesGardexUrbaine: 0,
+    piedsLineairesGardexOptimum: 0,
+    nombrePoteaux: 0,
+
+    // Anciens champs pour compatibilité
     tempsEstimeInstallation: 0,
     piedsCarresFibre: 0,
     piedsRampesBarrotin: 0,
@@ -121,57 +183,89 @@ export default function NouvelleCommandePage() {
     piedsRampesGardexVision: 0,
     piedsRampesGardexVisionUrbaine: 0,
     piedsRampesGardexVisionOptimum: 0,
-    piedsLineairesRampes: 0,
-    nombrePoteaux: 0,
+
+    // NOUVEAU: Temps installation auto
+    utiliserCalculAuto: false,
+    tempsInstallationAuto: 0,
 
     // Production
     structure: false,
-    couleur: "",
     mesure: "",
     mesureDonneeLe: "",
     plan: "",
     envoyeProduction: "",
     productionTerminee: "",
     termine: "",
-    livraison: "",
+    statutLivraison: "N_A",
+    installation: "",
     enProduction: false,
 
-    // Achats
+    // NOUVEAU: Achats avec nouveaux champs
     achatFibre: "",
+    dateEnvoieFibre: "",
     dateReceptionFibre: "",
+    quantiteNonRecueFibre: 0,
+
     achatLimons: "",
+    dateEnvoieLimons: "",
     dateReceptionLimons: "",
+    quantiteNonRecueLimons: 0,
+
     achatVerres: "",
+    dateEnvoieVerres: "",
     dateReceptionVerre: "",
+    quantiteNonRecueVerres: 0,
+
     achatColonnes: "",
+    dateEnvoieColonnes: "",
     dateReceptionColonnes: "",
+    quantiteNonRecueColonnes: 0,
+
     achatPeinture: "",
+    dateEnvoiePeinture: "",
     dateReceptionPeinture: "",
+    quantiteNonRecuePeinture: 0,
+
     achatAttaches: "",
+    dateEnvoieAttaches: "",
     dateReceptionAttaches: "",
+    quantiteNonRecueAttaches: 0,
+
     achatPlancherAluminium: "",
+    dateEnvoiePlancherAluminium: "",
     dateReceptionPlancherAluminium: "",
+    quantiteNonRecuePlancherAluminium: 0,
 
     // Avertissements
     avertissementClient: "",
     avertissementPriseMesure: "",
 
-    // Notes
+    // Commentaire (dans infos générales)
     commentaire: "",
   });
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
+  const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
+  const [showStructureForm, setShowStructureForm] = useState(false);
 
-  // Charger clients et représentants
+  // Charger clients, représentants et config
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, repsRes] = await Promise.all([
+        const [clientsRes, repsRes, configRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/representants"),
+          fetch("/api/configurations"),
         ]);
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (repsRes.ok) setRepresentants(await repsRes.json());
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          setConfig({
+            coutHeureInstallation: configData.coutHeureInstallation || 160,
+            facteurTempsInstallation: configData.facteurTempsInstallation || 0.7,
+          });
+        }
       } catch (err) {
         console.error("Erreur chargement:", err);
       }
@@ -183,6 +277,33 @@ export default function NouvelleCommandePage() {
   const prixTotal = useMemo(() => {
     return (formData.prixVenteMateriaux || 0) + (formData.prixVenteInstallation || 0);
   }, [formData.prixVenteMateriaux, formData.prixVenteInstallation]);
+
+  // NOUVEAU: Calculer les pieds linéaires totaux avec facteurs
+  const piedsLineairesTotaux = useMemo(() => {
+    let total = 0;
+    total += (formData.piedsLineairesBarrotin || 0) * 1.25;
+    total += (formData.piedsLineairesVerre || 0) * 1;
+    total += (formData.piedsLineairesMur || 0) * 4;
+    total += (formData.piedsLineairesMainDouble || 0) * 2.25;
+    total += (formData.piedsLineairesGardexVision || 0) * 1;
+    total += (formData.piedsLineairesGardexUrbaine || 0) * 2;
+    total += (formData.piedsLineairesGardexOptimum || 0) * 0.75;
+    return Math.round(total * 100) / 100;
+  }, [
+    formData.piedsLineairesBarrotin,
+    formData.piedsLineairesVerre,
+    formData.piedsLineairesMur,
+    formData.piedsLineairesMainDouble,
+    formData.piedsLineairesGardexVision,
+    formData.piedsLineairesGardexUrbaine,
+    formData.piedsLineairesGardexOptimum,
+  ]);
+
+  // NOUVEAU: Calculer le temps d'installation auto
+  const tempsInstallationAuto = useMemo(() => {
+    if (!formData.utiliserCalculAuto || formData.prixVenteInstallation <= 0) return 0;
+    return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
+  }, [formData.utiliserCalculAuto, formData.prixVenteInstallation, config]);
 
   // Auto-calculer dates quand dateProduction change
   useEffect(() => {
@@ -214,9 +335,11 @@ export default function NouvelleCommandePage() {
         numeroPhase: i + 1,
         piedsLineaires: 0,
         poteaux: 0,
-        tempsInstallation: 0,
+        coutBalcon: 0,
+        prixTotal: 0,
         produit: false,
         installationTerminee: false,
+        reprise: false,
       }));
       setBalcons(newBalcons);
     } else if (formData.typeCommande === "STANDARD") {
@@ -234,8 +357,34 @@ export default function NouvelleCommandePage() {
     }
   }, [formData.clientId, clients]);
 
+  // Mettre à jour le temps d'installation auto dans le form
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, tempsInstallationAuto }));
+  }, [tempsInstallationAuto]);
+
   const updateBalcon = (index: number, field: keyof Balcon, value: number | boolean | string) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
+  };
+
+  const addStructure = () => {
+    setStructuresAchat(prev => [
+      ...prev,
+      {
+        nom: `Structure ${prev.length + 1}`,
+        statutAchat: "A_FAIRE",
+        dateEnvoie: "",
+        dateReception: "",
+        quantiteNonRecue: 0,
+      },
+    ]);
+  };
+
+  const updateStructure = (index: number, field: keyof StructureAchat, value: any) => {
+    setStructuresAchat(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  };
+
+  const removeStructure = (index: number) => {
+    setStructuresAchat(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -252,14 +401,20 @@ export default function NouvelleCommandePage() {
       const dataToSend = {
         ...formData,
         prixTotal,
+        piedsLineairesRampes: piedsLineairesTotaux,
+        tempsInstallationAuto,
         balcons: balcons.length > 0 ? balcons : undefined,
+        structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
         // Convertir les valeurs vides en null
         representantId: formData.representantId || null,
+        couleur: formData.couleur || null,
+        couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
         mesure: formData.mesure || null,
         plan: formData.plan || null,
         envoyeProduction: formData.envoyeProduction || null,
         productionTerminee: formData.productionTerminee || null,
         termine: formData.termine || null,
+        installation: formData.installation || null,
         achatFibre: formData.achatFibre || null,
         achatLimons: formData.achatLimons || null,
         achatVerres: formData.achatVerres || null,
@@ -408,19 +563,35 @@ export default function NouvelleCommandePage() {
               </select>
             </div>
 
-            {/* Activité */}
+            {/* NOUVEAU: Couleur */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Activité</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couleur</label>
               <select
-                value={formData.activite}
-                onChange={(e) => setFormData({ ...formData, activite: e.target.value })}
+                value={formData.couleur}
+                onChange={(e) => setFormData({ ...formData, couleur: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
               >
-                {ACTIVITE_OPTIONS.map(a => (
-                  <option key={a.value} value={a.value}>{a.label}</option>
+                {COULEUR_OPTIONS.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
             </div>
+
+            {/* NOUVEAU: Couleur personnalisée si AUTRE */}
+            {formData.couleur === "AUTRE" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Couleur personnalisée
+                </label>
+                <input
+                  type="text"
+                  value={formData.couleurPersonnalisee}
+                  onChange={(e) => setFormData({ ...formData, couleurPersonnalisee: e.target.value })}
+                  placeholder="Entrez la couleur"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
+              </div>
+            )}
           </div>
 
           {/* Type de commande */}
@@ -444,6 +615,37 @@ export default function NouvelleCommandePage() {
               ))}
             </div>
           </div>
+
+          {/* NOUVEAU: Reprise */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
+              <input
+                type="checkbox"
+                checked={formData.reprise}
+                onChange={(e) => setFormData({ ...formData, reprise: e.target.checked })}
+                className="w-5 h-5 rounded"
+              />
+              <span className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                Cette commande est une reprise
+              </span>
+            </label>
+          </div>
+
+          {/* NOUVEAU: Numéro ancienne commande si reprise */}
+          {formData.reprise && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Numéro de l'ancienne commande
+              </label>
+              <input
+                type="text"
+                value={formData.ancienneCommandeNumero}
+                onChange={(e) => setFormData({ ...formData, ancienneCommandeNumero: e.target.value })}
+                placeholder="CMD-2024-001"
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+          )}
 
           {/* Nombre de balcons/phases selon le type */}
           {formData.typeCommande === "COMMERCIAL" && (
@@ -488,9 +690,11 @@ export default function NouvelleCommandePage() {
                     </th>
                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">Pieds linéaires</th>
                     <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">Poteaux</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">Temps installation</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">Coût</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-300">Prix total</th>
                     <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">Produit</th>
                     <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">Installé</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-600 dark:text-gray-300">Reprise</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -523,9 +727,17 @@ export default function NouvelleCommandePage() {
                       <td className="px-3 py-2">
                         <input
                           type="number"
-                          value={b.tempsInstallation}
-                          onChange={(e) => updateBalcon(i, "tempsInstallation", parseInt(e.target.value) || 0)}
-                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                          value={b.coutBalcon}
+                          onChange={(e) => updateBalcon(i, "coutBalcon", parseInt(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="number"
+                          value={b.prixTotal}
+                          onChange={(e) => updateBalcon(i, "prixTotal", parseInt(e.target.value) || 0)}
+                          className="w-24 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
                         />
                       </td>
                       <td className="px-3 py-2 text-center">
@@ -544,6 +756,14 @@ export default function NouvelleCommandePage() {
                           className="w-4 h-4 rounded"
                         />
                       </td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={b.reprise}
+                          onChange={(e) => updateBalcon(i, "reprise", e.target.checked)}
+                          className="w-4 h-4 rounded"
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -552,30 +772,60 @@ export default function NouvelleCommandePage() {
                     <td className="px-3 py-2">Total</td>
                     <td className="px-3 py-2">{balcons.reduce((sum, b) => sum + b.piedsLineaires, 0)}</td>
                     <td className="px-3 py-2">{balcons.reduce((sum, b) => sum + b.poteaux, 0)}</td>
-                    <td className="px-3 py-2">{balcons.reduce((sum, b) => sum + b.tempsInstallation, 0)}h</td>
+                    <td className="px-3 py-2">{balcons.reduce((sum, b) => sum + b.coutBalcon, 0)} $</td>
+                    <td className="px-3 py-2">{balcons.reduce((sum, b) => sum + b.prixTotal, 0)} $</td>
                     <td className="px-3 py-2 text-center">{balcons.filter(b => b.produit).length}/{balcons.length}</td>
                     <td className="px-3 py-2 text-center">{balcons.filter(b => b.installationTerminee).length}/{balcons.length}</td>
+                    <td className="px-3 py-2 text-center">{balcons.filter(b => b.reprise).length}/{balcons.length}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           )}
 
-          {/* Adresse */}
+          {/* Adresse avec commentaire */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              <span className="text-red-500">*</span> Adresse d'installation
+              <span className="text-red-500">*</span> Adresse
             </label>
             <div className="relative">
               <MapPin className="absolute left-4 top-3 text-gray-400" size={20} />
-              <textarea
+              <input
+                type="text"
                 value={formData.adresse}
                 onChange={(e) => setFormData({ ...formData, adresse: e.target.value })}
-                placeholder="Adresse complète"
-                rows={2}
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none"
+                placeholder="Rechercher une adresse..."
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
               />
             </div>
+          </div>
+
+          {/* Commentaire adresse */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Commentaire pour l'adresse
+            </label>
+            <input
+              type="text"
+              value={formData.commentaireAdresse}
+              onChange={(e) => setFormData({ ...formData, commentaireAdresse: e.target.value })}
+              placeholder="Ex: Sonner à la porte 2, code: 1234..."
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+            />
+          </div>
+
+          {/* Commentaire général (déplacé ici) */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Commentaire général
+            </label>
+            <textarea
+              value={formData.commentaire}
+              onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
+              placeholder="Notes et remarques générales..."
+              rows={3}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none"
+            />
           </div>
         </Section>
 
@@ -608,7 +858,7 @@ export default function NouvelleCommandePage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Date prévue / Livraison
+                Date prévue
                 <Info className="inline w-4 h-4 ml-1 text-gray-400"  />
               </label>
               <input
@@ -667,29 +917,96 @@ export default function NouvelleCommandePage() {
               </div>
             </div>
           </div>
+
+          {/* NOUVEAU: Temps d'installation auto */}
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-4 mb-3">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.utiliserCalculAuto}
+                  onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Calcul automatique du temps d'installation
+                </span>
+              </label>
+            </div>
+            {formData.utiliserCalculAuto && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Coût à l'heure</label>
+                  <div className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg text-sm">
+                    {config.coutHeureInstallation.toFixed(2)} $/h
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Facteur</label>
+                  <div className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg text-sm">
+                    {config.facteurTempsInstallation}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Temps calculé</label>
+                  <div className="px-3 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg text-sm font-bold text-blue-700">
+                    {tempsInstallationAuto.toFixed(2)} h
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </Section>
 
-        {/* SECTION 3: RAMPES ET MESURES */}
+        {/* SECTION 3: PIEDS LINÉAIRES ET POTEAUX (anciennement Rampes et Mesures) */}
         <Section
           icon={<Ruler />}
-          title="Rampes et Mesures"
-          description="Dimensions et quantités"
+          title="Pieds linéaires et Poteaux"
+          description="Dimensions avec facteurs automatiques"
           isOpen={activeSection === "rampes"}
           onToggle={() => setActiveSection(activeSection === "rampes" ? null : "rampes")}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            <InputField label="Temps installation (h)" value={formData.tempsEstimeInstallation} onChange={(v) => setFormData({ ...formData, tempsEstimeInstallation: v })} />
-            <InputField label="Pieds carrés fibre" value={formData.piedsCarresFibre} onChange={(v) => setFormData({ ...formData, piedsCarresFibre: v })} />
-            <InputField label="Pieds rampes barrotin" value={formData.piedsRampesBarrotin} onChange={(v) => setFormData({ ...formData, piedsRampesBarrotin: v })} />
-            <InputField label="Pieds rampes verre" value={formData.piedsRampesVerre} onChange={(v) => setFormData({ ...formData, piedsRampesVerre: v })} />
-            <InputField label="Pieds mur intimité" value={formData.piedsRampesMurIntimite} onChange={(v) => setFormData({ ...formData, piedsRampesMurIntimite: v })} />
-            <InputField label="Pieds main double" value={formData.piedsRampesMainDouble} onChange={(v) => setFormData({ ...formData, piedsRampesMainDouble: v })} />
-            <InputField label="Pieds Gardex Vision" value={formData.piedsRampesGardexVision} onChange={(v) => setFormData({ ...formData, piedsRampesGardexVision: v })} />
-            <InputField label="Pieds Gardex Urbaine" value={formData.piedsRampesGardexVisionUrbaine} onChange={(v) => setFormData({ ...formData, piedsRampesGardexVisionUrbaine: v })} />
-            <InputField label="Pieds Gardex Optimum" value={formData.piedsRampesGardexVisionOptimum} onChange={(v) => setFormData({ ...formData, piedsRampesGardexVisionOptimum: v })} />
-            <InputField label="Pieds linéaires total" value={formData.piedsLineairesRampes} onChange={(v) => setFormData({ ...formData, piedsLineairesRampes: v })} />
-            <InputField label="Nombre de poteaux" value={formData.nombrePoteaux} onChange={(v) => setFormData({ ...formData, nombrePoteaux: v })} />
+            {PIEDS_LINEAIRES_FACTEURS.map(item => (
+              <div key={item.key}>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {item.label} (facteur: {item.facteur})
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData[item.key as keyof typeof formData] as number || 0}
+                  onChange={(e) => setFormData({ ...formData, [item.key]: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
+              </div>
+            ))}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nombre de poteaux</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.nombrePoteaux}
+                onChange={(e) => setFormData({ ...formData, nombrePoteaux: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
           </div>
+
+          {/* Total calculé */}
+          <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                Pieds linéaires totaux (avec facteurs)
+              </span>
+              <span className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                {piedsLineairesTotaux} pi
+              </span>
+            </div>
+          </div>
+
+          {/* Anciens champs masqués mais conservés pour compatibilité */}
+          <input type="hidden" value={piedsLineairesTotaux} />
         </Section>
 
         {/* SECTION 4: PRODUCTION */}
@@ -701,17 +1018,6 @@ export default function NouvelleCommandePage() {
           onToggle={() => setActiveSection(activeSection === "production" ? null : "production")}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couleur</label>
-              <input
-                type="text"
-                value={formData.couleur}
-                onChange={(e) => setFormData({ ...formData, couleur: e.target.value })}
-                placeholder="Ex: Blanc, Noir, Bronze..."
-                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
-              />
-            </div>
-
             <SymbolSelect
               label="Mesure"
               value={formData.mesure}
@@ -757,16 +1063,27 @@ export default function NouvelleCommandePage() {
               options={CODE_PRODUCTION_OPTIONS}
             />
 
+            {/* NOUVEAU: Statut livraison */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut livraison</label>
-              <input
-                type="text"
-                value={formData.livraison}
-                onChange={(e) => setFormData({ ...formData, livraison: e.target.value })}
-                placeholder="Ex: En cours, Livré..."
+              <select
+                value={formData.statutLivraison}
+                onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
-              />
+              >
+                {STATUT_LIVRAISON_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
+
+            {/* NOUVEAU: Installation */}
+            <SymbolSelect
+              label="Installation"
+              value={formData.installation}
+              onChange={(v) => setFormData({ ...formData, installation: v })}
+              options={CODE_PRODUCTION_OPTIONS}
+            />
 
             <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
               <input
@@ -792,28 +1109,179 @@ export default function NouvelleCommandePage() {
           onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AchatField label="Fibre" value={formData.achatFibre} date={formData.dateReceptionFibre}
-              onChange={(v) => setFormData({ ...formData, achatFibre: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionFibre: v })} />
-            <AchatField label="Limons" value={formData.achatLimons} date={formData.dateReceptionLimons}
-              onChange={(v) => setFormData({ ...formData, achatLimons: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionLimons: v })} />
-            <AchatField label="Verres" value={formData.achatVerres} date={formData.dateReceptionVerre}
-              onChange={(v) => setFormData({ ...formData, achatVerres: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionVerre: v })} />
-            <AchatField label="Colonnes" value={formData.achatColonnes} date={formData.dateReceptionColonnes}
-              onChange={(v) => setFormData({ ...formData, achatColonnes: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionColonnes: v })} />
-            <AchatField label="Peinture" value={formData.achatPeinture} date={formData.dateReceptionPeinture}
-              onChange={(v) => setFormData({ ...formData, achatPeinture: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionPeinture: v })} />
-            <AchatField label="Attaches" value={formData.achatAttaches} date={formData.dateReceptionAttaches}
-              onChange={(v) => setFormData({ ...formData, achatAttaches: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionAttaches: v })} />
-            <AchatField label="Plancher aluminium" value={formData.achatPlancherAluminium} date={formData.dateReceptionPlancherAluminium}
-              onChange={(v) => setFormData({ ...formData, achatPlancherAluminium: v })}
-              onDateChange={(v) => setFormData({ ...formData, dateReceptionPlancherAluminium: v })} />
+            <AchatField 
+              label="Fibre" 
+              statut={formData.achatFibre}
+              dateEnvoie={formData.dateEnvoieFibre}
+              dateReception={formData.dateReceptionFibre}
+              quantiteNonRecue={formData.quantiteNonRecueFibre}
+              onStatutChange={(v) => setFormData({ ...formData, achatFibre: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieFibre: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionFibre: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueFibre: v })}
+            />
+            <AchatField 
+              label="Limons" 
+              statut={formData.achatLimons}
+              dateEnvoie={formData.dateEnvoieLimons}
+              dateReception={formData.dateReceptionLimons}
+              quantiteNonRecue={formData.quantiteNonRecueLimons}
+              onStatutChange={(v) => setFormData({ ...formData, achatLimons: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieLimons: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionLimons: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueLimons: v })}
+            />
+            <AchatField 
+              label="Verres" 
+              statut={formData.achatVerres}
+              dateEnvoie={formData.dateEnvoieVerres}
+              dateReception={formData.dateReceptionVerre}
+              quantiteNonRecue={formData.quantiteNonRecueVerres}
+              onStatutChange={(v) => setFormData({ ...formData, achatVerres: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieVerres: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionVerre: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueVerres: v })}
+            />
+            <AchatField 
+              label="Colonnes" 
+              statut={formData.achatColonnes}
+              dateEnvoie={formData.dateEnvoieColonnes}
+              dateReception={formData.dateReceptionColonnes}
+              quantiteNonRecue={formData.quantiteNonRecueColonnes}
+              onStatutChange={(v) => setFormData({ ...formData, achatColonnes: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieColonnes: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionColonnes: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueColonnes: v })}
+            />
+            <AchatField 
+              label="Peinture" 
+              statut={formData.achatPeinture}
+              dateEnvoie={formData.dateEnvoiePeinture}
+              dateReception={formData.dateReceptionPeinture}
+              quantiteNonRecue={formData.quantiteNonRecuePeinture}
+              onStatutChange={(v) => setFormData({ ...formData, achatPeinture: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePeinture: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPeinture: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePeinture: v })}
+            />
+            <AchatField 
+              label="Attaches" 
+              statut={formData.achatAttaches}
+              dateEnvoie={formData.dateEnvoieAttaches}
+              dateReception={formData.dateReceptionAttaches}
+              quantiteNonRecue={formData.quantiteNonRecueAttaches}
+              onStatutChange={(v) => setFormData({ ...formData, achatAttaches: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieAttaches: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionAttaches: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueAttaches: v })}
+            />
+            <AchatField 
+              label="Plancher aluminium" 
+              statut={formData.achatPlancherAluminium}
+              dateEnvoie={formData.dateEnvoiePlancherAluminium}
+              dateReception={formData.dateReceptionPlancherAluminium}
+              quantiteNonRecue={formData.quantiteNonRecuePlancherAluminium}
+              onStatutChange={(v) => setFormData({ ...formData, achatPlancherAluminium: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePlancherAluminium: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPlancherAluminium: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePlancherAluminium: v })}
+            />
           </div>
+
+          {/* NOUVEAU: Option structure */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+              <input
+                type="checkbox"
+                checked={formData.structure}
+                onChange={(e) => setFormData({ ...formData, structure: e.target.checked })}
+                className="w-5 h-5 rounded"
+              />
+              <span className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                Ajouter des structures d'achat manuellement
+              </span>
+            </label>
+          </div>
+
+          {/* NOUVEAU: Structures d'achat */}
+          {formData.structure && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-gray-700 dark:text-gray-300">Structures d'achat</h4>
+                <button
+                  type="button"
+                  onClick={addStructure}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 rounded-lg text-sm font-medium"
+                >
+                  <Plus size={16} />
+                  Ajouter une structure
+                </button>
+              </div>
+
+              {structuresAchat.map((structure, index) => (
+                <div key={index} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <input
+                      type="text"
+                      value={structure.nom}
+                      onChange={(e) => updateStructure(index, "nom", e.target.value)}
+                      placeholder="Nom de la structure"
+                      className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeStructure(index)}
+                      className="ml-2 p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Statut</label>
+                      <select
+                        value={structure.statutAchat}
+                        onChange={(e) => updateStructure(index, "statutAchat", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      >
+                        {STATUT_ACHAT_OPTIONS.map(o => (
+                          <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date d'envoi</label>
+                      <input
+                        type="date"
+                        value={structure.dateEnvoie || ""}
+                        onChange={(e) => updateStructure(index, "dateEnvoie", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
+                      <input
+                        type="date"
+                        value={structure.dateReception || ""}
+                        onChange={(e) => updateStructure(index, "dateReception", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Quantité non reçue</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={structure.quantiteNonRecue || 0}
+                        onChange={(e) => updateStructure(index, "quantiteNonRecue", parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
 
         {/* SECTION 6: AVERTISSEMENTS */}
@@ -838,23 +1306,6 @@ export default function NouvelleCommandePage() {
               options={AVERTISSEMENT_MESURE_OPTIONS}
             />
           </div>
-        </Section>
-
-        {/* SECTION 7: COMMENTAIRES */}
-        <Section
-          icon={<FileText />}
-          title="Commentaires"
-          description="Notes et remarques"
-          isOpen={activeSection === "commentaires"}
-          onToggle={() => setActiveSection(activeSection === "commentaires" ? null : "commentaires")}
-        >
-          <textarea
-            value={formData.commentaire}
-            onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
-            placeholder="Ajoutez vos notes et commentaires ici..."
-            rows={4}
-            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none"
-          />
         </Section>
 
         {/* Boutons */}
@@ -909,22 +1360,6 @@ function Section({ icon, title, description, isOpen, onToggle, children }: {
   );
 }
 
-// Composant InputField numérique
-function InputField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{label}</label>
-      <input
-        type="number"
-        min="0"
-        value={value || ""}
-        onChange={(e) => onChange(parseInt(e.target.value) || 0)}
-        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
-      />
-    </div>
-  );
-}
-
 // Composant Select avec symboles
 function SymbolSelect({ label, value, onChange, options }: {
   label: string; value: string; onChange: (v: string) => void;
@@ -958,18 +1393,28 @@ function SymbolSelect({ label, value, onChange, options }: {
   );
 }
 
-// Composant Achat avec statut et date
-function AchatField({ label, value, date, onChange, onDateChange }: {
-  label: string; value: string; date: string;
-  onChange: (v: string) => void; onDateChange: (v: string) => void;
+// NOUVEAU: Composant Achat avec statut, dates et quantité non reçue
+function AchatField({ 
+  label, statut, dateEnvoie, dateReception, quantiteNonRecue,
+  onStatutChange, onDateEnvoieChange, onDateReceptionChange, onQuantiteChange 
+}: {
+  label: string;
+  statut: string;
+  dateEnvoie: string;
+  dateReception: string;
+  quantiteNonRecue: number;
+  onStatutChange: (v: string) => void;
+  onDateEnvoieChange: (v: string) => void;
+  onDateReceptionChange: (v: string) => void;
+  onQuantiteChange: (v: number) => void;
 }) {
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{label}</label>
       <div className="space-y-2">
         <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={statut}
+          onChange={(e) => onStatutChange(e.target.value)}
           className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
         >
           {STATUT_ACHAT_OPTIONS.map(o => (
@@ -980,9 +1425,24 @@ function AchatField({ label, value, date, onChange, onDateChange }: {
         </select>
         <input
           type="date"
-          value={date}
-          onChange={(e) => onDateChange(e.target.value)}
-          placeholder="Date réception"
+          value={dateEnvoie}
+          onChange={(e) => onDateEnvoieChange(e.target.value)}
+          placeholder="Date d'envoi"
+          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+        />
+        <input
+          type="date"
+          value={dateReception}
+          onChange={(e) => onDateReceptionChange(e.target.value)}
+          placeholder="Date de réception"
+          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+        />
+        <input
+          type="number"
+          min="0"
+          value={quantiteNonRecue || 0}
+          onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)}
+          placeholder="Qté non reçue"
           className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
         />
       </div>

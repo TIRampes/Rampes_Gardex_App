@@ -6,7 +6,8 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Package, User, MapPin, Calendar, DollarSign,
   Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Building2, Layers,
-  ChevronDown, CheckCircle2, Info
+  ChevronDown, CheckCircle2, Info, Paintbrush, RefreshCw, MessageCircle,
+  Plus, Trash2
 } from "lucide-react";
 
 // Types et constantes (mêmes que nouveau/page.tsx)
@@ -14,7 +15,17 @@ interface Client { id: string; nom: string; type: string; adresse: string; }
 interface Representant { id: string; nom: string; }
 interface Balcon {
   id?: string; nom: string; numeroPhase: number; piedsLineaires: number;
-  poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;
+  poteaux: number; coutBalcon: number; prixTotal: number;
+  produit: boolean; installationTerminee: boolean; reprise: boolean;
+  notes?: string;
+}
+interface StructureAchat {
+  id?: string;
+  nom: string;
+  statutAchat: string;
+  dateEnvoie?: string;
+  dateReception?: string;
+  quantiteNonRecue?: number;
 }
 
 const CODE_PRODUCTION_OPTIONS = [
@@ -59,7 +70,23 @@ const SERVICE_OPTIONS = [
   { value: "LIVRAISON", label: "🚚 Livraison" },
   { value: "CUEILLETTE", label: "📦 Cueillette" },
   { value: "TRANSPORT", label: "🚛 Transport" },
-  { value: "MESURE", label: "📏 Mesure" },
+];
+
+const COULEUR_OPTIONS = [
+  { value: "", label: "— Sélectionner —" },
+  { value: "NOIR", label: "Noir" },
+  { value: "BLANC", label: "Blanc" },
+  { value: "BRUN_COMMERCIALE", label: "Brun commerciale" },
+  { value: "GRIS_CHARBON", label: "Gris charbon" },
+  { value: "ARGILE", label: "Argile" },
+  { value: "SPECIALE", label: "Spéciale" },
+  { value: "GRIS_METALLIQUE", label: "Gris métallique" },
+  { value: "AUTRE", label: "Autre" },
+];
+
+const STATUT_LIVRAISON_OPTIONS = [
+  { value: "N_A", label: "N/A" },
+  { value: "LIVRE", label: "Livré" },
 ];
 
 const AVERTISSEMENT_CLIENT_OPTIONS = [
@@ -75,6 +102,16 @@ const AVERTISSEMENT_MESURE_OPTIONS = [
   { value: "PRESENCE_REPRESENTANT", label: "Présence représentant requise", symbol: "👔" },
 ];
 
+const PIEDS_LINEAIRES_FACTEURS = [
+  { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
+  { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
+  { key: "piedsLineairesMur", label: "Mur", facteur: 4 },
+  { key: "piedsLineairesMainDouble", label: "Main double", facteur: 2.25 },
+  { key: "piedsLineairesGardexVision", label: "Gardex Vision", facteur: 1 },
+  { key: "piedsLineairesGardexUrbaine", label: "Gardex Urbaine", facteur: 2 },
+  { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
+];
+
 const formatDateForInput = (date?: string) => date ? new Date(date).toISOString().split("T")[0] : "";
 
 export default function EditCommandePage() {
@@ -87,41 +124,77 @@ export default function EditCommandePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>("general");
+  const [config, setConfig] = useState({ coutHeureInstallation: 160, facteurTempsInstallation: 0.7 });
 
   const [formData, setFormData] = useState({
+    // Général
     numero: "", clientId: "", representantId: "", reference: "",
     typeCommande: "STANDARD", service: "INSTALLATION", statut: "ACTIVE",
-    activite: "INSTALLATION", adresse: "", nombreBalcons: 0, nombrePhases: 0,
-    dateEntree: "", dateProduction: "", datePrevue: "", dateLivraison: "",
+    adresse: "", commentaireAdresse: "",
+    // Couleur
+    couleur: "", couleurPersonnalisee: "",
+    // Reprise
+    reprise: false, ancienneCommandeNumero: "",
+    // Commercial / Multi-Phase / Multiplan
+    nombreBalcons: 0, nombrePhases: 0, piedsLineairesEstime: 0, piedsLineairesReels: 0,
+    // Dates
+    dateEntree: "", dateProduction: "", datePrevue: "", datePriseMesure: "", dateLivraison: "",
+    // Prix
     prixVenteMateriaux: 0, prixVenteInstallation: 0,
-    tempsEstimeInstallation: 0, piedsCarresFibre: 0, piedsRampesBarrotin: 0,
-    piedsRampesVerre: 0, piedsRampesMurIntimite: 0, piedsRampesMainDouble: 0,
-    piedsRampesGardexVision: 0, piedsRampesGardexVisionUrbaine: 0,
-    piedsRampesGardexVisionOptimum: 0, piedsLineairesRampes: 0, nombrePoteaux: 0,
-    structure: false, couleur: "", mesure: "", mesureDonneeLe: "", plan: "",
-    envoyeProduction: "", productionTerminee: "", termine: "", livraison: "",
-    enProduction: false, reprise: false,
-    achatFibre: "", dateReceptionFibre: "", achatLimons: "", dateReceptionLimons: "",
-    achatVerres: "", dateReceptionVerre: "", achatColonnes: "", dateReceptionColonnes: "",
-    achatPeinture: "", dateReceptionPeinture: "", achatAttaches: "", dateReceptionAttaches: "",
-    achatPlancherAluminium: "", dateReceptionPlancherAluminium: "",
-    avertissementClient: "", avertissementPriseMesure: "", commentaire: "",
+    // Pieds linéaires
+    piedsLineairesBarrotin: 0, piedsLineairesVerre: 0, piedsLineairesMur: 0,
+    piedsLineairesMainDouble: 0, piedsLineairesGardexVision: 0,
+    piedsLineairesGardexUrbaine: 0, piedsLineairesGardexOptimum: 0,
+    nombrePoteaux: 0,
+    // Anciens champs
+    tempsEstimeInstallation: 0, piedsCarresFibre: 0,
+    piedsRampesBarrotin: 0, piedsRampesVerre: 0, piedsRampesMurIntimite: 0,
+    piedsRampesMainDouble: 0, piedsRampesGardexVision: 0,
+    piedsRampesGardexVisionUrbaine: 0, piedsRampesGardexVisionOptimum: 0,
+    // Temps installation auto
+    utiliserCalculAuto: false, tempsInstallationAuto: 0,
+    // Production
+    structure: false, mesure: "", mesureDonneeLe: "", plan: "",
+    envoyeProduction: "", productionTerminee: "", termine: "",
+    statutLivraison: "N_A", installation: "", enProduction: false,
+    // Achats avec nouveaux champs
+    achatFibre: "", dateEnvoieFibre: "", dateReceptionFibre: "", quantiteNonRecueFibre: 0,
+    achatLimons: "", dateEnvoieLimons: "", dateReceptionLimons: "", quantiteNonRecueLimons: 0,
+    achatVerres: "", dateEnvoieVerres: "", dateReceptionVerre: "", quantiteNonRecueVerres: 0,
+    achatColonnes: "", dateEnvoieColonnes: "", dateReceptionColonnes: "", quantiteNonRecueColonnes: 0,
+    achatPeinture: "", dateEnvoiePeinture: "", dateReceptionPeinture: "", quantiteNonRecuePeinture: 0,
+    achatAttaches: "", dateEnvoieAttaches: "", dateReceptionAttaches: "", quantiteNonRecueAttaches: 0,
+    achatPlancherAluminium: "", dateEnvoiePlancherAluminium: "", dateReceptionPlancherAluminium: "", quantiteNonRecuePlancherAluminium: 0,
+    // Avertissements
+    avertissementClient: "", avertissementPriseMesure: "",
+    // Commentaire
+    commentaire: "",
   });
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
+  const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
+  const [showStructureForm, setShowStructureForm] = useState(false);
 
   // Charger données initiales
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, repsRes, commandeRes] = await Promise.all([
+        const [clientsRes, repsRes, commandeRes, configRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/representants"),
           fetch(`/api/commandes/${params.id}`),
+          fetch("/api/configurations"),
         ]);
 
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (repsRes.ok) setRepresentants(await repsRes.json());
+        if (configRes.ok) {
+          const configData = await configRes.json();
+          setConfig({
+            coutHeureInstallation: configData.coutHeureInstallation || 160,
+            facteurTempsInstallation: configData.facteurTempsInstallation || 0.7,
+          });
+        }
 
         if (commandeRes.ok) {
           const c = await commandeRes.json();
@@ -133,16 +206,31 @@ export default function EditCommandePage() {
             typeCommande: c.typeCommande || "STANDARD",
             service: c.service || "INSTALLATION",
             statut: c.statut || "ACTIVE",
-            activite: c.activite || "INSTALLATION",
             adresse: c.adresse || "",
+            commentaireAdresse: c.commentaireAdresse || "",
+            couleur: c.couleur || "",
+            couleurPersonnalisee: c.couleurPersonnalisee || "",
+            reprise: c.reprise || false,
+            ancienneCommandeNumero: c.ancienneCommandeNumero || "",
             nombreBalcons: c.nombreBalcons || 0,
             nombrePhases: c.nombrePhases || 0,
+            piedsLineairesEstime: c.piedsLineairesEstime || 0,
+            piedsLineairesReels: c.piedsLineairesReels || 0,
             dateEntree: formatDateForInput(c.dateEntree),
             dateProduction: formatDateForInput(c.dateProduction),
             datePrevue: formatDateForInput(c.datePrevue),
+            datePriseMesure: formatDateForInput(c.datePriseMesure),
             dateLivraison: formatDateForInput(c.dateLivraison),
             prixVenteMateriaux: Number(c.prixVenteMateriaux) || 0,
             prixVenteInstallation: Number(c.prixVenteInstallation) || 0,
+            piedsLineairesBarrotin: c.piedsLineairesBarrotin || 0,
+            piedsLineairesVerre: c.piedsLineairesVerre || 0,
+            piedsLineairesMur: c.piedsLineairesMur || 0,
+            piedsLineairesMainDouble: c.piedsLineairesMainDouble || 0,
+            piedsLineairesGardexVision: c.piedsLineairesGardexVision || 0,
+            piedsLineairesGardexUrbaine: c.piedsLineairesGardexUrbaine || 0,
+            piedsLineairesGardexOptimum: c.piedsLineairesGardexOptimum || 0,
+            nombrePoteaux: c.nombrePoteaux || 0,
             tempsEstimeInstallation: c.tempsEstimeInstallation || 0,
             piedsCarresFibre: c.piedsCarresFibre || 0,
             piedsRampesBarrotin: c.piedsRampesBarrotin || 0,
@@ -152,39 +240,53 @@ export default function EditCommandePage() {
             piedsRampesGardexVision: c.piedsRampesGardexVision || 0,
             piedsRampesGardexVisionUrbaine: c.piedsRampesGardexVisionUrbaine || 0,
             piedsRampesGardexVisionOptimum: c.piedsRampesGardexVisionOptimum || 0,
-            piedsLineairesRampes: c.piedsLineairesRampes || 0,
-            nombrePoteaux: c.nombrePoteaux || 0,
+            utiliserCalculAuto: c.utiliserCalculAuto || false,
+            tempsInstallationAuto: Number(c.tempsInstallationAuto) || 0,
             structure: c.structure || false,
-            couleur: c.couleur || "",
             mesure: c.mesure || "",
             mesureDonneeLe: formatDateForInput(c.mesureDonneeLe),
             plan: c.plan || "",
             envoyeProduction: c.envoyeProduction || "",
             productionTerminee: c.productionTerminee || "",
             termine: c.termine || "",
-            livraison: c.livraison || "",
+            statutLivraison: c.statutLivraison || "N_A",
+            installation: c.installation || "",
             enProduction: c.enProduction || false,
-            reprise: c.reprise || false,
             achatFibre: c.achatFibre || "",
+            dateEnvoieFibre: formatDateForInput(c.dateEnvoieFibre),
             dateReceptionFibre: formatDateForInput(c.dateReceptionFibre),
+            quantiteNonRecueFibre: c.quantiteNonRecueFibre || 0,
             achatLimons: c.achatLimons || "",
+            dateEnvoieLimons: formatDateForInput(c.dateEnvoieLimons),
             dateReceptionLimons: formatDateForInput(c.dateReceptionLimons),
+            quantiteNonRecueLimons: c.quantiteNonRecueLimons || 0,
             achatVerres: c.achatVerres || "",
+            dateEnvoieVerres: formatDateForInput(c.dateEnvoieVerres),
             dateReceptionVerre: formatDateForInput(c.dateReceptionVerre),
+            quantiteNonRecueVerres: c.quantiteNonRecueVerres || 0,
             achatColonnes: c.achatColonnes || "",
+            dateEnvoieColonnes: formatDateForInput(c.dateEnvoieColonnes),
             dateReceptionColonnes: formatDateForInput(c.dateReceptionColonnes),
+            quantiteNonRecueColonnes: c.quantiteNonRecueColonnes || 0,
             achatPeinture: c.achatPeinture || "",
+            dateEnvoiePeinture: formatDateForInput(c.dateEnvoiePeinture),
             dateReceptionPeinture: formatDateForInput(c.dateReceptionPeinture),
+            quantiteNonRecuePeinture: c.quantiteNonRecuePeinture || 0,
             achatAttaches: c.achatAttaches || "",
+            dateEnvoieAttaches: formatDateForInput(c.dateEnvoieAttaches),
             dateReceptionAttaches: formatDateForInput(c.dateReceptionAttaches),
+            quantiteNonRecueAttaches: c.quantiteNonRecueAttaches || 0,
             achatPlancherAluminium: c.achatPlancherAluminium || "",
+            dateEnvoiePlancherAluminium: formatDateForInput(c.dateEnvoiePlancherAluminium),
             dateReceptionPlancherAluminium: formatDateForInput(c.dateReceptionPlancherAluminium),
+            quantiteNonRecuePlancherAluminium: c.quantiteNonRecuePlancherAluminium || 0,
             avertissementClient: c.avertissementClient || "",
             avertissementPriseMesure: c.avertissementPriseMesure || "",
             commentaire: c.commentaire || "",
           });
 
           if (c.balcons) setBalcons(c.balcons);
+          if (c.structuresAchat) setStructuresAchat(c.structuresAchat);
         }
       } catch (err) {
         console.error("Erreur:", err);
@@ -197,10 +299,66 @@ export default function EditCommandePage() {
     if (params.id) fetchData();
   }, [params.id]);
 
-  const prixTotal = useMemo(() => (formData.prixVenteMateriaux || 0) + (formData.prixVenteInstallation || 0), [formData.prixVenteMateriaux, formData.prixVenteInstallation]);
+  // Calculer prix total
+  const prixTotal = useMemo(() => {
+    return (formData.prixVenteMateriaux || 0) + (formData.prixVenteInstallation || 0);
+  }, [formData.prixVenteMateriaux, formData.prixVenteInstallation]);
+
+  // Calculer les pieds linéaires totaux avec facteurs
+  const piedsLineairesTotaux = useMemo(() => {
+    let total = 0;
+    total += (formData.piedsLineairesBarrotin || 0) * 1.25;
+    total += (formData.piedsLineairesVerre || 0) * 1;
+    total += (formData.piedsLineairesMur || 0) * 4;
+    total += (formData.piedsLineairesMainDouble || 0) * 2.25;
+    total += (formData.piedsLineairesGardexVision || 0) * 1;
+    total += (formData.piedsLineairesGardexUrbaine || 0) * 2;
+    total += (formData.piedsLineairesGardexOptimum || 0) * 0.75;
+    return Math.round(total * 100) / 100;
+  }, [
+    formData.piedsLineairesBarrotin,
+    formData.piedsLineairesVerre,
+    formData.piedsLineairesMur,
+    formData.piedsLineairesMainDouble,
+    formData.piedsLineairesGardexVision,
+    formData.piedsLineairesGardexUrbaine,
+    formData.piedsLineairesGardexOptimum,
+  ]);
+
+  // Calculer le temps d'installation auto
+  const tempsInstallationAuto = useMemo(() => {
+    if (!formData.utiliserCalculAuto || formData.prixVenteInstallation <= 0) return 0;
+    return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
+  }, [formData.utiliserCalculAuto, formData.prixVenteInstallation, config]);
+
+  // Mettre à jour le temps d'installation auto
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, tempsInstallationAuto }));
+  }, [tempsInstallationAuto]);
 
   const updateBalcon = (index: number, field: keyof Balcon, value: number | boolean | string) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
+  };
+
+  const addStructure = () => {
+    setStructuresAchat(prev => [
+      ...prev,
+      {
+        nom: `Structure ${prev.length + 1}`,
+        statutAchat: "A_FAIRE",
+        dateEnvoie: "",
+        dateReception: "",
+        quantiteNonRecue: 0,
+      },
+    ]);
+  };
+
+  const updateStructure = (index: number, field: keyof StructureAchat, value: any) => {
+    setStructuresAchat(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  };
+
+  const removeStructure = (index: number) => {
+    setStructuresAchat(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -212,13 +370,19 @@ export default function EditCommandePage() {
       const dataToSend = {
         ...formData,
         prixTotal,
+        piedsLineairesRampes: piedsLineairesTotaux,
+        tempsInstallationAuto,
         balcons: balcons.length > 0 ? balcons : undefined,
+        structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
         representantId: formData.representantId || null,
+        couleur: formData.couleur || null,
+        couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
         mesure: formData.mesure || null,
         plan: formData.plan || null,
         envoyeProduction: formData.envoyeProduction || null,
         productionTerminee: formData.productionTerminee || null,
         termine: formData.termine || null,
+        installation: formData.installation || null,
         achatFibre: formData.achatFibre || null,
         achatLimons: formData.achatLimons || null,
         achatVerres: formData.achatVerres || null,
@@ -292,7 +456,7 @@ export default function EditCommandePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Section Général */}
+        {/* SECTION 1: INFORMATIONS GÉNÉRALES */}
         <Section icon={<Package />} title="Informations générales" isOpen={activeSection === "general"} onToggle={() => setActiveSection(activeSection === "general" ? null : "general")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
@@ -332,101 +496,259 @@ export default function EditCommandePage() {
               </select>
             </div>
           </div>
+
+          {/* Couleur */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Couleur</label>
+              <select value={formData.couleur} onChange={(e) => setFormData({ ...formData, couleur: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+                {COULEUR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            {formData.couleur === "AUTRE" && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Couleur personnalisée</label>
+                <input type="text" value={formData.couleurPersonnalisee} onChange={(e) => setFormData({ ...formData, couleurPersonnalisee: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              </div>
+            )}
+          </div>
+
+          {/* Reprise */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+              <input type="checkbox" checked={formData.reprise} onChange={(e) => setFormData({ ...formData, reprise: e.target.checked })} className="w-5 h-5" />
+              <span className="text-sm font-medium text-orange-700">Cette commande est une reprise</span>
+            </label>
+          </div>
+
+          {formData.reprise && (
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Numéro de l'ancienne commande</label>
+              <input type="text" value={formData.ancienneCommandeNumero} onChange={(e) => setFormData({ ...formData, ancienneCommandeNumero: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+            </div>
+          )}
+
+          {/* Adresse et commentaires */}
           <div className="mt-4">
             <label className="block text-sm font-medium mb-2">Adresse</label>
-            <textarea value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} rows={2} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none" />
+            <input type="text" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
           </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-2">Commentaire adresse</label>
+            <input type="text" value={formData.commentaireAdresse} onChange={(e) => setFormData({ ...formData, commentaireAdresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium mb-2">Commentaire général</label>
+            <textarea value={formData.commentaire} onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })} rows={3} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none" />
+          </div>
+
           <div className="mt-4 flex items-center gap-4">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={formData.enProduction} onChange={(e) => setFormData({ ...formData, enProduction: e.target.checked })} className="w-4 h-4" />
               <span className="text-sm">En production</span>
             </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={formData.reprise} onChange={(e) => setFormData({ ...formData, reprise: e.target.checked })} className="w-4 h-4" />
-              <span className="text-sm">Reprise</span>
-            </label>
           </div>
         </Section>
 
-        {/* Section Dates */}
+        {/* SECTION 2: DATES ET PRIX */}
         <Section icon={<Calendar />} title="Dates et Prix" isOpen={activeSection === "dates"} onToggle={() => setActiveSection(activeSection === "dates" ? null : "dates")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div><label className="block text-sm font-medium mb-2">Date entrée</label><input type="date" value={formData.dateEntree} onChange={(e) => setFormData({ ...formData, dateEntree: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <div><label className="block text-sm font-medium mb-2">Date production</label><input type="date" value={formData.dateProduction} onChange={(e) => setFormData({ ...formData, dateProduction: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <div><label className="block text-sm font-medium mb-2">Date prévue</label><input type="date" value={formData.datePrevue} onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date livraison</label><input type="date" value={formData.dateLivraison} onChange={(e) => setFormData({ ...formData, dateLivraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            <div><label className="block text-sm font-medium mb-2">Date mesure</label><input type="date" value={formData.datePriseMesure} onChange={(e) => setFormData({ ...formData, datePriseMesure: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
             <div><label className="block text-sm font-medium mb-2">Prix matériaux ($)</label><input type="number" step="0.01" value={formData.prixVenteMateriaux} onChange={(e) => setFormData({ ...formData, prixVenteMateriaux: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <div><label className="block text-sm font-medium mb-2">Prix installation ($)</label><input type="number" step="0.01" value={formData.prixVenteInstallation} onChange={(e) => setFormData({ ...formData, prixVenteInstallation: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <div><label className="block text-sm font-medium mb-2">Prix total</label><div className="px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 rounded-xl text-xl font-bold text-green-700">{prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}</div></div>
           </div>
-        </Section>
 
-        {/* Section Rampes */}
-        <Section icon={<Ruler />} title="Rampes et Mesures" isOpen={activeSection === "rampes"} onToggle={() => setActiveSection(activeSection === "rampes" ? null : "rampes")}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[
-              { label: "Temps install. (h)", key: "tempsEstimeInstallation" },
-              { label: "Pieds carrés fibre", key: "piedsCarresFibre" },
-              { label: "Rampes barrotin", key: "piedsRampesBarrotin" },
-              { label: "Rampes verre", key: "piedsRampesVerre" },
-              { label: "Mur intimité", key: "piedsRampesMurIntimite" },
-              { label: "Main double", key: "piedsRampesMainDouble" },
-              { label: "Gardex Vision", key: "piedsRampesGardexVision" },
-              { label: "Gardex Urbaine", key: "piedsRampesGardexVisionUrbaine" },
-              { label: "Gardex Optimum", key: "piedsRampesGardexVisionOptimum" },
-              { label: "Pieds linéaires", key: "piedsLineairesRampes" },
-              { label: "Nombre poteaux", key: "nombrePoteaux" },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-sm font-medium mb-2">{f.label}</label>
-                <input type="number" min="0" value={(formData[f.key as keyof typeof formData] as number) || 0} onChange={(e) => setFormData({ ...formData, [f.key]: parseInt(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+          {/* Temps installation auto */}
+          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+            <label className="flex items-center gap-2 mb-3">
+              <input type="checkbox" checked={formData.utiliserCalculAuto} onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })} className="w-4 h-4" />
+              <span className="text-sm font-medium text-blue-700">Calcul automatique du temps d'installation</span>
+            </label>
+            {formData.utiliserCalculAuto && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div><label className="block text-xs text-gray-500">Coût à l'heure</label><div className="px-3 py-2 bg-white rounded-lg">{config.coutHeureInstallation} $/h</div></div>
+                <div><label className="block text-xs text-gray-500">Facteur</label><div className="px-3 py-2 bg-white rounded-lg">{config.facteurTempsInstallation}</div></div>
+                <div><label className="block text-xs text-gray-500">Temps calculé</label><div className="px-3 py-2 bg-blue-100 rounded-lg font-bold">{tempsInstallationAuto.toFixed(2)} h</div></div>
               </div>
-            ))}
+            )}
           </div>
         </Section>
 
-        {/* Section Production */}
+        {/* SECTION 3: PIEDS LINÉAIRES ET POTEAUX */}
+        <Section icon={<Ruler />} title="Pieds linéaires et Poteaux" isOpen={activeSection === "rampes"} onToggle={() => setActiveSection(activeSection === "rampes" ? null : "rampes")}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {PIEDS_LINEAIRES_FACTEURS.map(f => (
+              <div key={f.key}>
+                <label className="block text-sm font-medium mb-2">{f.label} (×{f.facteur})</label>
+                <input type="number" min="0" value={formData[f.key as keyof typeof formData] as number || 0} onChange={(e) => setFormData({ ...formData, [f.key]: parseInt(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              </div>
+            ))}
+            <div>
+              <label className="block text-sm font-medium mb-2">Nombre de poteaux</label>
+              <input type="number" min="0" value={formData.nombrePoteaux} onChange={(e) => setFormData({ ...formData, nombrePoteaux: parseInt(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+            </div>
+          </div>
+          <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-purple-700">Total (avec facteurs)</span>
+              <span className="text-2xl font-bold text-purple-700">{piedsLineairesTotaux} pi</span>
+            </div>
+          </div>
+        </Section>
+
+        {/* SECTION 4: PRODUCTION */}
         <Section icon={<Factory />} title="Production" isOpen={activeSection === "production"} onToggle={() => setActiveSection(activeSection === "production" ? null : "production")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div><label className="block text-sm font-medium mb-2">Couleur</label><input type="text" value={formData.couleur} onChange={(e) => setFormData({ ...formData, couleur: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <SymbolSelect label="Mesure" value={formData.mesure} onChange={(v) => setFormData({ ...formData, mesure: v })} options={CODE_PRODUCTION_OPTIONS} />
             <div><label className="block text-sm font-medium mb-2">Mesure donnée le</label><input type="date" value={formData.mesureDonneeLe} onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <SymbolSelect label="Plan" value={formData.plan} onChange={(v) => setFormData({ ...formData, plan: v })} options={CODE_PRODUCTION_OPTIONS} />
             <SymbolSelect label="Envoyé production" value={formData.envoyeProduction} onChange={(v) => setFormData({ ...formData, envoyeProduction: v })} options={CODE_PRODUCTION_OPTIONS} />
             <SymbolSelect label="Production terminée" value={formData.productionTerminee} onChange={(v) => setFormData({ ...formData, productionTerminee: v })} options={CODE_PRODUCTION_OPTIONS} />
             <SymbolSelect label="Terminé" value={formData.termine} onChange={(v) => setFormData({ ...formData, termine: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <div><label className="block text-sm font-medium mb-2">Statut livraison</label><input type="text" value={formData.livraison} onChange={(e) => setFormData({ ...formData, livraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            <SymbolSelect label="Installation" value={formData.installation} onChange={(v) => setFormData({ ...formData, installation: v })} options={CODE_PRODUCTION_OPTIONS} />
+            <div>
+              <label className="block text-sm font-medium mb-2">Statut livraison</label>
+              <select value={formData.statutLivraison} onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+                {STATUT_LIVRAISON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
           </div>
         </Section>
 
-        {/* Section Achats */}
+        {/* SECTION 5: ACHATS */}
         <Section icon={<ShoppingCart />} title="Achats" isOpen={activeSection === "achats"} onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { label: "Fibre", keyStatut: "achatFibre", keyDate: "dateReceptionFibre" },
-              { label: "Limons", keyStatut: "achatLimons", keyDate: "dateReceptionLimons" },
-              { label: "Verres", keyStatut: "achatVerres", keyDate: "dateReceptionVerre" },
-              { label: "Colonnes", keyStatut: "achatColonnes", keyDate: "dateReceptionColonnes" },
-              { label: "Peinture", keyStatut: "achatPeinture", keyDate: "dateReceptionPeinture" },
-              { label: "Attaches", keyStatut: "achatAttaches", keyDate: "dateReceptionAttaches" },
-              { label: "Plancher alu.", keyStatut: "achatPlancherAluminium", keyDate: "dateReceptionPlancherAluminium" },
-            ].map(a => (
-            <div key={a.keyStatut} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
-                <label className="block text-sm font-semibold mb-2">{a.label}</label>
-                <select value={formData[a.keyStatut as keyof typeof formData] as string} onChange={(e) => setFormData({ ...formData, [a.keyStatut]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm mb-2">
-                    {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol ? `${o.symbol} - ${o.label}` : o.label}</option>)}
-                </select>
-                <input type="date" value={formData[a.keyDate as keyof typeof formData] as string} onChange={(e) => setFormData({ ...formData, [a.keyDate]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm" />
-            </div>
-            ))}
+            <AchatEditField 
+              label="Fibre" 
+              statut={formData.achatFibre}
+              dateEnvoie={formData.dateEnvoieFibre}
+              dateReception={formData.dateReceptionFibre}
+              quantiteNonRecue={formData.quantiteNonRecueFibre}
+              onStatutChange={(v) => setFormData({ ...formData, achatFibre: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieFibre: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionFibre: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueFibre: v })}
+            />
+            <AchatEditField 
+              label="Limons" 
+              statut={formData.achatLimons}
+              dateEnvoie={formData.dateEnvoieLimons}
+              dateReception={formData.dateReceptionLimons}
+              quantiteNonRecue={formData.quantiteNonRecueLimons}
+              onStatutChange={(v) => setFormData({ ...formData, achatLimons: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieLimons: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionLimons: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueLimons: v })}
+            />
+            <AchatEditField 
+              label="Verres" 
+              statut={formData.achatVerres}
+              dateEnvoie={formData.dateEnvoieVerres}
+              dateReception={formData.dateReceptionVerre}
+              quantiteNonRecue={formData.quantiteNonRecueVerres}
+              onStatutChange={(v) => setFormData({ ...formData, achatVerres: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieVerres: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionVerre: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueVerres: v })}
+            />
+            <AchatEditField 
+              label="Colonnes" 
+              statut={formData.achatColonnes}
+              dateEnvoie={formData.dateEnvoieColonnes}
+              dateReception={formData.dateReceptionColonnes}
+              quantiteNonRecue={formData.quantiteNonRecueColonnes}
+              onStatutChange={(v) => setFormData({ ...formData, achatColonnes: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieColonnes: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionColonnes: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueColonnes: v })}
+            />
+            <AchatEditField 
+              label="Peinture" 
+              statut={formData.achatPeinture}
+              dateEnvoie={formData.dateEnvoiePeinture}
+              dateReception={formData.dateReceptionPeinture}
+              quantiteNonRecue={formData.quantiteNonRecuePeinture}
+              onStatutChange={(v) => setFormData({ ...formData, achatPeinture: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePeinture: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPeinture: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePeinture: v })}
+            />
+            <AchatEditField 
+              label="Attaches" 
+              statut={formData.achatAttaches}
+              dateEnvoie={formData.dateEnvoieAttaches}
+              dateReception={formData.dateReceptionAttaches}
+              quantiteNonRecue={formData.quantiteNonRecueAttaches}
+              onStatutChange={(v) => setFormData({ ...formData, achatAttaches: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieAttaches: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionAttaches: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueAttaches: v })}
+            />
+            <AchatEditField 
+              label="Plancher alu." 
+              statut={formData.achatPlancherAluminium}
+              dateEnvoie={formData.dateEnvoiePlancherAluminium}
+              dateReception={formData.dateReceptionPlancherAluminium}
+              quantiteNonRecue={formData.quantiteNonRecuePlancherAluminium}
+              onStatutChange={(v) => setFormData({ ...formData, achatPlancherAluminium: v })}
+              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePlancherAluminium: v })}
+              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPlancherAluminium: v })}
+              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePlancherAluminium: v })}
+            />
           </div>
+
+          {/* Option structure */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <input type="checkbox" checked={formData.structure} onChange={(e) => setFormData({ ...formData, structure: e.target.checked })} className="w-5 h-5" />
+              <span className="text-sm font-medium text-purple-700">Ajouter des structures d'achat</span>
+            </label>
+          </div>
+
+          {/* Structures d'achat */}
+          {formData.structure && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium">Structures d'achat</h4>
+                <button type="button" onClick={addStructure} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
+                  <Plus size={16} /> Ajouter
+                </button>
+              </div>
+              {structuresAchat.map((s, i) => (
+                <div key={i} className="p-4 bg-gray-50 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <input type="text" value={s.nom} onChange={(e) => updateStructure(i, "nom", e.target.value)} placeholder="Nom" className="flex-1 px-3 py-2 bg-white border rounded-lg text-sm" />
+                    <button type="button" onClick={() => removeStructure(i)} className="ml-2 p-2 text-red-600"><Trash2 size={16} /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <select value={s.statutAchat} onChange={(e) => updateStructure(i, "statutAchat", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm">
+                      {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
+                    </select>
+                    <input type="date" value={s.dateEnvoie || ""} onChange={(e) => updateStructure(i, "dateEnvoie", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm" />
+                    <input type="date" value={s.dateReception || ""} onChange={(e) => updateStructure(i, "dateReception", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm" />
+                    <input type="number" min="0" value={s.quantiteNonRecue || 0} onChange={(e) => updateStructure(i, "quantiteNonRecue", parseInt(e.target.value) || 0)} placeholder="Qté non reçue" className="px-3 py-2 bg-white border rounded-lg text-sm" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
 
-        {/* Section Commentaires */}
-        <Section icon={<FileText />} title="Commentaires" isOpen={activeSection === "commentaires"} onToggle={() => setActiveSection(activeSection === "commentaires" ? null : "commentaires")}>
-          <textarea value={formData.commentaire} onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })} rows={4} placeholder="Notes et commentaires..." className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none" />
+        {/* SECTION 6: AVERTISSEMENTS */}
+        <Section icon={<AlertTriangle />} title="Avertissements" isOpen={activeSection === "avertissements"} onToggle={() => setActiveSection(activeSection === "avertissements" ? null : "avertissements")}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <SymbolSelect label="Avertissement client" value={formData.avertissementClient} onChange={(v) => setFormData({ ...formData, avertissementClient: v })} options={AVERTISSEMENT_CLIENT_OPTIONS} />
+            <SymbolSelect label="Avertissement mesure" value={formData.avertissementPriseMesure} onChange={(v) => setFormData({ ...formData, avertissementPriseMesure: v })} options={AVERTISSEMENT_MESURE_OPTIONS} />
+          </div>
         </Section>
 
         {/* Boutons */}
@@ -442,6 +764,7 @@ export default function EditCommandePage() {
   );
 }
 
+// Composants
 function Section({ icon, title, isOpen, onToggle, children }: { icon: React.ReactNode; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -464,6 +787,25 @@ function SymbolSelect({ label, value, onChange, options }: { label: string; valu
       <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
         {options.map(o => <option key={o.value} value={o.value}>{o.symbol ? `${o.symbol} - ${o.label}` : o.label}</option>)}
       </select>
+    </div>
+  );
+}
+
+function AchatEditField({ label, statut, dateEnvoie, dateReception, quantiteNonRecue, onStatutChange, onDateEnvoieChange, onDateReceptionChange, onQuantiteChange }: {
+  label: string; statut: string; dateEnvoie: string; dateReception: string; quantiteNonRecue: number;
+  onStatutChange: (v: string) => void; onDateEnvoieChange: (v: string) => void; onDateReceptionChange: (v: string) => void; onQuantiteChange: (v: number) => void;
+}) {
+  return (
+    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+      <label className="block text-sm font-semibold mb-3">{label}</label>
+      <div className="space-y-2">
+        <select value={statut} onChange={(e) => onStatutChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm">
+          {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
+        </select>
+        <input type="date" value={dateEnvoie} onChange={(e) => onDateEnvoieChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Date envoi" />
+        <input type="date" value={dateReception} onChange={(e) => onDateReceptionChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Date réception" />
+        <input type="number" min="0" value={quantiteNonRecue || 0} onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Qté non reçue" />
+      </div>
     </div>
   );
 }

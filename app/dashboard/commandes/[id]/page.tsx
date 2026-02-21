@@ -7,7 +7,7 @@ import {
   ArrowLeft, Edit, Trash2, Package, User, MapPin, Calendar, DollarSign,
   Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Phone, Mail,
   Clock, CheckCircle2, XCircle, Loader2, Building2, Layers, ExternalLink,
-  History, Wrench, Truck
+  History, Wrench, Truck, MessageCircle, Paintbrush, Hash, RefreshCw
 } from "lucide-react";
 
 // Types complets
@@ -18,7 +18,11 @@ interface Client {
 interface Representant { id: string; nom: string; telephone?: string; }
 interface Balcon {
   id: string; nom: string; numeroPhase: number; piedsLineaires: number;
-  poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;
+  poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;coutBalcon?: number; prixTotal?: number;
+}
+interface StructureAchat {
+  id: string; nom: string; statutAchat: string;
+  dateEnvoie?: string; dateReception?: string; quantiteNonRecue?: number;
 }
 interface Intervention {
   id: string; type: string; datePrevue: string; statut: string;
@@ -29,27 +33,55 @@ interface HistoriqueStatut {
 }
 interface Commande {
   id: string; numero: string; reference?: string; typeCommande: string;
-  service: string; statut: string; activite: string; adresse: string;
+  service: string; statut: string; adresse: string; commentaireAdresse?: string;
   client: Client; representant?: Representant; balcons: Balcon[];
+  structuresAchat: StructureAchat[];
   dateEntree: string; datePrevue?: string; dateProduction?: string;
-  datePriseMesure?: string; dateLivraison?: string;
+  datePriseMesure?: string; dateLivraison?: string; semainePrevue?: string;
   prixTotal: number; prixVenteMateriaux: number; prixVenteInstallation: number;
+  tempsInstallationAuto: number; utiliserCalculAuto: boolean;
+  // Pieds linéaires
+  piedsLineairesBarrotin: number; piedsLineairesVerre: number;
+  piedsLineairesMur: number; piedsLineairesMainDouble: number;
+  piedsLineairesGardexVision: number; piedsLineairesGardexUrbaine: number;
+  piedsLineairesGardexOptimum: number; piedsLineairesRampes: number;
+  nombrePoteaux: number;
+  // Anciens champs
   tempsEstimeInstallation: number; piedsCarresFibre?: number;
-  piedsRampesBarrotin: number; piedsRampesVerre: number; piedsRampesMurIntimite: number;
-  piedsRampesMainDouble: number; piedsRampesGardexVision: number;
-  piedsRampesGardexVisionUrbaine: number; piedsRampesGardexVisionOptimum: number;
-  piedsLineairesRampes: number; nombrePoteaux: number;
-  structure: boolean; couleur?: string; mesure?: string; mesureDonneeLe?: string;
+  piedsRampesBarrotin: number; piedsRampesVerre: number;
+  piedsRampesMurIntimite: number; piedsRampesMainDouble: number;
+  piedsRampesGardexVision: number; piedsRampesGardexVisionUrbaine: number;
+  piedsRampesGardexVisionOptimum: number;
+  // Production
+  structure: boolean; couleur?: string; couleurPersonnalisee?: string;
+  mesure?: string; mesureDonneeLe?: string;
   plan?: string; envoyeProduction?: string; productionTerminee?: string;
-  termine?: string; livraison?: string; enProduction: boolean; reprise: boolean;
-  achatFibre?: string; achatLimons?: string; achatVerres?: string;
-  achatColonnes?: string; achatPeinture?: string; achatAttaches?: string;
-  achatPlancherAluminium?: string; dateReceptionFibre?: string;
-  dateReceptionLimons?: string; dateReceptionVerre?: string;
+  termine?: string; statutLivraison: string; installation?: string;
+  enProduction: boolean; reprise: boolean; ancienneCommandeNumero?: string;
+  // Achats avec nouveaux champs
+  achatFibre?: string; dateEnvoieFibre?: string; dateReceptionFibre?: string;
+  quantiteNonRecueFibre?: number;
+  achatLimons?: string; dateEnvoieLimons?: string; dateReceptionLimons?: string;
+  quantiteNonRecueLimons?: number;
+  achatVerres?: string; dateEnvoieVerres?: string; dateReceptionVerre?: string;
+  quantiteNonRecueVerres?: number;
+  achatColonnes?: string; dateEnvoieColonnes?: string; dateReceptionColonnes?: string;
+  quantiteNonRecueColonnes?: number;
+  achatPeinture?: string; dateEnvoiePeinture?: string; dateReceptionPeinture?: string;
+  quantiteNonRecuePeinture?: number;
+  achatAttaches?: string; dateEnvoieAttaches?: string; dateReceptionAttaches?: string;
+  quantiteNonRecueAttaches?: number;
+  achatPlancherAluminium?: string; dateEnvoiePlancherAluminium?: string;
+  dateReceptionPlancherAluminium?: string; quantiteNonRecuePlancherAluminium?: number;
+  // Avertissements
   avertissementClient?: string; avertissementPriseMesure?: string;
-  commentaire?: string; createdAt: string; updatedAt: string;
+  // Commentaire
+  commentaire?: string;
+  // Dates système
+  createdAt: string; updatedAt: string;
   interventions: Intervention[]; historiqueStatuts: HistoriqueStatut[];
   _count: { interventions: number; reprises: number; achats: number };
+  config?: { coutHeureInstallation: number; facteurTempsInstallation: number };
 }
 
 // Mappings
@@ -93,7 +125,17 @@ const SERVICE_CONFIG: Record<string, { label: string; color: string; icon: React
   LIVRAISON: { label: "Livraison", color: "bg-green-500", icon: <Truck size={14} /> },
   CUEILLETTE: { label: "Cueillette", color: "bg-yellow-500", icon: <Package size={14} /> },
   TRANSPORT: { label: "Transport", color: "bg-purple-500", icon: <Truck size={14} /> },
-  MESURE: { label: "Mesure", color: "bg-orange-500", icon: <Ruler size={14} /> },
+};
+
+const COULEUR_MAP: Record<string, { bg: string; text: string; label: string }> = {
+  NOIR: { bg: "bg-gray-900", text: "text-white", label: "Noir" },
+  BLANC: { bg: "bg-gray-100", text: "text-gray-900", label: "Blanc" },
+  BRUN_COMMERCIALE: { bg: "bg-amber-800", text: "text-white", label: "Brun commerciale" },
+  GRIS_CHARBON: { bg: "bg-gray-700", text: "text-white", label: "Gris charbon" },
+  ARGILE: { bg: "bg-amber-200", text: "text-amber-900", label: "Argile" },
+  SPECIALE: { bg: "bg-purple-600", text: "text-white", label: "Spéciale" },
+  GRIS_METALLIQUE: { bg: "bg-gray-400", text: "text-gray-900", label: "Gris métallique" },
+  AUTRE: { bg: "bg-blue-400", text: "text-white", label: "Autre" },
 };
 
 const formatDate = (date?: string) => date ? new Date(date).toLocaleDateString("fr-CA", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -157,6 +199,7 @@ export default function CommandeDetailsPage() {
   const statutConfig = STATUT_CONFIG[commande.statut];
   const typeConfig = TYPE_CONFIG[commande.typeCommande];
   const serviceConfig = SERVICE_CONFIG[commande.service];
+  const couleurConfig = commande.couleur ? COULEUR_MAP[commande.couleur] : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-4 pb-8 px-4 sm:px-0">
@@ -202,7 +245,7 @@ export default function CommandeDetailsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={<DollarSign />} label="Prix total" value={commande.prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })} color="green" />
         <StatCard icon={<Ruler />} label="Pieds linéaires" value={`${commande.piedsLineairesRampes} pi`} color="blue" />
-        <StatCard icon={<Clock />} label="Temps estimé" value={`${commande.tempsEstimeInstallation}h`} color="purple" />
+        <StatCard icon={<Clock />} label="Temps installation" value={commande.utiliserCalculAuto ? `${commande.tempsInstallationAuto.toFixed(2)}h` : `${commande.tempsEstimeInstallation}h`} color="purple" />
         <StatCard icon={<Package />} label="Interventions" value={commande._count.interventions.toString()} color="orange" />
       </div>
 
@@ -230,11 +273,17 @@ export default function CommandeDetailsPage() {
             </div>
           )}
           <div className="sm:col-span-2">
-            <p className="text-xs text-gray-500 uppercase font-medium">Adresse d'installation</p>
+            <p className="text-xs text-gray-500 uppercase font-medium">Adresse</p>
             <p className="font-medium text-gray-900 dark:text-white flex items-start gap-1">
               <MapPin size={16} className="mt-0.5 flex-shrink-0 text-gray-400" />
               {commande.adresse}
             </p>
+            {commande.commentaireAdresse && (
+              <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                <MessageCircle size={14} />
+                {commande.commentaireAdresse}
+              </p>
+            )}
           </div>
         </div>
       </SectionCard>
@@ -245,7 +294,7 @@ export default function CommandeDetailsPage() {
           <DateField label="Date d'entrée" value={commande.dateEntree} />
           <DateField label="Date production" value={commande.dateProduction} />
           <DateField label="Date prévue" value={commande.datePrevue} highlight />
-          <DateField label="Semaine prévue" value={formatSemaine(commande.datePrevue)} isText />
+          <DateField label="Semaine prévue" value={commande.semainePrevue || formatSemaine(commande.datePrevue)} isText />
           <DateField label="Mesure donnée le" value={commande.mesureDonneeLe} />
         </div>
       </SectionCard>
@@ -272,40 +321,65 @@ export default function CommandeDetailsPage() {
             </p>
           </div>
         </div>
+        {commande.utiliserCalculAuto && commande.config && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Temps installation auto: {commande.tempsInstallationAuto.toFixed(2)}h 
+              (basé sur {commande.config.coutHeureInstallation}$/h × facteur {commande.config.facteurTempsInstallation})
+            </p>
+          </div>
+        )}
       </SectionCard>
 
-      {/* SECTION: RAMPES ET MESURES */}
-      <SectionCard icon={<Ruler />} title="Rampes et Mesures">
+      {/* SECTION: COULEUR */}
+      {commande.couleur && (
+        <SectionCard icon={<Paintbrush />} title="Couleur">
+          <div className="flex items-center gap-3">
+            {couleurConfig ? (
+              <span className={`px-4 py-2 rounded-lg font-medium ${couleurConfig.bg} ${couleurConfig.text}`}>
+                {couleurConfig.label}
+              </span>
+            ) : (
+              <span className="text-gray-900 dark:text-white">{commande.couleur}</span>
+            )}
+            {commande.couleur === "AUTRE" && commande.couleurPersonnalisee && (
+              <span className="text-gray-600">({commande.couleurPersonnalisee})</span>
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      {/* SECTION: PIEDS LINÉAIRES ET POTEAUX */}
+      <SectionCard icon={<Ruler />} title="Pieds linéaires et Poteaux">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <MeasureField label="Temps installation" value={`${commande.tempsEstimeInstallation}h`} />
-          <MeasureField label="Pieds carrés fibre" value={commande.piedsCarresFibre} />
-          <MeasureField label="Rampes barrotin" value={`${commande.piedsRampesBarrotin} pi`} />
-          <MeasureField label="Rampes verre" value={`${commande.piedsRampesVerre} pi`} />
-          <MeasureField label="Mur intimité" value={`${commande.piedsRampesMurIntimite} pi`} />
-          <MeasureField label="Main double" value={`${commande.piedsRampesMainDouble} pi`} />
-          <MeasureField label="Gardex Vision" value={`${commande.piedsRampesGardexVision} pi`} />
-          <MeasureField label="Gardex Urbaine" value={`${commande.piedsRampesGardexVisionUrbaine} pi`} />
-          <MeasureField label="Gardex Optimum" value={`${commande.piedsRampesGardexVisionOptimum} pi`} />
-          <MeasureField label="Total linéaire" value={`${commande.piedsLineairesRampes} pi`} highlight />
-          <MeasureField label="Nombre poteaux" value={commande.nombrePoteaux} highlight />
+          <MeasureField label="Barrotin" value={`${commande.piedsLineairesBarrotin} pi (×1.25)`} />
+          <MeasureField label="Verre" value={`${commande.piedsLineairesVerre} pi`} />
+          <MeasureField label="Mur" value={`${commande.piedsLineairesMur} pi (×4)`} />
+          <MeasureField label="Main double" value={`${commande.piedsLineairesMainDouble} pi (×2.25)`} />
+          <MeasureField label="Gardex Vision" value={`${commande.piedsLineairesGardexVision} pi`} />
+          <MeasureField label="Gardex Urbaine" value={`${commande.piedsLineairesGardexUrbaine} pi (×2)`} />
+          <MeasureField label="Gardex Optimum" value={`${commande.piedsLineairesGardexOptimum} pi (×0.75)`} />
+          <MeasureField label="Total" value={`${commande.piedsLineairesRampes} pi`} highlight />
+          <MeasureField label="Poteaux" value={commande.nombrePoteaux} highlight />
         </div>
       </SectionCard>
 
       {/* SECTION: PRODUCTION */}
       <SectionCard icon={<Factory />} title="Production" badge={commande.enProduction ? "En production" : undefined}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-medium">Couleur</p>
-            <p className="font-semibold text-gray-900 dark:text-white">{commande.couleur || "—"}</p>
-          </div>
           <CodeField label="Mesure" code={commande.mesure} />
           <CodeField label="Plan" code={commande.plan} />
           <CodeField label="Envoyé production" code={commande.envoyeProduction} />
           <CodeField label="Production terminée" code={commande.productionTerminee} />
           <CodeField label="Terminé" code={commande.termine} />
+          <CodeField label="Installation" code={commande.installation} />
           <div>
             <p className="text-xs text-gray-500 uppercase font-medium">Statut livraison</p>
-            <p className="font-semibold text-gray-900 dark:text-white">{commande.livraison || "—"}</p>
+            <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold ${
+              commande.statutLivraison === "LIVRE" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+            }`}>
+              {commande.statutLivraison === "LIVRE" ? "Livré" : "N/A"}
+            </span>
           </div>
         </div>
       </SectionCard>
@@ -313,14 +387,42 @@ export default function CommandeDetailsPage() {
       {/* SECTION: ACHATS */}
       <SectionCard icon={<ShoppingCart />} title="Achats">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <AchatField label="Fibre" code={commande.achatFibre} date={commande.dateReceptionFibre} />
-          <AchatField label="Limons" code={commande.achatLimons} date={commande.dateReceptionLimons} />
-          <AchatField label="Verres" code={commande.achatVerres} date={commande.dateReceptionVerre} />
-          <AchatField label="Colonnes" code={commande.achatColonnes} />
-          <AchatField label="Peinture" code={commande.achatPeinture} />
-          <AchatField label="Attaches" code={commande.achatAttaches} />
-          <AchatField label="Plancher alu." code={commande.achatPlancherAluminium} />
+          <AchatField label="Fibre" code={commande.achatFibre} dateEnvoie={commande.dateEnvoieFibre} dateReception={commande.dateReceptionFibre} quantiteNonRecue={commande.quantiteNonRecueFibre} />
+          <AchatField label="Limons" code={commande.achatLimons} dateEnvoie={commande.dateEnvoieLimons} dateReception={commande.dateReceptionLimons} quantiteNonRecue={commande.quantiteNonRecueLimons} />
+          <AchatField label="Verres" code={commande.achatVerres} dateEnvoie={commande.dateEnvoieVerres} dateReception={commande.dateReceptionVerre} quantiteNonRecue={commande.quantiteNonRecueVerres} />
+          <AchatField label="Colonnes" code={commande.achatColonnes} dateEnvoie={commande.dateEnvoieColonnes} dateReception={commande.dateReceptionColonnes} quantiteNonRecue={commande.quantiteNonRecueColonnes} />
+          <AchatField label="Peinture" code={commande.achatPeinture} dateEnvoie={commande.dateEnvoiePeinture} dateReception={commande.dateReceptionPeinture} quantiteNonRecue={commande.quantiteNonRecuePeinture} />
+          <AchatField label="Attaches" code={commande.achatAttaches} dateEnvoie={commande.dateEnvoieAttaches} dateReception={commande.dateReceptionAttaches} quantiteNonRecue={commande.quantiteNonRecueAttaches} />
+          <AchatField label="Plancher alu." code={commande.achatPlancherAluminium} dateEnvoie={commande.dateEnvoiePlancherAluminium} dateReception={commande.dateReceptionPlancherAluminium} quantiteNonRecue={commande.quantiteNonRecuePlancherAluminium} />
         </div>
+
+        {/* Structures d'achat */}
+        {commande.structuresAchat && commande.structuresAchat.length > 0 && (
+          <div className="mt-4">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Structures d'achat</h4>
+            <div className="space-y-2">
+              {commande.structuresAchat.map(s => (
+                <div key={s.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">{s.nom}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                        ACHAT_SYMBOLS[s.statutAchat]?.bgColor || "bg-gray-100"
+                      } ${ACHAT_SYMBOLS[s.statutAchat]?.color || "text-gray-600"}`}>
+                        {ACHAT_SYMBOLS[s.statutAchat]?.symbol || s.statutAchat}
+                      </span>
+                      {s.dateEnvoie && <span className="text-xs text-gray-500">Envoi: {formatDate(s.dateEnvoie)}</span>}
+                      {s.dateReception && <span className="text-xs text-gray-500">Reçu: {formatDate(s.dateReception)}</span>}
+                      {s.quantiteNonRecue && s.quantiteNonRecue > 0 && (
+                        <span className="text-xs text-red-600">Non reçu: {s.quantiteNonRecue}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </SectionCard>
 
       {/* SECTION: BALCONS/PHASES si applicable */}
@@ -336,6 +438,8 @@ export default function CommandeDetailsPage() {
                   <th className="px-3 py-2 text-left text-xs font-semibold">Nom</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold">Pieds lin.</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold">Poteaux</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold">Coût</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold">Prix</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">Produit</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">Installé</th>
                   <th className="px-3 py-2 text-center text-xs font-semibold">Reprise</th>
@@ -347,6 +451,8 @@ export default function CommandeDetailsPage() {
                     <td className="px-3 py-2 font-medium">{b.nom}</td>
                     <td className="px-3 py-2 text-right">{b.piedsLineaires}</td>
                     <td className="px-3 py-2 text-right">{b.poteaux}</td>
+                    <td className="px-3 py-2 text-right">{b.coutBalcon?.toFixed(2) ?? "0.00"} $</td>
+                    <td className="px-3 py-2 text-right">{b.prixTotal?.toFixed(2) ?? "0.00"} $</td>
                     <td className="px-3 py-2 text-center">{b.produit ? <CheckCircle2 size={16} className="text-green-500 mx-auto" /> : "—"}</td>
                     <td className="px-3 py-2 text-center">{b.installationTerminee ? <CheckCircle2 size={16} className="text-green-500 mx-auto" /> : "—"}</td>
                     <td className="px-3 py-2 text-center">{b.reprise ? <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Oui</span> : "—"}</td>
@@ -355,6 +461,15 @@ export default function CommandeDetailsPage() {
               </tbody>
             </table>
           </div>
+        </SectionCard>
+      )}
+
+      {/* SECTION: REPRISE */}
+      {commande.reprise && commande.ancienneCommandeNumero && (
+        <SectionCard icon={<RefreshCw />} title="Reprise">
+          <p className="text-gray-700 dark:text-gray-300">
+            Ancienne commande: <span className="font-bold">{commande.ancienneCommandeNumero}</span>
+          </p>
         </SectionCard>
       )}
 
@@ -494,7 +609,9 @@ function CodeField({ label, code }: { label: string; code?: string }) {
   );
 }
 
-function AchatField({ label, code, date }: { label: string; code?: string; date?: string }) {
+function AchatField({ label, code, dateEnvoie, dateReception, quantiteNonRecue }: { 
+  label: string; code?: string; dateEnvoie?: string; dateReception?: string; quantiteNonRecue?: number;
+}) {
   const config = code ? ACHAT_SYMBOLS[code] : null;
   return (
     <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl">
@@ -506,7 +623,13 @@ function AchatField({ label, code, date }: { label: string; code?: string; date?
       ) : (
         <span className="text-gray-400 text-sm">—</span>
       )}
-      {date && <p className="text-xs text-gray-500 mt-1">{formatDate(date)}</p>}
+      <div className="mt-1 space-y-1">
+        {dateEnvoie && <p className="text-xs text-gray-500">Envoi: {formatDate(dateEnvoie)}</p>}
+        {dateReception && <p className="text-xs text-gray-500">Reçu: {formatDate(dateReception)}</p>}
+        {quantiteNonRecue && quantiteNonRecue > 0 && (
+          <p className="text-xs text-red-600">Non reçu: {quantiteNonRecue}</p>
+        )}
+      </div>
     </div>
   );
 }
