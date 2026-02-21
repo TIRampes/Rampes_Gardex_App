@@ -1,6 +1,6 @@
-import { NextResponse ,NextRequest} from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { commandeSchema } from "../schema";
+import { commandeSchema, calculatePiedsLineairesTotaux, calculateTempsInstallationAuto } from "../schema";
 
 // GET - Récupérer une commande par ID
 export async function GET(
@@ -16,6 +16,7 @@ export async function GET(
         client: true,
         representant: true,
         balcons: { orderBy: { numeroPhase: "asc" } },
+        structuresAchat: true,
         planifications: {
           include: { equipe: true },
           orderBy: { datePlanifiee: "desc" },
@@ -57,7 +58,17 @@ export async function GET(
       return NextResponse.json({ error: "Commande non trouvée" }, { status: 404 });
     }
 
-    return NextResponse.json(commande);
+    // Récupérer les configurations
+    const configs = await prisma.configuration.findMany();
+    const configMap = Object.fromEntries(configs.map(c => [c.cle, c.valeur]));
+
+    return NextResponse.json({
+      ...commande,
+      config: {
+        coutHeureInstallation: parseFloat(configMap.coutHeureInstallation || "160"),
+        facteurTempsInstallation: parseFloat(configMap.facteurTempsInstallation || "0.7"),
+      }
+    });
   } catch (error) {
     console.error("Erreur GET commande:", error);
     return NextResponse.json({ error: "Erreur lors de la récupération" }, { status: 500 });
@@ -76,7 +87,10 @@ export async function PUT(
     // Vérifier que la commande existe
     const existingCommande = await prisma.commande.findUnique({
       where: { id },
-      include: { balcons: true },
+      include: { 
+        balcons: true,
+        structuresAchat: true 
+      },
     });
 
     if (!existingCommande) {
@@ -102,17 +116,66 @@ export async function PUT(
       }
     }
 
+    // Récupérer les configurations
+    const configs = await prisma.configuration.findMany();
+    const configMap = Object.fromEntries(configs.map(c => [c.cle, c.valeur]));
+    const coutHeure = parseFloat(configMap.coutHeureInstallation || "160");
+    const facteurTemps = parseFloat(configMap.facteurTempsInstallation || "0.7");
+
     // Calculer le prix total si modifié
     const prixVenteMateriaux = data.prixVenteMateriaux ?? Number(existingCommande.prixVenteMateriaux);
     const prixVenteInstallation = data.prixVenteInstallation ?? Number(existingCommande.prixVenteInstallation);
     const prixTotal = prixVenteMateriaux + prixVenteInstallation;
 
+    // Calculer les pieds linéaires totaux
+    const piedsLineairesBarrotin = data.piedsLineairesBarrotin ?? existingCommande.piedsLineairesBarrotin;
+    const piedsLineairesVerre = data.piedsLineairesVerre ?? existingCommande.piedsLineairesVerre;
+    const piedsLineairesMur = data.piedsLineairesMur ?? existingCommande.piedsLineairesMur;
+    const piedsLineairesMainDouble = data.piedsLineairesMainDouble ?? existingCommande.piedsLineairesMainDouble;
+    const piedsLineairesGardexVision = data.piedsLineairesGardexVision ?? existingCommande.piedsLineairesGardexVision;
+    const piedsLineairesGardexUrbaine = data.piedsLineairesGardexUrbaine ?? existingCommande.piedsLineairesGardexUrbaine;
+    const piedsLineairesGardexOptimum = data.piedsLineairesGardexOptimum ?? existingCommande.piedsLineairesGardexOptimum;
+
+    const piedsLineairesRampes = calculatePiedsLineairesTotaux({
+      piedsLineairesBarrotin: Number(piedsLineairesBarrotin),
+      piedsLineairesVerre: Number(piedsLineairesVerre),
+      piedsLineairesMur: Number(piedsLineairesMur),
+      piedsLineairesMainDouble: Number(piedsLineairesMainDouble),
+      piedsLineairesGardexVision: Number(piedsLineairesGardexVision),
+      piedsLineairesGardexUrbaine: Number(piedsLineairesGardexUrbaine),
+      piedsLineairesGardexOptimum: Number(piedsLineairesGardexOptimum),
+    });
+
+   // Calculer le temps d'installation auto si demandé
+let tempsInstallationAuto: number = Number(existingCommande.tempsInstallationAuto ?? 0);
+const utiliserCalculAuto = data.utiliserCalculAuto ?? existingCommande.utiliserCalculAuto;
+
+if (utiliserCalculAuto && Number(prixVenteInstallation ?? 0) > 0) {
+  try {
+    const prix = Number(prixVenteInstallation ?? 0);
+    const coutH = Number(coutHeure ?? 160); // valeur par défaut
+    const facteur = Number(facteurTemps ?? 0.7); // valeur par défaut
+
+    // Ne lancer le calcul que si tout est valide
+    if (!isNaN(prix) && !isNaN(coutH) && !isNaN(facteur) && coutH > 0) {
+      tempsInstallationAuto = calculateTempsInstallationAuto(prix, coutH, facteur);
+      tempsInstallationAuto = Math.round(tempsInstallationAuto * 2) / 2; // arrondi au demi-heure
+    } else {
+      tempsInstallationAuto = 0;
+    }
+  } catch (error) {
+    console.error("Erreur lors du calcul du temps d'installation auto:", error);
+    tempsInstallationAuto = 0;
+  }
+}
+
+
     // Gérer le changement de statut
     const ancienStatut = existingCommande.statut;
     const nouveauStatut = data.statut || ancienStatut;
 
-    // Extraire les balcons
-    const { balcons, ...commandeData } = data;
+    // Extraire les balcons et structures
+    const { balcons, structuresAchat, ...commandeData } = data;
 
     // Mettre à jour la commande
     const commande = await prisma.commande.update({
@@ -120,18 +183,27 @@ export async function PUT(
       data: {
         ...commandeData,
         prixTotal,
+        piedsLineairesRampes,
+        tempsInstallationAuto,
         datePrevue: data.datePrevue ? new Date(data.datePrevue) : undefined,
         dateLivraison: data.dateLivraison ? new Date(data.dateLivraison) : undefined,
         dateProduction: data.dateProduction ? new Date(data.dateProduction) : undefined,
         datePriseMesure: data.datePriseMesure ? new Date(data.datePriseMesure) : undefined,
         mesureDonneeLe: data.mesureDonneeLe ? new Date(data.mesureDonneeLe) : undefined,
         dateReceptionFibre: data.dateReceptionFibre ? new Date(data.dateReceptionFibre) : undefined,
+        dateEnvoieFibre: data.dateEnvoieFibre ? new Date(data.dateEnvoieFibre) : undefined,
         dateReceptionLimons: data.dateReceptionLimons ? new Date(data.dateReceptionLimons) : undefined,
+        dateEnvoieLimons: data.dateEnvoieLimons ? new Date(data.dateEnvoieLimons) : undefined,
         dateReceptionVerre: data.dateReceptionVerre ? new Date(data.dateReceptionVerre) : undefined,
+        dateEnvoieVerres: data.dateEnvoieVerres ? new Date(data.dateEnvoieVerres) : undefined,
         dateReceptionColonnes: data.dateReceptionColonnes ? new Date(data.dateReceptionColonnes) : undefined,
+        dateEnvoieColonnes: data.dateEnvoieColonnes ? new Date(data.dateEnvoieColonnes) : undefined,
         dateReceptionPeinture: data.dateReceptionPeinture ? new Date(data.dateReceptionPeinture) : undefined,
+        dateEnvoiePeinture: data.dateEnvoiePeinture ? new Date(data.dateEnvoiePeinture) : undefined,
         dateReceptionAttaches: data.dateReceptionAttaches ? new Date(data.dateReceptionAttaches) : undefined,
+        dateEnvoieAttaches: data.dateEnvoieAttaches ? new Date(data.dateEnvoieAttaches) : undefined,
         dateReceptionPlancherAluminium: data.dateReceptionPlancherAluminium ? new Date(data.dateReceptionPlancherAluminium) : undefined,
+        dateEnvoiePlancherAluminium: data.dateEnvoiePlancherAluminium ? new Date(data.dateEnvoiePlancherAluminium) : undefined,
         dateCompletion: nouveauStatut === "COMPLETEE" && ancienStatut !== "COMPLETEE" ? new Date() : undefined,
         dateAnnulation: nouveauStatut === "ANNULEE" && ancienStatut !== "ANNULEE" ? new Date() : undefined,
       },
@@ -139,6 +211,7 @@ export async function PUT(
         client: { select: { id: true, nom: true, type: true } },
         representant: { select: { id: true, nom: true } },
         balcons: true,
+        structuresAchat: true,
       },
     });
 
@@ -174,6 +247,26 @@ export async function PUT(
             installationTerminee: b.installationTerminee || false,
             reprise: b.reprise || false,
             notes: b.notes || null,
+          })),
+        });
+      }
+    }
+
+    // Gérer les structures d'achat si fournies
+    if (structuresAchat !== undefined) {
+      // Supprimer les anciennes structures
+      await prisma.structureAchat.deleteMany({ where: { commandeId: id } });
+      
+      // Créer les nouvelles structures
+      if (structuresAchat && structuresAchat.length > 0) {
+        await prisma.structureAchat.createMany({
+          data: structuresAchat.map(s => ({
+            commandeId: id,
+            nom: s.nom,
+            statutAchat: s.statutAchat || "A_FAIRE",
+            dateEnvoie: s.dateEnvoie ? new Date(s.dateEnvoie) : null,
+            dateReception: s.dateReception ? new Date(s.dateReception) : null,
+            quantiteNonRecue: s.quantiteNonRecue || null,
           })),
         });
       }
