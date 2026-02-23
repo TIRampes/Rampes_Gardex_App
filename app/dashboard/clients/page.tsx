@@ -144,55 +144,55 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Stats responsive */}
+      {/* Stats - style comme commandes */}
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-7 gap-2 sm:gap-4">
-        <StatCard 
-          title={<><span className="hidden xs:inline">Total clients</span><span className="xs:hidden">Total</span></>} 
-          value={stats.total} 
-          icon={Users} 
-          color="from-gray-600 to-gray-700" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Total clients</span><span className="xs:hidden">Total</span></>}
+          value={stats.total}
+          icon={Users}
+          color="gray"
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Entrepreneurs</span><span className="xs:hidden">Entrep.</span></>} 
-          value={stats.entrepreneurs} 
-          icon={Building2} 
-          color="from-blue-500 to-blue-600" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Entrepreneurs</span><span className="xs:hidden">Entrep.</span></>}
+          value={stats.entrepreneurs}
+          icon={Building2}
+          color="blue"
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Résidentiels</span><span className="xs:hidden">Résid.</span></>} 
-          value={stats.residentiels} 
-          icon={User} 
-          color="from-emerald-500 to-emerald-600" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Résidentiels</span><span className="xs:hidden">Résid.</span></>}
+          value={stats.residentiels}
+          icon={User}
+          color="emerald"
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Rive Nord</span><span className="xs:hidden">N</span></>} 
-          value={statsResidentiel.riveNord} 
-          icon={Home} 
-          color="from-blue-400 to-blue-500" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Rive Nord</span><span className="xs:hidden">N</span></>}
+          value={statsResidentiel.riveNord}
+          icon={Home}
+          color="blueLight"
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveNord / stats.residentiels) * 100)}%` : undefined}
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Rive Sud</span><span className="xs:hidden">S</span></>} 
-          value={statsResidentiel.riveSud} 
-          icon={Home} 
-          color="from-green-400 to-green-500" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Rive Sud</span><span className="xs:hidden">S</span></>}
+          value={statsResidentiel.riveSud}
+          icon={Home}
+          color="greenLight"
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveSud / stats.residentiels) * 100)}%` : undefined}
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Distributeurs</span><span className="xs:hidden">Dist.</span></>} 
-          value={stats.distributeurs} 
-          icon={Building2} 
-          color="from-purple-500 to-purple-600" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Distributeurs</span><span className="xs:hidden">Dist.</span></>}
+          value={stats.distributeurs}
+          icon={Building2}
+          color="purple"
         />
-        <StatCard 
-          title={<><span className="hidden xs:inline">Ambassadeurs</span><span className="xs:hidden">Amb.</span></>} 
-          value={stats.ambassadeurs} 
-          icon={Award} 
-          color="from-amber-500 to-amber-600" 
+        <StatCard
+          title={<><span className="hidden xs:inline">Ambassadeurs</span><span className="xs:hidden">Amb.</span></>}
+          value={stats.ambassadeurs}
+          icon={Award}
+          color="orange"
         />
       </div>
 
-      {/* Search & Filters */}
+      {/* Search & Filters (inchangé) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex flex-wrap gap-3">
           {/* Search */}
@@ -306,7 +306,7 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table (inchangée) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16 sm:py-20">
@@ -434,29 +434,36 @@ export default function ClientsPage() {
   );
 }
 
-interface StatCardProps {
-  title: React.ReactNode; // modifié pour accepter du JSX
-  value: number;
-  icon: React.ElementType;
-  color: string;
+// Composant StatCard reprenant le style des commandes
+function StatCard({ title, value, icon: Icon, color, subtitle }: { 
+  title: React.ReactNode; 
+  value: number; 
+  icon: React.ElementType; 
+  color: string; 
   subtitle?: string;
-}
+}) {
+  const colors: Record<string, string> = {
+    gray: "from-gray-600 to-gray-700",
+    blue: "from-blue-500 to-blue-600",
+    emerald: "from-emerald-500 to-emerald-600",
+    blueLight: "from-blue-400 to-blue-500",
+    greenLight: "from-green-400 to-green-500",
+    purple: "from-purple-500 to-purple-600",
+    orange: "from-orange-500 to-orange-600",
+  };
 
-function StatCard({ title, value, icon: Icon, color, subtitle }: StatCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
+    <div className={`bg-gradient-to-br ${colors[color]} rounded-xl p-3 sm:p-4 text-white shadow-lg`}>
       <div className="flex items-center justify-between">
-        <div className="min-w-0">
-          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{title}</div>
-          <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{value}</div>
-          {subtitle && (
-            <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">{subtitle}</div>
-          )}
+        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/20 rounded-lg flex items-center justify-center">
+          <Icon size={16} className="sm:w-5 sm:h-5" />
         </div>
-        <div className={`w-8 h-8 sm:w-12 sm:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md sm:shadow-lg flex-shrink-0`}>
-          <Icon className="text-white w-4 h-4 sm:w-6 sm:h-6" />
-        </div>
+        <span className="text-lg sm:text-2xl font-bold">{value}</span>
       </div>
+      <div className="text-white/80 text-xs sm:text-sm mt-1 font-medium">{title}</div>
+      {subtitle && (
+        <div className="text-white/60 text-[10px] sm:text-xs mt-0.5">{subtitle}</div>
+      )}
     </div>
   );
 }
