@@ -73,7 +73,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, [isOpen]);
 
   const handleLogout = () => {
-    signOut({ callbackUrl: "/Auth/login" });
+    signOut({ callbackUrl: "/auth/login" });
   };
 
   return (
