@@ -48,46 +48,26 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
 
-  // 👇 FONCTION POUR CHARGER LES CLIENTS AVEC DÉTECTION AUTOMATIQUE DES ZONES
   const fetchClients = async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/clients");
       if (res.ok) {
         const data = await res.json();
-        
-        // Traiter chaque client pour détecter et mettre à jour les zones
         const clientsAvecZone = data.map((client: Client) => {
-          // Uniquement pour les clients résidentiels
           if (client.type === "RESIDENTIEL") {
-            // 1. Détection automatique de la zone à partir de la ville/code postal
             const zone = determinerZoneResidentielle(client.ville, client.codePostal);
-            
-            // 2. Si une zone est détectée ET qu'elle est différente de celle en base
             if (zone && client.zoneResidentielle !== zone) {
-              // Mise à jour en arrière-plan (ne bloque pas l'affichage)
               fetch(`/api/clients/${client.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ zoneResidentielle: zone })
-              })
-              .then(response => {
-                if (response.ok) {
-                  console.log(`✅ Zone mise à jour pour ${client.nom}: ${zone}`);
-                }
-              })
-              .catch(error => {
-                console.error(`❌ Erreur mise à jour ${client.nom}:`, error);
-              });
+              }).catch(error => console.error(`❌ Erreur mise à jour ${client.nom}:`, error));
             }
-            
-            // 3. Retourner le client AVEC la zone détectée (pour affichage immédiat)
             return { ...client, zoneResidentielle: zone || client.zoneResidentielle };
           }
           return client;
         });
-        
-        // 4. Mettre à jour l'état avec les clients enrichis
         setClients(clientsAvecZone);
       }
     } catch (error) {
@@ -97,30 +77,24 @@ export default function ClientsPage() {
     }
   };
 
-  // Charger les clients au montage du composant
   useEffect(() => {
     fetchClients();
   }, []);
 
-  // Extraire les villes uniques pour le filtre
   const villes = [...new Set(clients.map(c => c.ville).filter(Boolean))] as string[];
 
-  // Filtrage des clients
   const filteredClients = clients.filter((client) => {
     const matchesSearch = 
       client.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.personne_Contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.telephone.includes(searchQuery) ||
       (client.ville && client.ville.toLowerCase().includes(searchQuery.toLowerCase()));
-    
     const matchesType = filterType === "all" || client.type === filterType;
     const matchesVille = filterVille === "all" || client.ville === filterVille;
     const matchesZone = filterZone === "all" || client.zoneResidentielle === filterZone;
-    
     return matchesSearch && matchesType && matchesVille && matchesZone;
   });
 
-  // Statistiques générales
   const stats = {
     total: clients.length,
     entrepreneurs: clients.filter(c => c.type === "ENTREPRENEUR").length,
@@ -129,7 +103,6 @@ export default function ClientsPage() {
     ambassadeurs: clients.filter(c => c.type === "AMBASSADEUR").length,
   };
 
-  // Statistiques des zones résidentielles
   const statsResidentiel = {
     riveNord: clients.filter(c => c.type === "RESIDENTIEL" && c.zoneResidentielle === "RIVE_NORD").length,
     riveSud: clients.filter(c => c.type === "RESIDENTIEL" && c.zoneResidentielle === "RIVE_SUD").length,
@@ -141,7 +114,7 @@ export default function ClientsPage() {
     try {
       const res = await fetch(`/api/clients/${selectedClient.id}`, { method: "DELETE" });
       if (res.ok) {
-        fetchClients(); // Recharger la liste après suppression
+        fetchClients();
         setShowDeleteModal(false);
         setSelectedClient(null);
       } else {
@@ -171,27 +144,52 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Stats avec nouvelles cartes pour Rive Nord/Sud */}
-      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 sm:gap-4">
-        <StatCard title="Total clients" value={stats.total} icon={Users} color="from-gray-600 to-gray-700" />
-        <StatCard title="Entrepreneurs" value={stats.entrepreneurs} icon={Building2} color="from-blue-500 to-blue-600" />
-        <StatCard title="Résidentiels" value={stats.residentiels} icon={User} color="from-emerald-500 to-emerald-600" />
+      {/* Stats responsive */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-7 gap-2 sm:gap-4">
         <StatCard 
-          title="Rive Nord" 
+          title={<><span className="hidden xs:inline">Total clients</span><span className="xs:hidden">Total</span></>} 
+          value={stats.total} 
+          icon={Users} 
+          color="from-gray-600 to-gray-700" 
+        />
+        <StatCard 
+          title={<><span className="hidden xs:inline">Entrepreneurs</span><span className="xs:hidden">Entrep.</span></>} 
+          value={stats.entrepreneurs} 
+          icon={Building2} 
+          color="from-blue-500 to-blue-600" 
+        />
+        <StatCard 
+          title={<><span className="hidden xs:inline">Résidentiels</span><span className="xs:hidden">Résid.</span></>} 
+          value={stats.residentiels} 
+          icon={User} 
+          color="from-emerald-500 to-emerald-600" 
+        />
+        <StatCard 
+          title={<><span className="hidden xs:inline">Rive Nord</span><span className="xs:hidden">N</span></>} 
           value={statsResidentiel.riveNord} 
           icon={Home} 
           color="from-blue-400 to-blue-500" 
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveNord / stats.residentiels) * 100)}%` : undefined}
         />
         <StatCard 
-          title="Rive Sud" 
+          title={<><span className="hidden xs:inline">Rive Sud</span><span className="xs:hidden">S</span></>} 
           value={statsResidentiel.riveSud} 
           icon={Home} 
           color="from-green-400 to-green-500" 
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveSud / stats.residentiels) * 100)}%` : undefined}
         />
-        <StatCard title="Distributeurs" value={stats.distributeurs} icon={Building2} color="from-purple-500 to-purple-600" />
-        <StatCard title="Ambassadeurs" value={stats.ambassadeurs} icon={Award} color="from-amber-500 to-amber-600" />
+        <StatCard 
+          title={<><span className="hidden xs:inline">Distributeurs</span><span className="xs:hidden">Dist.</span></>} 
+          value={stats.distributeurs} 
+          icon={Building2} 
+          color="from-purple-500 to-purple-600" 
+        />
+        <StatCard 
+          title={<><span className="hidden xs:inline">Ambassadeurs</span><span className="xs:hidden">Amb.</span></>} 
+          value={stats.ambassadeurs} 
+          icon={Award} 
+          color="from-amber-500 to-amber-600" 
+        />
       </div>
 
       {/* Search & Filters */}
@@ -437,7 +435,7 @@ export default function ClientsPage() {
 }
 
 interface StatCardProps {
-  title: string;
+  title: React.ReactNode; // modifié pour accepter du JSX
   value: number;
   icon: React.ElementType;
   color: string;
@@ -449,10 +447,10 @@ function StatCard({ title, value, icon: Icon, color, subtitle }: StatCardProps) 
     <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
       <div className="flex items-center justify-between">
         <div className="min-w-0">
-          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{title}</p>
-          <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{value}</p>
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{title}</div>
+          <div className="text-lg sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1">{value}</div>
           {subtitle && (
-            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">{subtitle}</p>
+            <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">{subtitle}</div>
           )}
         </div>
         <div className={`w-8 h-8 sm:w-12 sm:h-14 rounded-lg sm:rounded-xl bg-gradient-to-br ${color} flex items-center justify-center shadow-md sm:shadow-lg flex-shrink-0`}>
