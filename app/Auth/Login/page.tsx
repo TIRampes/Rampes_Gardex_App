@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 
-export default function LoginPage() {
+export default function loginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [error, setError] = useState("");
