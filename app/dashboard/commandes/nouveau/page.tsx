@@ -9,6 +9,7 @@ import {
   Building2, Layers, ChevronDown, CheckCircle2, Info, Paintbrush,
   Truck, Wrench, Clock, MessageCircle, RefreshCw, Hash
 } from "lucide-react";
+import { useConfig } from "@/app/context/ConfigContext";
 
 // Types
 interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; }
@@ -86,7 +87,6 @@ const SERVICE_OPTIONS = [
   { value: "TRANSPORT", label: "Transport", icon: "🚛" },
 ];
 
-// Options de couleur
 const COULEUR_OPTIONS = [
   { value: "", label: "— Sélectionner —" },
   { value: "NOIR", label: "Noir", bg: "bg-gray-900", text: "text-white" },
@@ -99,13 +99,11 @@ const COULEUR_OPTIONS = [
   { value: "AUTRE", label: "Autre", bg: "bg-blue-400", text: "text-white" },
 ];
 
-// Options pour statut livraison
 const STATUT_LIVRAISON_OPTIONS = [
   { value: "N_A", label: "N/A" },
   { value: "LIVRE", label: "Livré" },
 ];
 
-// Facteurs pour pieds linéaires
 const PIEDS_LINEAIRES_FACTEURS = [
   { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
   { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
@@ -118,17 +116,15 @@ const PIEDS_LINEAIRES_FACTEURS = [
 
 export default function NouvelleCommandePage() {
   const router = useRouter();
+  const { config, loading: configLoading } = useConfig();
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [representants, setRepresentants] = useState<Representant[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>("general");
-  const [config, setConfig] = useState({ coutHeureInstallation: 160, facteurTempsInstallation: 0.7 });
 
-  // Form data
   const [formData, setFormData] = useState({
-    // Général
     numero: "",
     clientId: "",
     representantId: "",
@@ -137,34 +133,22 @@ export default function NouvelleCommandePage() {
     service: "INSTALLATION",
     adresse: "",
     commentaireAdresse: "",
-
-    // Couleur
     couleur: "",
     couleurPersonnalisee: "",
-
-    // Reprise
     reprise: false,
     ancienneCommandeNumero: "",
-
-    // Commercial / Multi-Phase / Multiplan
     nombreBalcons: 0,
     nombrePhases: 0,
     piedsLineairesEstime: 0,
     piedsLineairesReels: 0,
-
-    // Dates
     dateEntree: new Date().toISOString().split("T")[0],
     dateProduction: "",
     datePrevue: "",
     datePriseMesure: "",
     dateLivraison: "",
-
-    // Prix
     prixTotal: 0,
     prixVenteInstallation: 0,
-    prixVenteMateriaux: 0, // sera calculé automatiquement
-
-    // Pieds linéaires par type
+    prixVenteMateriaux: 0,
     piedsLineairesBarrotin: 0,
     piedsLineairesVerre: 0,
     piedsLineairesMur: 0,
@@ -173,8 +157,6 @@ export default function NouvelleCommandePage() {
     piedsLineairesGardexUrbaine: 0,
     piedsLineairesGardexOptimum: 0,
     nombrePoteaux: 0,
-
-    // Anciens champs pour compatibilité
     tempsEstimeInstallation: 0,
     piedsCarresFibre: 0,
     piedsRampesBarrotin: 0,
@@ -184,11 +166,7 @@ export default function NouvelleCommandePage() {
     piedsRampesGardexVision: 0,
     piedsRampesGardexVisionUrbaine: 0,
     piedsRampesGardexVisionOptimum: 0,
-
-    // Temps installation auto
     utiliserCalculAuto: false,
-
-    // Production
     structure: false,
     mesure: "",
     mesureDonneeLe: "",
@@ -198,73 +176,52 @@ export default function NouvelleCommandePage() {
     termine: "",
     statutLivraison: "N_A",
     installation: "",
-
-    // Achats avec nouveaux champs
     achatFibre: "",
     dateEnvoieFibre: "",
     dateReceptionFibre: "",
     quantiteNonRecueFibre: 0,
-
     achatLimons: "",
     dateEnvoieLimons: "",
     dateReceptionLimons: "",
     quantiteNonRecueLimons: 0,
-
     achatVerres: "",
     dateEnvoieVerres: "",
     dateReceptionVerre: "",
     quantiteNonRecueVerres: 0,
-
     achatColonnes: "",
     dateEnvoieColonnes: "",
     dateReceptionColonnes: "",
     quantiteNonRecueColonnes: 0,
-
     achatPeinture: "",
     dateEnvoiePeinture: "",
     dateReceptionPeinture: "",
     quantiteNonRecuePeinture: 0,
-
     achatAttaches: "",
     dateEnvoieAttaches: "",
     dateReceptionAttaches: "",
     quantiteNonRecueAttaches: 0,
-
     achatPlancherAluminium: "",
     dateEnvoiePlancherAluminium: "",
     dateReceptionPlancherAluminium: "",
     quantiteNonRecuePlancherAluminium: 0,
-
-    // Avertissements
     avertissementClient: "",
     avertissementPriseMesure: "",
-
-    // Commentaire (dans infos générales)
     commentaire: "",
   });
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
   const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
-  const [showStructureForm, setShowStructureForm] = useState(false);
 
-  // Charger clients, représentants et config
+  // Charger clients et représentants
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, repsRes, configRes] = await Promise.all([
+        const [clientsRes, repsRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/representants"),
-          fetch("/api/configurations"),
         ]);
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (repsRes.ok) setRepresentants(await repsRes.json());
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          setConfig({
-            coutHeureInstallation: configData.coutHeureInstallation || 160,
-            facteurTempsInstallation: configData.facteurTempsInstallation || 0.7,
-          });
-        }
       } catch (err) {
         console.error("Erreur chargement:", err);
       }
@@ -287,7 +244,7 @@ export default function NouvelleCommandePage() {
       setFormData(prev => ({
         ...prev,
         dateProduction: dateProd.toISOString().split("T")[0],
-        dateLivraison: prev.datePrevue, // livraison = date prévue (inchangé)
+        dateLivraison: prev.datePrevue,
       }));
     } else {
       setFormData(prev => ({ ...prev, dateProduction: "", dateLivraison: "" }));
@@ -315,8 +272,9 @@ export default function NouvelleCommandePage() {
     formData.piedsLineairesGardexOptimum,
   ]);
 
-  // Calculer le temps d'installation auto (utilisé quand la checkbox est cochée)
+  // Calculer le temps d'installation auto (utilise config du contexte)
   const tempsInstallationCalcule = useMemo(() => {
+    if (!config) return 0;
     if (formData.prixVenteInstallation <= 0) return 0;
     return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
   }, [formData.prixVenteInstallation, config]);
@@ -328,7 +286,7 @@ export default function NouvelleCommandePage() {
     }
   }, [formData.utiliserCalculAuto, tempsInstallationCalcule]);
 
-  // Générer les balcons/phases quand le nombre change
+  // Générer les balcons/phases
   useEffect(() => {
     const count = formData.typeCommande === "COMMERCIAL" 
       ? formData.nombreBalcons 
@@ -337,7 +295,6 @@ export default function NouvelleCommandePage() {
     if (count > 0 && (formData.typeCommande !== "STANDARD")) {
       const prefix = formData.typeCommande === "COMMERCIAL" ? "Balcon" : 
                      formData.typeCommande === "MULTI_PHASE" ? "Phase" : "Plan";
-      
       const newBalcons: Balcon[] = Array.from({ length: count }, (_, i) => ({
         nom: `${prefix} ${i + 1}`,
         numeroPhase: i + 1,
@@ -355,7 +312,7 @@ export default function NouvelleCommandePage() {
     }
   }, [formData.typeCommande, formData.nombreBalcons, formData.nombrePhases]);
 
-  // Mettre l'adresse du client sélectionné
+  // Adresse du client sélectionné
   useEffect(() => {
     if (formData.clientId) {
       const client = clients.find(c => c.id === formData.clientId);
@@ -395,7 +352,6 @@ export default function NouvelleCommandePage() {
     setError(null);
     setLoading(true);
 
-    // Validation
     if (!formData.numero.trim()) { setError("Le numéro est obligatoire"); setLoading(false); return; }
     if (!formData.clientId) { setError("Le client est obligatoire"); setLoading(false); return; }
     if (!formData.adresse.trim()) { setError("L'adresse est obligatoire"); setLoading(false); return; }
@@ -407,7 +363,6 @@ export default function NouvelleCommandePage() {
         piedsLineairesRampes: piedsLineairesTotaux,
         balcons: balcons.length > 0 ? balcons : undefined,
         structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
-        // Convertir les valeurs vides en null
         representantId: formData.representantId || null,
         couleur: formData.couleur || null,
         couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
@@ -448,6 +403,14 @@ export default function NouvelleCommandePage() {
       setLoading(false);
     }
   };
+
+  if (configLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+      </div>
+    );
+  }
 
   if (success) {
     return (
@@ -1003,7 +966,7 @@ export default function NouvelleCommandePage() {
             </div>
           </div>
 
-          {/* Champ caché pour la compatibilité */}
+          {/* Champ caché pour compatibilité */}
           <input type="hidden" value={piedsLineairesTotaux} />
         </Section>
 
@@ -1082,8 +1045,6 @@ export default function NouvelleCommandePage() {
               onChange={(v) => setFormData({ ...formData, installation: v })}
               options={CODE_PRODUCTION_OPTIONS}
             />
-
-            {/* La checkbox "En production" a été retirée */}
           </div>
         </Section>
 
@@ -1319,7 +1280,7 @@ export default function NouvelleCommandePage() {
   );
 }
 
-// Composant Section collapsible
+// Composants auxiliaires
 function Section({ icon, title, description, isOpen, onToggle, children }: {
   icon: React.ReactNode; title: string; description: string;
   isOpen: boolean; onToggle: () => void; children: React.ReactNode;
@@ -1347,7 +1308,6 @@ function Section({ icon, title, description, isOpen, onToggle, children }: {
   );
 }
 
-// Composant Select avec symboles
 function SymbolSelect({ label, value, onChange, options }: {
   label: string; value: string; onChange: (v: string) => void;
   options: { value: string; label: string; symbol: string; color?: string }[];
@@ -1380,7 +1340,6 @@ function SymbolSelect({ label, value, onChange, options }: {
   );
 }
 
-// Composant Achat avec labels explicites
 function AchatField({ 
   label, statut, dateEnvoie, dateReception, quantiteNonRecue,
   onStatutChange, onDateEnvoieChange, onDateReceptionChange, onQuantiteChange 

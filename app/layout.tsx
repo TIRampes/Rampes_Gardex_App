@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Providers from "./providers";
 import GoogleMapsScript from "./components/Map/GoogleMapScript";
+import { ConfigProvider } from "@/app/context/ConfigContext";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -33,9 +34,11 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning >
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>{children}</Providers>
-        <GoogleMapsScript />
-        </body>
+        <ConfigProvider>
+          <Providers>{children}</Providers>
+          <GoogleMapsScript />
+        </ConfigProvider>
+      </body>
     </html>
   );
 }

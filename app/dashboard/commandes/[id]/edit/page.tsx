@@ -5,18 +5,26 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Package, User, MapPin, Calendar, DollarSign,
-  Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Building2, Layers,
-  ChevronDown, CheckCircle2, Info, Paintbrush, RefreshCw, MessageCircle,
-  Plus, Trash2
+  Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Plus, Trash2,
+  Building2, Layers, ChevronDown, CheckCircle2, Info, Paintbrush,
+  Truck, Wrench, Clock, MessageCircle, RefreshCw, Hash, Send, X
 } from "lucide-react";
+import { useConfig } from "@/app/context/ConfigContext";
 
-// Types et constantes (mêmes que nouveau/page.tsx)
-interface Client { id: string; nom: string; type: string; adresse: string; }
-interface Representant { id: string; nom: string; }
+// Types
+interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; cellulaire?: string; emails: string[]; }
+interface Representant { id: string; nom: string; email?: string; telephone?: string; }
 interface Balcon {
-  id?: string; nom: string; numeroPhase: number; piedsLineaires: number;
-  poteaux: number; coutBalcon: number; prixTotal: number;
-  produit: boolean; installationTerminee: boolean; reprise: boolean;
+  id?: string;
+  nom: string;
+  numeroPhase: number;
+  piedsLineaires: number;
+  poteaux: number;
+  coutBalcon: number;
+  prixTotal: number;
+  produit: boolean;
+  installationTerminee: boolean;
+  reprise: boolean;
   notes?: string;
 }
 interface StructureAchat {
@@ -27,7 +35,111 @@ interface StructureAchat {
   dateReception?: string;
   quantiteNonRecue?: number;
 }
+interface Commande {
+  id: string;
+  numero: string;
+  reference?: string;
+  clientId: string;
+  client: Client;
+  representantId?: string;
+  representant?: Representant;
+  typeCommande: string;
+  service: string;
+  statut: string;
+  adresse: string;
+  commentaireAdresse?: string;
+  couleur?: string;
+  couleurPersonnalisee?: string;
+  reprise: boolean;
+  ancienneCommandeNumero?: string;
+  nombreBalcons?: number;
+  nombrePhases?: number;
+  piedsLineairesEstime?: number;
+  piedsLineairesReels?: number;
+  dateEntree: string;
+  dateProduction?: string;
+  datePrevue?: string;
+  datePriseMesure?: string;
+  dateLivraison?: string;
+  prixTotal: number;
+  prixVenteInstallation: number;
+  prixVenteMateriaux: number;
+  piedsLineairesBarrotin: number;
+  piedsLineairesVerre: number;
+  piedsLineairesMur: number;
+  piedsLineairesMainDouble: number;
+  piedsLineairesGardexVision: number;
+  piedsLineairesGardexUrbaine: number;
+  piedsLineairesGardexOptimum: number;
+  nombrePoteaux: number;
+  tempsEstimeInstallation: number;
+  piedsCarresFibre?: number;
+  piedsRampesBarrotin: number;
+  piedsRampesVerre: number;
+  piedsRampesMurIntimite: number;
+  piedsRampesMainDouble: number;
+  piedsRampesGardexVision: number;
+  piedsRampesGardexVisionUrbaine: number;
+  piedsRampesGardexVisionOptimum: number;
+  utiliserCalculAuto: boolean;
+  structure: boolean;
+  mesure?: string;
+  mesureDonneeLe?: string;
+  plan?: string;
+  envoyeProduction?: string;
+  productionTerminee?: string;
+  termine?: string;
+  statutLivraison: string;
+  installation?: string;
+  enProduction: boolean;
+  achatFibre?: string;
+  dateEnvoieFibre?: string;
+  dateReceptionFibre?: string;
+  quantiteNonRecueFibre?: number;
+  achatLimons?: string;
+  dateEnvoieLimons?: string;
+  dateReceptionLimons?: string;
+  quantiteNonRecueLimons?: number;
+  achatVerres?: string;
+  dateEnvoieVerres?: string;
+  dateReceptionVerre?: string;
+  quantiteNonRecueVerres?: number;
+  achatColonnes?: string;
+  dateEnvoieColonnes?: string;
+  dateReceptionColonnes?: string;
+  quantiteNonRecueColonnes?: number;
+  achatPeinture?: string;
+  dateEnvoiePeinture?: string;
+  dateReceptionPeinture?: string;
+  quantiteNonRecuePeinture?: number;
+  achatAttaches?: string;
+  dateEnvoieAttaches?: string;
+  dateReceptionAttaches?: string;
+  quantiteNonRecueAttaches?: number;
+  achatPlancherAluminium?: string;
+  dateEnvoiePlancherAluminium?: string;
+  dateReceptionPlancherAluminium?: string;
+  quantiteNonRecuePlancherAluminium?: number;
+  avertissementClient?: string;
+  avertissementPriseMesure?: string;
+  commentaire?: string;
+  balcons: Balcon[];
+  structuresAchat: StructureAchat[];
+}
 
+// Options de commentaires prédéfinis
+const PREDEFINED_COMMENTS = [
+  "Un bris de production nous oblige à repousser votre commande. Nous faisons tout notre possible pour que votre commande soit prête le plus rapidement possible.",
+  "Dû aux mauvaises conditions météo des derniers jours, nos installations ont été retardées. Nous sommes donc contraints de retarder votre installation.",
+  "Étant donné le retard d'un de nos fournisseurs, nous devons repousser la date de livraison de votre commande. Soyez assuré que dès que notre fournisseur nous livrera, votre commande sera produite en priorité.",
+  "La prise de mesure a été retardée. La nouvelle date sera attribuée selon les délais en vigueur en ce moment.",
+  "Pour des raisons hors de notre contrôle, nous devons déplacer votre installation à une date ultérieure.",
+  "Dossier encore en attente d'une réponse du client.",
+  "Date de délai non respectée",
+  "Autre"
+];
+
+// Mapping codes production (copié depuis la page de création)
 const CODE_PRODUCTION_OPTIONS = [
   { value: "", label: "— Sélectionner —", symbol: "", color: "" },
   { value: "COMPLETE", label: "Complété", symbol: "✓", color: "text-green-600" },
@@ -51,11 +163,17 @@ const STATUT_ACHAT_OPTIONS = [
   { value: "BACK_ORDER", label: "Back order", symbol: "B/O", color: "text-red-600" },
 ];
 
-const STATUT_OPTIONS = [
-  { value: "ACTIVE", label: "Active" },
-  { value: "EN_ATTENTE", label: "En attente" },
-  { value: "COMPLETEE", label: "Complétée" },
-  { value: "ANNULEE", label: "Annulée" },
+const AVERTISSEMENT_CLIENT_OPTIONS = [
+  { value: "", label: "— Aucun —", symbol: "" },
+  { value: "CONF_REP", label: "Confirmé par représentant", symbol: "Conf.Rep" },
+  { value: "CONF_CLIENT", label: "Confirmé par client", symbol: "Conf.Client" },
+  { value: "ATT_REP_CLIENT", label: "Attente réponse", symbol: "Att.Rep.Client" },
+];
+
+const AVERTISSEMENT_MESURE_OPTIONS = [
+  { value: "", label: "— Aucun —", symbol: "" },
+  { value: "PRESENCE_CLIENT", label: "Présence client requise", symbol: "👤 Client" },
+  { value: "PRESENCE_REPRESENTANT", label: "Présence représentant requise", symbol: "👔 Rep." },
 ];
 
 const TYPE_COMMANDE_OPTIONS = [
@@ -89,17 +207,11 @@ const STATUT_LIVRAISON_OPTIONS = [
   { value: "LIVRE", label: "Livré" },
 ];
 
-const AVERTISSEMENT_CLIENT_OPTIONS = [
-  { value: "", label: "— Aucun —", symbol: "" },
-  { value: "CONF_REP", label: "Confirmé par représentant", symbol: "Conf.Rep" },
-  { value: "CONF_CLIENT", label: "Confirmé par client", symbol: "Conf.Client" },
-  { value: "ATT_REP_CLIENT", label: "Attente réponse", symbol: "Att.Rep.Client" },
-];
-
-const AVERTISSEMENT_MESURE_OPTIONS = [
-  { value: "", label: "— Aucun —", symbol: "" },
-  { value: "PRESENCE_CLIENT", label: "Présence client requise", symbol: "👤" },
-  { value: "PRESENCE_REPRESENTANT", label: "Présence représentant requise", symbol: "👔" },
+const STATUT_OPTIONS = [
+  { value: "ACTIVE", label: "Active" },
+  { value: "EN_ATTENTE", label: "En attente" },
+  { value: "COMPLETEE", label: "Complétée" },
+  { value: "ANNULEE", label: "Annulée" },
 ];
 
 const PIEDS_LINEAIRES_FACTEURS = [
@@ -117,6 +229,7 @@ const formatDateForInput = (date?: string) => date ? new Date(date).toISOString(
 export default function EditCommandePage() {
   const router = useRouter();
   const params = useParams();
+  const { config, loading: configLoading } = useConfig();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
@@ -124,80 +237,128 @@ export default function EditCommandePage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>("general");
-  const [config, setConfig] = useState({ coutHeureInstallation: 160, facteurTempsInstallation: 0.7 });
+  const [originalDatePrevue, setOriginalDatePrevue] = useState<string | null>(null);
+  const [originalCommande, setOriginalCommande] = useState<Commande | null>(null);
 
+  // États pour le modal d'avis de changement de date
+  const [showDateChangeModal, setShowDateChangeModal] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<any>(null);
+  const [selectedComments, setSelectedComments] = useState<string[]>([]);
+  const [customComment, setCustomComment] = useState("");
+  const [sendToClientSms, setSendToClientSms] = useState(true);
+  const [sendToClientEmail, setSendToClientEmail] = useState(true);
+  const [sendToRepresentantEmail, setSendToRepresentantEmail] = useState(true);
+  const [additionalEmails, setAdditionalEmails] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState("");
+
+  // Formulaire
   const [formData, setFormData] = useState({
-    // Général
-    numero: "", clientId: "", representantId: "", reference: "",
-    typeCommande: "STANDARD", service: "INSTALLATION", statut: "ACTIVE",
-    adresse: "", commentaireAdresse: "",
-    // Couleur
-    couleur: "", couleurPersonnalisee: "",
-    // Reprise
-    reprise: false, ancienneCommandeNumero: "",
-    // Commercial / Multi-Phase / Multiplan
-    nombreBalcons: 0, nombrePhases: 0, piedsLineairesEstime: 0, piedsLineairesReels: 0,
-    // Dates
-    dateEntree: "", dateProduction: "", datePrevue: "", datePriseMesure: "", dateLivraison: "",
-    // Prix
-    prixVenteMateriaux: 0, prixVenteInstallation: 0,
-    // Pieds linéaires
-    piedsLineairesBarrotin: 0, piedsLineairesVerre: 0, piedsLineairesMur: 0,
-    piedsLineairesMainDouble: 0, piedsLineairesGardexVision: 0,
-    piedsLineairesGardexUrbaine: 0, piedsLineairesGardexOptimum: 0,
+    numero: "",
+    clientId: "",
+    representantId: "",
+    reference: "",
+    typeCommande: "STANDARD",
+    service: "INSTALLATION",
+    statut: "ACTIVE",
+    adresse: "",
+    commentaireAdresse: "",
+    couleur: "",
+    couleurPersonnalisee: "",
+    reprise: false,
+    ancienneCommandeNumero: "",
+    nombreBalcons: 0,
+    nombrePhases: 0,
+    piedsLineairesEstime: 0,
+    piedsLineairesReels: 0,
+    dateEntree: "",
+    dateProduction: "",
+    datePrevue: "",
+    datePriseMesure: "",
+    dateLivraison: "",
+    prixTotal: 0,
+    prixVenteInstallation: 0,
+    prixVenteMateriaux: 0,
+    piedsLineairesBarrotin: 0,
+    piedsLineairesVerre: 0,
+    piedsLineairesMur: 0,
+    piedsLineairesMainDouble: 0,
+    piedsLineairesGardexVision: 0,
+    piedsLineairesGardexUrbaine: 0,
+    piedsLineairesGardexOptimum: 0,
     nombrePoteaux: 0,
-    // Anciens champs
-    tempsEstimeInstallation: 0, piedsCarresFibre: 0,
-    piedsRampesBarrotin: 0, piedsRampesVerre: 0, piedsRampesMurIntimite: 0,
-    piedsRampesMainDouble: 0, piedsRampesGardexVision: 0,
-    piedsRampesGardexVisionUrbaine: 0, piedsRampesGardexVisionOptimum: 0,
-    // Temps installation auto
-    utiliserCalculAuto: false, tempsInstallationAuto: 0,
-    // Production
-    structure: false, mesure: "", mesureDonneeLe: "", plan: "",
-    envoyeProduction: "", productionTerminee: "", termine: "",
-    statutLivraison: "N_A", installation: "", enProduction: false,
-    // Achats avec nouveaux champs
-    achatFibre: "", dateEnvoieFibre: "", dateReceptionFibre: "", quantiteNonRecueFibre: 0,
-    achatLimons: "", dateEnvoieLimons: "", dateReceptionLimons: "", quantiteNonRecueLimons: 0,
-    achatVerres: "", dateEnvoieVerres: "", dateReceptionVerre: "", quantiteNonRecueVerres: 0,
-    achatColonnes: "", dateEnvoieColonnes: "", dateReceptionColonnes: "", quantiteNonRecueColonnes: 0,
-    achatPeinture: "", dateEnvoiePeinture: "", dateReceptionPeinture: "", quantiteNonRecuePeinture: 0,
-    achatAttaches: "", dateEnvoieAttaches: "", dateReceptionAttaches: "", quantiteNonRecueAttaches: 0,
-    achatPlancherAluminium: "", dateEnvoiePlancherAluminium: "", dateReceptionPlancherAluminium: "", quantiteNonRecuePlancherAluminium: 0,
-    // Avertissements
-    avertissementClient: "", avertissementPriseMesure: "",
-    // Commentaire
+    tempsEstimeInstallation: 0,
+    piedsCarresFibre: 0,
+    piedsRampesBarrotin: 0,
+    piedsRampesVerre: 0,
+    piedsRampesMurIntimite: 0,
+    piedsRampesMainDouble: 0,
+    piedsRampesGardexVision: 0,
+    piedsRampesGardexVisionUrbaine: 0,
+    piedsRampesGardexVisionOptimum: 0,
+    utiliserCalculAuto: false,
+    structure: false,
+    mesure: "",
+    mesureDonneeLe: "",
+    plan: "",
+    envoyeProduction: "",
+    productionTerminee: "",
+    termine: "",
+    statutLivraison: "N_A",
+    installation: "",
+    enProduction: false,
+    achatFibre: "",
+    dateEnvoieFibre: "",
+    dateReceptionFibre: "",
+    quantiteNonRecueFibre: 0,
+    achatLimons: "",
+    dateEnvoieLimons: "",
+    dateReceptionLimons: "",
+    quantiteNonRecueLimons: 0,
+    achatVerres: "",
+    dateEnvoieVerres: "",
+    dateReceptionVerre: "",
+    quantiteNonRecueVerres: 0,
+    achatColonnes: "",
+    dateEnvoieColonnes: "",
+    dateReceptionColonnes: "",
+    quantiteNonRecueColonnes: 0,
+    achatPeinture: "",
+    dateEnvoiePeinture: "",
+    dateReceptionPeinture: "",
+    quantiteNonRecuePeinture: 0,
+    achatAttaches: "",
+    dateEnvoieAttaches: "",
+    dateReceptionAttaches: "",
+    quantiteNonRecueAttaches: 0,
+    achatPlancherAluminium: "",
+    dateEnvoiePlancherAluminium: "",
+    dateReceptionPlancherAluminium: "",
+    quantiteNonRecuePlancherAluminium: 0,
+    avertissementClient: "",
+    avertissementPriseMesure: "",
     commentaire: "",
   });
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
   const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
-  const [showStructureForm, setShowStructureForm] = useState(false);
 
-  // Charger données initiales
+  // Charger clients, représentants et commande
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, repsRes, commandeRes, configRes] = await Promise.all([
+        const [clientsRes, repsRes, commandeRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/representants"),
           fetch(`/api/commandes/${params.id}`),
-          fetch("/api/configurations"),
         ]);
 
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (repsRes.ok) setRepresentants(await repsRes.json());
-        if (configRes.ok) {
-          const configData = await configRes.json();
-          setConfig({
-            coutHeureInstallation: configData.coutHeureInstallation || 160,
-            facteurTempsInstallation: configData.facteurTempsInstallation || 0.7,
-          });
-        }
 
         if (commandeRes.ok) {
           const c = await commandeRes.json();
+          setOriginalCommande(c);
+          setOriginalDatePrevue(c.datePrevue || null);
           setFormData({
             numero: c.numero || "",
             clientId: c.clientId || "",
@@ -221,8 +382,9 @@ export default function EditCommandePage() {
             datePrevue: formatDateForInput(c.datePrevue),
             datePriseMesure: formatDateForInput(c.datePriseMesure),
             dateLivraison: formatDateForInput(c.dateLivraison),
-            prixVenteMateriaux: Number(c.prixVenteMateriaux) || 0,
+            prixTotal: Number(c.prixTotal) || 0,
             prixVenteInstallation: Number(c.prixVenteInstallation) || 0,
+            prixVenteMateriaux: Number(c.prixVenteMateriaux) || 0,
             piedsLineairesBarrotin: c.piedsLineairesBarrotin || 0,
             piedsLineairesVerre: c.piedsLineairesVerre || 0,
             piedsLineairesMur: c.piedsLineairesMur || 0,
@@ -241,7 +403,6 @@ export default function EditCommandePage() {
             piedsRampesGardexVisionUrbaine: c.piedsRampesGardexVisionUrbaine || 0,
             piedsRampesGardexVisionOptimum: c.piedsRampesGardexVisionOptimum || 0,
             utiliserCalculAuto: c.utiliserCalculAuto || false,
-            tempsInstallationAuto: Number(c.tempsInstallationAuto) || 0,
             structure: c.structure || false,
             mesure: c.mesure || "",
             mesureDonneeLe: formatDateForInput(c.mesureDonneeLe),
@@ -284,7 +445,6 @@ export default function EditCommandePage() {
             avertissementPriseMesure: c.avertissementPriseMesure || "",
             commentaire: c.commentaire || "",
           });
-
           if (c.balcons) setBalcons(c.balcons);
           if (c.structuresAchat) setStructuresAchat(c.structuresAchat);
         }
@@ -299,12 +459,11 @@ export default function EditCommandePage() {
     if (params.id) fetchData();
   }, [params.id]);
 
-  // Calculer prix total
+  // Calculs
   const prixTotal = useMemo(() => {
-    return (formData.prixVenteMateriaux || 0) + (formData.prixVenteInstallation || 0);
-  }, [formData.prixVenteMateriaux, formData.prixVenteInstallation]);
+    return (formData.prixTotal || 0);
+  }, [formData.prixTotal]);
 
-  // Calculer les pieds linéaires totaux avec facteurs
   const piedsLineairesTotaux = useMemo(() => {
     let total = 0;
     total += (formData.piedsLineairesBarrotin || 0) * 1.25;
@@ -325,18 +484,39 @@ export default function EditCommandePage() {
     formData.piedsLineairesGardexOptimum,
   ]);
 
-  // Calculer le temps d'installation auto
-  const tempsInstallationAuto = useMemo(() => {
-    if (!formData.utiliserCalculAuto || formData.prixVenteInstallation <= 0) return 0;
+  const tempsInstallationCalcule = useMemo(() => {
+    if (!config) return 0;
+    if (formData.prixVenteInstallation <= 0) return 0;
     return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
-  }, [formData.utiliserCalculAuto, formData.prixVenteInstallation, config]);
+  }, [formData.prixVenteInstallation, config]);
 
-  // Mettre à jour le temps d'installation auto
   useEffect(() => {
-    setFormData(prev => ({ ...prev, tempsInstallationAuto }));
-  }, [tempsInstallationAuto]);
+    if (formData.utiliserCalculAuto) {
+      setFormData(prev => ({ ...prev, tempsEstimeInstallation: tempsInstallationCalcule }));
+    }
+  }, [formData.utiliserCalculAuto, tempsInstallationCalcule]);
 
-  const updateBalcon = (index: number, field: keyof Balcon, value: number | boolean | string) => {
+  useEffect(() => {
+    if (formData.datePrevue) {
+      const datePrev = new Date(formData.datePrevue);
+      const dateProd = new Date(datePrev);
+      dateProd.setDate(dateProd.getDate() - 7);
+      setFormData(prev => ({
+        ...prev,
+        dateProduction: dateProd.toISOString().split("T")[0],
+        dateLivraison: prev.datePrevue,
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, dateProduction: "", dateLivraison: "" }));
+    }
+  }, [formData.datePrevue]);
+
+  useEffect(() => {
+    const materiaux = Math.max(0, (formData.prixTotal || 0) - (formData.prixVenteInstallation || 0));
+    setFormData(prev => ({ ...prev, prixVenteMateriaux: materiaux }));
+  }, [formData.prixTotal, formData.prixVenteInstallation]);
+
+  const updateBalcon = (index: number, field: keyof Balcon, value: any) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
   };
 
@@ -361,43 +541,80 @@ export default function EditCommandePage() {
     setStructuresAchat(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleAddEmail = () => {
+    if (newEmail && /^\S+@\S+\.\S+$/.test(newEmail)) {
+      setAdditionalEmails([...additionalEmails, newEmail]);
+      setNewEmail("");
+    }
+  };
+
+  const handleRemoveEmail = (email: string) => {
+    setAdditionalEmails(additionalEmails.filter(e => e !== email));
+  };
+
+  const handleCommentToggle = (comment: string) => {
+    if (comment === "Autre") {
+      // Pour "Autre", on ne le met pas dans selectedComments, on utilise customComment
+      return;
+    }
+    setSelectedComments(prev =>
+      prev.includes(comment) ? prev.filter(c => c !== comment) : [...prev, comment]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSaving(true);
 
+    // Validation
+    if (!formData.numero.trim()) { setError("Le numéro est obligatoire"); return; }
+    if (!formData.clientId) { setError("Le client est obligatoire"); return; }
+    if (!formData.adresse.trim()) { setError("L'adresse est obligatoire"); return; }
+
+    // Vérifier si la date prévue a changé
+    if (originalDatePrevue !== formData.datePrevue) {
+      // Ouvrir le modal avec les données actuelles
+      setPendingFormData({ ...formData, balcons, structuresAchat });
+      setShowDateChangeModal(true);
+    } else {
+      // Pas de changement de date, soumettre directement
+      await submitForm(formData);
+    }
+  };
+
+  const submitForm = async (dataToSend: any) => {
+    setSaving(true);
     try {
-      const dataToSend = {
-        ...formData,
-        prixTotal,
+      const payload = {
+        ...dataToSend,
+        prixTotal: dataToSend.prixTotal,
         piedsLineairesRampes: piedsLineairesTotaux,
-        tempsInstallationAuto,
         balcons: balcons.length > 0 ? balcons : undefined,
         structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
-        representantId: formData.representantId || null,
-        couleur: formData.couleur || null,
-        couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
-        mesure: formData.mesure || null,
-        plan: formData.plan || null,
-        envoyeProduction: formData.envoyeProduction || null,
-        productionTerminee: formData.productionTerminee || null,
-        termine: formData.termine || null,
-        installation: formData.installation || null,
-        achatFibre: formData.achatFibre || null,
-        achatLimons: formData.achatLimons || null,
-        achatVerres: formData.achatVerres || null,
-        achatColonnes: formData.achatColonnes || null,
-        achatPeinture: formData.achatPeinture || null,
-        achatAttaches: formData.achatAttaches || null,
-        achatPlancherAluminium: formData.achatPlancherAluminium || null,
-        avertissementClient: formData.avertissementClient || null,
-        avertissementPriseMesure: formData.avertissementPriseMesure || null,
+        representantId: dataToSend.representantId || null,
+        couleur: dataToSend.couleur || null,
+        couleurPersonnalisee: dataToSend.couleur === "AUTRE" ? dataToSend.couleurPersonnalisee : null,
+        mesure: dataToSend.mesure || null,
+        plan: dataToSend.plan || null,
+        envoyeProduction: dataToSend.envoyeProduction || null,
+        productionTerminee: dataToSend.productionTerminee || null,
+        termine: dataToSend.termine || null,
+        installation: dataToSend.installation || null,
+        achatFibre: dataToSend.achatFibre || null,
+        achatLimons: dataToSend.achatLimons || null,
+        achatVerres: dataToSend.achatVerres || null,
+        achatColonnes: dataToSend.achatColonnes || null,
+        achatPeinture: dataToSend.achatPeinture || null,
+        achatAttaches: dataToSend.achatAttaches || null,
+        achatPlancherAluminium: dataToSend.achatPlancherAluminium || null,
+        avertissementClient: dataToSend.avertissementClient || null,
+        avertissementPriseMesure: dataToSend.avertissementPriseMesure || null,
       };
 
       const res = await fetch(`/api/commandes/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(dataToSend),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -407,14 +624,76 @@ export default function EditCommandePage() {
         const data = await res.json();
         setError(data.error || "Erreur lors de la mise à jour");
       }
-    } catch {
+    } catch (err) {
       setError("Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  const handleSendNotification = async () => {
+    // Construire le commentaire complet
+    let fullComment = selectedComments.join(" ");
+    if (customComment.trim()) {
+      fullComment += (fullComment ? " " : "") + customComment.trim();
+    }
+    if (!fullComment) fullComment = "Changement de date sans raison spécifiée.";
+
+    // Destinataires
+    const client = clients.find(c => c.id === formData.clientId);
+    const representant = representants.find(r => r.id === formData.representantId);
+
+    const toSms = sendToClientSms && client?.telephone ? [client.telephone] : [];
+    const toEmails = [];
+    if (sendToClientEmail && client?.emails?.length) toEmails.push(...client.emails);
+    if (sendToRepresentantEmail && representant?.email) toEmails.push(representant.email);
+    toEmails.push(...additionalEmails);
+
+    // Préparer les données pour l'API
+    const notificationData = {
+      commande: {
+        numero: formData.numero,
+        reference: formData.reference,
+        clientNom: client?.nom,
+        representantNom: representant?.nom,
+        representantEmail: representant?.email,
+        representantTelephone: representant?.telephone,
+        ville: client?.adresse?.split('\n')[0] || "", // approximation
+        typeCommande: formData.typeCommande,
+        couleur: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : formData.couleur,
+        ancienneDate: originalDatePrevue,
+        nouvelleDate: formData.datePrevue,
+        raison: fullComment,
+        enProduction: originalCommande?.enProduction || false,
+      },
+      toSms,
+      toEmails,
+    };
+
+    try {
+      const res = await fetch("/api/notifications/date-change", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notificationData),
+      });
+      if (!res.ok) {
+        console.error("Erreur envoi notification");
+      }
+    } catch (err) {
+      console.error("Erreur réseau notification", err);
+    } finally {
+      // Soumettre le formulaire
+      setShowDateChangeModal(false);
+      await submitForm(pendingFormData);
+    }
+  };
+
+  const handleSaveWithoutNotification = async () => {
+    setShowDateChangeModal(false);
+    await submitForm(pendingFormData);
+  };
+
+  if (loading || configLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
@@ -426,7 +705,7 @@ export default function EditCommandePage() {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center space-y-4">
-          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-10 h-10 text-green-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Commande mise à jour!</h2>
@@ -449,9 +728,9 @@ export default function EditCommandePage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-xl">
+        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
           <AlertTriangle className="w-5 h-5 text-red-600" />
-          <p className="text-red-700">{error}</p>
+          <p className="text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -520,7 +799,6 @@ export default function EditCommandePage() {
               <span className="text-sm font-medium text-orange-700">Cette commande est une reprise</span>
             </label>
           </div>
-
           {formData.reprise && (
             <div className="mt-4">
               <label className="block text-sm font-medium mb-2">Numéro de l'ancienne commande</label>
@@ -533,17 +811,14 @@ export default function EditCommandePage() {
             <label className="block text-sm font-medium mb-2">Adresse</label>
             <input type="text" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
           </div>
-
           <div className="mt-4">
             <label className="block text-sm font-medium mb-2">Commentaire adresse</label>
             <input type="text" value={formData.commentaireAdresse} onChange={(e) => setFormData({ ...formData, commentaireAdresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
           </div>
-
           <div className="mt-4">
             <label className="block text-sm font-medium mb-2">Commentaire général</label>
             <textarea value={formData.commentaire} onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })} rows={3} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none" />
           </div>
-
           <div className="mt-4 flex items-center gap-4">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={formData.enProduction} onChange={(e) => setFormData({ ...formData, enProduction: e.target.checked })} className="w-4 h-4" />
@@ -556,30 +831,28 @@ export default function EditCommandePage() {
         <Section icon={<Calendar />} title="Dates et Prix" isOpen={activeSection === "dates"} onToggle={() => setActiveSection(activeSection === "dates" ? null : "dates")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div><label className="block text-sm font-medium mb-2">Date entrée</label><input type="date" value={formData.dateEntree} onChange={(e) => setFormData({ ...formData, dateEntree: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date production</label><input type="date" value={formData.dateProduction} onChange={(e) => setFormData({ ...formData, dateProduction: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date prévue</label><input type="date" value={formData.datePrevue} onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date mesure</label><input type="date" value={formData.datePriseMesure} onChange={(e) => setFormData({ ...formData, datePriseMesure: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            <div><label className="block text-sm font-medium mb-2">Date prévue *</label><input type="date" value={formData.datePrevue} onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            <div><label className="block text-sm font-medium mb-2">Date production (auto)</label><input type="date" value={formData.dateProduction} readOnly className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500" /></div>
+            <div><label className="block text-sm font-medium mb-2">Semaine prévue</label><div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-blue-700 dark:text-blue-300 font-semibold">{formData.datePrevue ? `S${Math.ceil(((new Date(formData.datePrevue).getTime() - new Date(new Date(formData.datePrevue).getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7)}` : "—"}</div></div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-            <div><label className="block text-sm font-medium mb-2">Prix matériaux ($)</label><input type="number" step="0.01" value={formData.prixVenteMateriaux} onChange={(e) => setFormData({ ...formData, prixVenteMateriaux: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            <div><label className="block text-sm font-medium mb-2">Prix total ($)</label><input type="number" step="0.01" value={formData.prixTotal} onChange={(e) => setFormData({ ...formData, prixTotal: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <div><label className="block text-sm font-medium mb-2">Prix installation ($)</label><input type="number" step="0.01" value={formData.prixVenteInstallation} onChange={(e) => setFormData({ ...formData, prixVenteInstallation: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Prix total</label><div className="px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 rounded-xl text-xl font-bold text-green-700">{prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}</div></div>
+            <div><label className="block text-sm font-medium mb-2">Prix matériaux (auto)</label><div className="px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xl font-bold text-gray-900 dark:text-white">{formData.prixVenteMateriaux.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}</div></div>
           </div>
 
-          {/* Temps installation auto */}
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
-            <label className="flex items-center gap-2 mb-3">
-              <input type="checkbox" checked={formData.utiliserCalculAuto} onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })} className="w-4 h-4" />
-              <span className="text-sm font-medium text-blue-700">Calcul automatique du temps d'installation</span>
-            </label>
-            {formData.utiliserCalculAuto && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div><label className="block text-xs text-gray-500">Coût à l'heure</label><div className="px-3 py-2 bg-white rounded-lg">{config.coutHeureInstallation} $/h</div></div>
-                <div><label className="block text-xs text-gray-500">Facteur</label><div className="px-3 py-2 bg-white rounded-lg">{config.facteurTempsInstallation}</div></div>
-                <div><label className="block text-xs text-gray-500">Temps calculé</label><div className="px-3 py-2 bg-blue-100 rounded-lg font-bold">{tempsInstallationAuto.toFixed(2)} h</div></div>
-              </div>
-            )}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Temps installation estimé (h)</label>
+              <input type="number" step="0.1" value={formData.tempsEstimeInstallation} onChange={(e) => setFormData({ ...formData, tempsEstimeInstallation: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+            </div>
+            <div className="flex items-center pt-8">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={formData.utiliserCalculAuto} onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })} className="w-4 h-4" />
+                <span className="text-sm">Calcul automatique</span>
+              </label>
+            </div>
           </div>
         </Section>
 
@@ -627,8 +900,8 @@ export default function EditCommandePage() {
         {/* SECTION 5: ACHATS */}
         <Section icon={<ShoppingCart />} title="Achats" isOpen={activeSection === "achats"} onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AchatEditField 
-              label="Fibre" 
+            <AchatEditField
+              label="Fibre"
               statut={formData.achatFibre}
               dateEnvoie={formData.dateEnvoieFibre}
               dateReception={formData.dateReceptionFibre}
@@ -638,8 +911,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionFibre: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueFibre: v })}
             />
-            <AchatEditField 
-              label="Limons" 
+            <AchatEditField
+              label="Limons"
               statut={formData.achatLimons}
               dateEnvoie={formData.dateEnvoieLimons}
               dateReception={formData.dateReceptionLimons}
@@ -649,8 +922,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionLimons: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueLimons: v })}
             />
-            <AchatEditField 
-              label="Verres" 
+            <AchatEditField
+              label="Verres"
               statut={formData.achatVerres}
               dateEnvoie={formData.dateEnvoieVerres}
               dateReception={formData.dateReceptionVerre}
@@ -660,8 +933,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionVerre: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueVerres: v })}
             />
-            <AchatEditField 
-              label="Colonnes" 
+            <AchatEditField
+              label="Colonnes"
               statut={formData.achatColonnes}
               dateEnvoie={formData.dateEnvoieColonnes}
               dateReception={formData.dateReceptionColonnes}
@@ -671,8 +944,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionColonnes: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueColonnes: v })}
             />
-            <AchatEditField 
-              label="Peinture" 
+            <AchatEditField
+              label="Peinture"
               statut={formData.achatPeinture}
               dateEnvoie={formData.dateEnvoiePeinture}
               dateReception={formData.dateReceptionPeinture}
@@ -682,8 +955,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPeinture: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePeinture: v })}
             />
-            <AchatEditField 
-              label="Attaches" 
+            <AchatEditField
+              label="Attaches"
               statut={formData.achatAttaches}
               dateEnvoie={formData.dateEnvoieAttaches}
               dateReception={formData.dateReceptionAttaches}
@@ -693,8 +966,8 @@ export default function EditCommandePage() {
               onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionAttaches: v })}
               onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueAttaches: v })}
             />
-            <AchatEditField 
-              label="Plancher alu." 
+            <AchatEditField
+              label="Plancher alu."
               statut={formData.achatPlancherAluminium}
               dateEnvoie={formData.dateEnvoiePlancherAluminium}
               dateReception={formData.dateReceptionPlancherAluminium}
@@ -724,18 +997,18 @@ export default function EditCommandePage() {
                 </button>
               </div>
               {structuresAchat.map((s, i) => (
-                <div key={i} className="p-4 bg-gray-50 rounded-xl">
+                <div key={i} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
                   <div className="flex items-center justify-between mb-3">
-                    <input type="text" value={s.nom} onChange={(e) => updateStructure(i, "nom", e.target.value)} placeholder="Nom" className="flex-1 px-3 py-2 bg-white border rounded-lg text-sm" />
+                    <input type="text" value={s.nom} onChange={(e) => updateStructure(i, "nom", e.target.value)} placeholder="Nom" className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
                     <button type="button" onClick={() => removeStructure(i)} className="ml-2 p-2 text-red-600"><Trash2 size={16} /></button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <select value={s.statutAchat} onChange={(e) => updateStructure(i, "statutAchat", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm">
+                    <select value={s.statutAchat} onChange={(e) => updateStructure(i, "statutAchat", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
                       {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
                     </select>
-                    <input type="date" value={s.dateEnvoie || ""} onChange={(e) => updateStructure(i, "dateEnvoie", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm" />
-                    <input type="date" value={s.dateReception || ""} onChange={(e) => updateStructure(i, "dateReception", e.target.value)} className="px-3 py-2 bg-white border rounded-lg text-sm" />
-                    <input type="number" min="0" value={s.quantiteNonRecue || 0} onChange={(e) => updateStructure(i, "quantiteNonRecue", parseInt(e.target.value) || 0)} placeholder="Qté non reçue" className="px-3 py-2 bg-white border rounded-lg text-sm" />
+                    <input type="date" value={s.dateEnvoie || ""} onChange={(e) => updateStructure(i, "dateEnvoie", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                    <input type="date" value={s.dateReception || ""} onChange={(e) => updateStructure(i, "dateReception", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                    <input type="number" min="0" value={s.quantiteNonRecue || 0} onChange={(e) => updateStructure(i, "quantiteNonRecue", parseInt(e.target.value) || 0)} placeholder="Qté non reçue" className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
                   </div>
                 </div>
               ))}
@@ -760,11 +1033,141 @@ export default function EditCommandePage() {
           </button>
         </div>
       </form>
+
+      {/* MODAL D'AVIS DE CHANGEMENT DE DATE */}
+      {showDateChangeModal && pendingFormData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Avis de changement de date</h3>
+              <button onClick={() => setShowDateChangeModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Informations commande */}
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 mb-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div><span className="text-gray-500">Commande:</span> <span className="font-medium">{pendingFormData.numero}</span></div>
+                <div><span className="text-gray-500">Référence:</span> <span>{pendingFormData.reference || "—"}</span></div>
+                <div><span className="text-gray-500">Client:</span> <span className="font-medium">{clients.find(c => c.id === pendingFormData.clientId)?.nom}</span></div>
+                <div><span className="text-gray-500">Représentant:</span> <span>{representants.find(r => r.id === pendingFormData.representantId)?.nom || "—"}</span></div>
+                <div><span className="text-gray-500">Ville:</span> <span>{clients.find(c => c.id === pendingFormData.clientId)?.adresse?.split('\n')[0] || "—"}</span></div>
+                <div><span className="text-gray-500">Type:</span> <span>{pendingFormData.typeCommande}</span></div>
+                <div><span className="text-gray-500">Couleur:</span> <span>{pendingFormData.couleur === "AUTRE" ? pendingFormData.couleurPersonnalisee : pendingFormData.couleur || "—"}</span></div>
+              </div>
+              <div className="mt-2 flex gap-4">
+                <div><span className="text-gray-500">Ancienne date:</span> <span className="line-through">{originalDatePrevue ? new Date(originalDatePrevue).toLocaleDateString('fr-CA') : "—"}</span></div>
+                <div><span className="text-gray-500">Nouvelle date:</span> <span className="font-bold text-blue-600">{pendingFormData.datePrevue ? new Date(pendingFormData.datePrevue).toLocaleDateString('fr-CA') : "—"}</span></div>
+              </div>
+            </div>
+
+            {/* Alerte si commande en production */}
+            {originalCommande?.enProduction && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+                  Attention: Cette commande est déjà en production. Un changement de date peut avoir un impact important.
+                </p>
+              </div>
+            )}
+
+            {/* Raisons prédéfinies */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Raison du changement (vous pouvez en sélectionner plusieurs)</label>
+              <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                {PREDEFINED_COMMENTS.map((comment, idx) => (
+                  <label key={idx} className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedComments.includes(comment) || (comment === "Autre" && customComment !== "")}
+                      onChange={() => handleCommentToggle(comment)}
+                      disabled={comment === "Autre"}
+                      className="mt-1"
+                    />
+                    <span className="text-sm">{comment}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Commentaire personnalisé */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Commentaire personnalisé (si "Autre" est coché ou pour compléter)</label>
+              <textarea
+                value={customComment}
+                onChange={(e) => setCustomComment(e.target.value)}
+                rows={3}
+                placeholder="Écrivez votre message ici..."
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg"
+              />
+            </div>
+
+            {/* Destinataires */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Envoyer à :</label>
+              <div className="space-y-2">
+                {clients.find(c => c.id === pendingFormData.clientId)?.telephone && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={sendToClientSms} onChange={(e) => setSendToClientSms(e.target.checked)} />
+                    <span className="text-sm">📱 Client (SMS) : {clients.find(c => c.id === pendingFormData.clientId)?.telephone}</span>
+                  </label>
+                )}
+                {clients.find(c => c.id === pendingFormData.clientId)?.emails?.map((email, idx) => (
+                  <label key={idx} className="flex items-center gap-2">
+                    <input type="checkbox" checked={sendToClientEmail} onChange={(e) => setSendToClientEmail(e.target.checked)} />
+                    <span className="text-sm">📧 Client : {email}</span>
+                  </label>
+                ))}
+                {representants.find(r => r.id === pendingFormData.representantId)?.email && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={sendToRepresentantEmail} onChange={(e) => setSendToRepresentantEmail(e.target.checked)} />
+                    <span className="text-sm">📧 Représentant : {representants.find(r => r.id === pendingFormData.representantId)?.email}</span>
+                  </label>
+                )}
+                {/* Emails supplémentaires */}
+                {additionalEmails.map((email, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-sm">📧 {email}</span>
+                    <button onClick={() => handleRemoveEmail(email)} className="text-red-500 text-xs">Supprimer</button>
+                  </div>
+                ))}
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Ajouter un email"
+                    className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                  <button onClick={handleAddEmail} className="px-3 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm">Ajouter</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Boutons d'action */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={handleSaveWithoutNotification}
+                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
+              >
+                Modifier sans envoyer d'avis
+              </button>
+              <button
+                onClick={handleSendNotification}
+                className="flex-1 px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl font-medium flex items-center justify-center gap-2"
+              >
+                <Send size={18} /> Envoyer l'avis
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Composants
+// Composants auxiliaires (Section, SymbolSelect, AchatEditField) – identiques à ceux de la page de création
 function Section({ icon, title, isOpen, onToggle, children }: { icon: React.ReactNode; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -799,12 +1202,21 @@ function AchatEditField({ label, statut, dateEnvoie, dateReception, quantiteNonR
     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
       <label className="block text-sm font-semibold mb-3">{label}</label>
       <div className="space-y-2">
-        <select value={statut} onChange={(e) => onStatutChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm">
+        <select value={statut} onChange={(e) => onStatutChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
           {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
         </select>
-        <input type="date" value={dateEnvoie} onChange={(e) => onDateEnvoieChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Date envoi" />
-        <input type="date" value={dateReception} onChange={(e) => onDateReceptionChange(e.target.value)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Date réception" />
-        <input type="number" min="0" value={quantiteNonRecue || 0} onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white border rounded-lg text-sm" placeholder="Qté non reçue" />
+        <div>
+          <label className="block text-xs text-gray-500">Date d'envoi</label>
+          <input type="date" value={dateEnvoie} onChange={(e) => onDateEnvoieChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500">Date de réception</label>
+          <input type="date" value={dateReception} onChange={(e) => onDateReceptionChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500">Quantité non reçue</label>
+          <input type="number" min="0" value={quantiteNonRecue || 0} onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+        </div>
       </div>
     </div>
   );

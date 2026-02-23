@@ -9,7 +9,7 @@ export async function GET() {
     // Convertir en objet clé-valeur
     const configMap = Object.fromEntries(configs.map(c => [c.cle, c.valeur]));
     
-    // Construire l'objet de retour avec la structure attendue par le front
+    // Construire l'objet de retour avec la structure attendue
     return NextResponse.json({
       coutHeureInstallation: parseFloat(configMap.coutHeureInstallation || "160"),
       facteurTempsInstallation: parseFloat(configMap.facteurTempsInstallation || "0.7"),
@@ -34,10 +34,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Préparer les opérations d'upsert pour chaque clé
     const operations = [];
     
-    // Traiter les valeurs simples
     if (body.coutHeureInstallation !== undefined) {
       operations.push(
         prisma.configuration.upsert({
@@ -58,7 +56,6 @@ export async function POST(request: Request) {
       );
     }
     
-    // Traiter les facteurs de pieds linéaires
     if (body.facteursPiedsLineaires) {
       const f = body.facteursPiedsLineaires;
       if (f.barrotin !== undefined) {
@@ -126,7 +123,6 @@ export async function POST(request: Request) {
       }
     }
     
-    // Exécuter toutes les opérations en transaction
     await prisma.$transaction(operations);
     
     return NextResponse.json({ success: true });

@@ -7,8 +7,9 @@ import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
   ChevronDown, MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
   CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers,
-  MessageCircle, User, Users, FilterX, Settings, Save, X
+  MessageCircle, User, Users, FilterX, Settings, Save, X, Lock
 } from "lucide-react";
+import { useConfig } from "@/app/context/ConfigContext";
 
 // Types
 interface Client { id: string; nom: string; type: string; telephone: string; personne_Contact: string; }
@@ -52,11 +53,6 @@ interface Stats {
   avecCommentaires: number;
   reprises: number;
 }
-interface Config {
-  coutHeureInstallation: number;
-  facteurTempsInstallation: number;
-  facteursPiedsLineaires: Record<string, number>;
-}
 
 // Mappings
 const CODE_SYMBOLS: Record<string, { symbol: string; color: string }> = {
@@ -87,7 +83,6 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bgColor: strin
   MULTIPLAN: { label: "Multiplan", color: "text-emerald-700", bgColor: "bg-emerald-50 dark:bg-emerald-900/30" },
 };
 
-// Couleurs corrigées selon demande
 const SERVICE_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   INSTALLATION: { label: "Installation", color: "bg-red-500", icon: <Wrench size={14} /> },
   LIVRAISON: { label: "Livraison", color: "bg-blue-500", icon: <Truck size={14} /> },
@@ -141,9 +136,9 @@ const CouleurBadge = ({ couleur }: { couleur: string | null }) => {
 
 export default function CommandesPage() {
   const router = useRouter();
+  const { config, refreshConfig } = useConfig();
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({ statut: "", type: "", service: "", representantId: "", clientId: "" });
@@ -152,6 +147,13 @@ export default function CommandesPage() {
   const [deleteModal, setDeleteModal] = useState<Commande | null>(null);
   const [representants, setRepresentants] = useState<{ id: string; nom: string }[]>([]);
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
+
+  // États pour le modal de mot de passe
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+
+  // États pour le modal de configuration
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState({
     coutHeureInstallation: 160,
@@ -165,11 +167,27 @@ export default function CommandesPage() {
     facteurGardexOptimum: 0.75,
   });
 
+  // Remplir le formulaire quand la config est chargée
+  useEffect(() => {
+    if (config) {
+      setConfigForm({
+        coutHeureInstallation: config.coutHeureInstallation,
+        facteurTempsInstallation: config.facteurTempsInstallation,
+        facteurBarrotin: config.facteursPiedsLineaires?.barrotin || 1.25,
+        facteurVerre: config.facteursPiedsLineaires?.verre || 1,
+        facteurMur: config.facteursPiedsLineaires?.mur || 4,
+        facteurMainDouble: config.facteursPiedsLineaires?.mainDouble || 2.25,
+        facteurGardexVision: config.facteursPiedsLineaires?.gardexVision || 1,
+        facteurGardexUrbaine: config.facteursPiedsLineaires?.gardexUrbaine || 2,
+        facteurGardexOptimum: config.facteursPiedsLineaires?.gardexOptimum || 0.75,
+      });
+    }
+  }, [config]);
+
   useEffect(() => {
     fetchCommandes();
     fetchRepresentants();
     fetchClients();
-    fetchConfig();
   }, [search, filters]);
 
   const fetchCommandes = async () => {
@@ -190,56 +208,6 @@ export default function CommandesPage() {
       console.error("Erreur:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchConfig = async () => {
-    try {
-      const res = await fetch("/api/configurations");
-      if (res.ok) {
-        const data = await res.json();
-        setConfig(data);
-        setConfigForm({
-          coutHeureInstallation: data.coutHeureInstallation || 160,
-          facteurTempsInstallation: data.facteurTempsInstallation || 0.7,
-          facteurBarrotin: data.facteursPiedsLineaires?.barrotin || 1.25,
-          facteurVerre: data.facteursPiedsLineaires?.verre || 1,
-          facteurMur: data.facteursPiedsLineaires?.mur || 4,
-          facteurMainDouble: data.facteursPiedsLineaires?.mainDouble || 2.25,
-          facteurGardexVision: data.facteursPiedsLineaires?.gardexVision || 1,
-          facteurGardexUrbaine: data.facteursPiedsLineaires?.gardexUrbaine || 2,
-          facteurGardexOptimum: data.facteursPiedsLineaires?.gardexOptimum || 0.75,
-        });
-      }
-    } catch (error) {
-      console.error("Erreur chargement config:", error);
-    }
-  };
-
-  const saveConfig = async () => {
-    try {
-      const facteurs = {
-        barrotin: configForm.facteurBarrotin,
-        verre: configForm.facteurVerre,
-        mur: configForm.facteurMur,
-        mainDouble: configForm.facteurMainDouble,
-        gardexVision: configForm.facteurGardexVision,
-        gardexUrbaine: configForm.facteurGardexUrbaine,
-        gardexOptimum: configForm.facteurGardexOptimum,
-      };
-      await fetch("/api/configurations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          coutHeureInstallation: configForm.coutHeureInstallation,
-          facteurTempsInstallation: configForm.facteurTempsInstallation,
-          facteursPiedsLineaires: facteurs,
-        }),
-      });
-      setShowConfigModal(false);
-      fetchConfig();
-    } catch (error) {
-      console.error("Erreur sauvegarde config:", error);
     }
   };
 
@@ -276,6 +244,46 @@ export default function CommandesPage() {
     setSearch("");
   };
 
+  // Gestion du mot de passe
+  const handlePasswordSubmit = () => {
+    const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
+    if (passwordInput === ADMIN_PASSWORD) {
+      setPasswordError(false);
+      setShowPasswordModal(false);
+      setPasswordInput("");
+      setShowConfigModal(true);
+    } else {
+      setPasswordError(true);
+    }
+  };
+
+  const saveConfig = async () => {
+    try {
+      const facteurs = {
+        barrotin: configForm.facteurBarrotin,
+        verre: configForm.facteurVerre,
+        mur: configForm.facteurMur,
+        mainDouble: configForm.facteurMainDouble,
+        gardexVision: configForm.facteurGardexVision,
+        gardexUrbaine: configForm.facteurGardexUrbaine,
+        gardexOptimum: configForm.facteurGardexOptimum,
+      };
+      await fetch("/api/configurations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coutHeureInstallation: configForm.coutHeureInstallation,
+          facteurTempsInstallation: configForm.facteurTempsInstallation,
+          facteursPiedsLineaires: facteurs,
+        }),
+      });
+      setShowConfigModal(false);
+      await refreshConfig(); // met à jour le contexte global
+    } catch (error) {
+      console.error("Erreur sauvegarde config:", error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header avec bouton paramètres */}
@@ -286,7 +294,7 @@ export default function CommandesPage() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => setShowConfigModal(true)}
+            onClick={() => setShowPasswordModal(true)}
             className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
             style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
           >
@@ -316,7 +324,7 @@ export default function CommandesPage() {
             <StatCard icon={<CheckCircle2 size={20} />} label="Complétées" value={stats.completees} color="emerald" />
           </div>
 
-          {/* Stats par service - texte noir en clair, blanc en dark */}
+          {/* Stats par service */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <ServiceStat label="Installation" value={stats.parService.INSTALLATION || 0} color="red" />
             <ServiceStat label="Livraison" value={stats.parService.LIVRAISON || 0} color="blue" />
@@ -425,15 +433,15 @@ export default function CommandesPage() {
 
       {/* Liste des commandes */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-auto max-h-[calc(100vh-280px)]">
-  {loading ? (
-    <div className="flex items-center justify-center py-20">
-      <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
-    </div>
-  ) : commandes.length === 0 ? (
-    <div className="text-center py-20">
-      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-      <p className="text-gray-500 dark:text-gray-400">Aucune commande trouvée</p>
-    </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+          </div>
+        ) : commandes.length === 0 ? (
+          <div className="text-center py-20">
+            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">Aucune commande trouvée</p>
+          </div>
         ) : (
           <table className="w-full min-w-[1400px] text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
@@ -584,6 +592,46 @@ export default function CommandesPage() {
         )}
       </div>
 
+      {/* Modal de mot de passe */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <Lock className="w-6 h-6 text-[var(--color-primary)]" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Accès restreint</h3>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Veuillez entrer le mot de passe pour accéder aux paramètres.
+            </p>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Mot de passe"
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl mb-2"
+              onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+            />
+            {passwordError && (
+              <p className="text-sm text-red-600 mb-2">Mot de passe incorrect</p>
+            )}
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => { setShowPasswordModal(false); setPasswordInput(""); setPasswordError(false); }}
+                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                className="flex-1 px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl font-medium"
+              >
+                Valider
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Paramètres */}
       {showConfigModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -729,7 +777,7 @@ export default function CommandesPage() {
   );
 }
 
-// Composants
+// Composants auxiliaires
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
     blue: "from-blue-500 to-blue-600",
@@ -751,7 +799,6 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
 }
 
 function ServiceStat({ label, value, color }: { label: string; value: number; color: string }) {
-  // Couleur de fond selon le service, mais texte noir en clair, blanc en dark
   const bgColorMap = {
     red: "bg-red-100 dark:bg-red-900/20",
     blue: "bg-blue-100 dark:bg-blue-900/20",
