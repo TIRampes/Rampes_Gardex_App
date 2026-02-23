@@ -153,39 +153,39 @@ export default function ClientsPage() {
           color="gray"
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Entrepreneurs</span><span className="xs:hidden">Entrep.</span></>}
+          title={<><span className="hidden xs:inline">Entrepreneurs</span><span className="xs:hidden">Entrepreneurs</span></>}
           value={stats.entrepreneurs}
           icon={Building2}
           color="blue"
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Résidentiels</span><span className="xs:hidden">Résid.</span></>}
+          title={<><span className="hidden xs:inline">Résidentiels</span><span className="xs:hidden">Résidentiels</span></>}
           value={stats.residentiels}
           icon={User}
           color="emerald"
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Rive Nord</span><span className="xs:hidden">N</span></>}
+          title={<><span className="hidden xs:inline">Rive Nord</span><span className="xs:hidden">Rive Nord</span></>}
           value={statsResidentiel.riveNord}
           icon={Home}
           color="blueLight"
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveNord / stats.residentiels) * 100)}%` : undefined}
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Rive Sud</span><span className="xs:hidden">S</span></>}
+          title={<><span className="hidden xs:inline">Rive Sud</span><span className="xs:hidden">Rive Sud</span></>}
           value={statsResidentiel.riveSud}
           icon={Home}
           color="greenLight"
           subtitle={stats.residentiels > 0 ? `${Math.round((statsResidentiel.riveSud / stats.residentiels) * 100)}%` : undefined}
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Distributeurs</span><span className="xs:hidden">Dist.</span></>}
+          title={<><span className="hidden xs:inline">Distributeurs</span><span className="xs:hidden">Distributeurs</span></>}
           value={stats.distributeurs}
           icon={Building2}
           color="purple"
         />
         <StatCard
-          title={<><span className="hidden xs:inline">Ambassadeurs</span><span className="xs:hidden">Amb.</span></>}
+          title={<><span className="hidden xs:inline">Ambassadeurs</span><span className="xs:hidden">Ambassadeurs</span></>}
           value={stats.ambassadeurs}
           icon={Award}
           color="orange"
