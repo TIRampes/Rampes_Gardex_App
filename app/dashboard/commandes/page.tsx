@@ -7,7 +7,7 @@ import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
   ChevronDown, MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
   CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers,
-  MessageCircle, User, Users, FilterX
+  MessageCircle, User, Users, FilterX, Settings, Save, X
 } from "lucide-react";
 
 // Types
@@ -24,11 +24,9 @@ interface Commande {
   prixTotal: number; prixVenteMateriaux: number; prixVenteInstallation: number;
   enProduction: boolean; reprise: boolean;
   piedsLineairesRampes: number; nombrePoteaux: number;
-  // Production
   mesure: string | null; plan: string | null; envoyeProduction: string | null;
   productionTerminee: string | null; termine: string | null;
   statutLivraison: string; installation: string | null;
-  // Achats
   achatFibre: string | null; achatLimons: string | null; achatVerres: string | null;
   achatColonnes: string | null; achatPeinture: string | null; achatAttaches: string | null;
   achatPlancherAluminium: string | null;
@@ -36,7 +34,6 @@ interface Commande {
   dateReceptionVerre: string | null;
   quantiteNonRecueFibre: number | null; quantiteNonRecueLimons: number | null;
   quantiteNonRecueVerres: number | null;
-  // Autres
   commentaire: string | null; couleur: string | null;
   balcons: Balcon[]; structuresAchat: StructureAchat[];
   _count: { interventions: number; reprises: number; achats: number };
@@ -58,6 +55,7 @@ interface Stats {
 interface Config {
   coutHeureInstallation: number;
   facteurTempsInstallation: number;
+  facteursPiedsLineaires: Record<string, number>;
 }
 
 // Mappings
@@ -89,11 +87,12 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; bgColor: strin
   MULTIPLAN: { label: "Multiplan", color: "text-emerald-700", bgColor: "bg-emerald-50 dark:bg-emerald-900/30" },
 };
 
+// Couleurs corrigées selon demande
 const SERVICE_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  INSTALLATION: { label: "Installation", color: "bg-blue-500", icon: <Wrench size={14} /> },
-  LIVRAISON: { label: "Livraison", color: "bg-green-500", icon: <Truck size={14} /> },
+  INSTALLATION: { label: "Installation", color: "bg-red-500", icon: <Wrench size={14} /> },
+  LIVRAISON: { label: "Livraison", color: "bg-blue-500", icon: <Truck size={14} /> },
   CUEILLETTE: { label: "Cueillette", color: "bg-yellow-500", icon: <Package size={14} /> },
-  TRANSPORT: { label: "Transport", color: "bg-purple-500", icon: <Truck size={14} /> },
+  TRANSPORT: { label: "Transport", color: "bg-green-500", icon: <Truck size={14} /> },
 };
 
 const STATUT_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
@@ -103,18 +102,10 @@ const STATUT_CONFIG: Record<string, { label: string; color: string; bgColor: str
   ANNULEE: { label: "Annulée", color: "text-red-700", bgColor: "bg-red-100 dark:bg-red-900/30", icon: <XCircle size={14} /> },
 };
 
-// NOUVEAU: Couleurs pour les activités
-const ACTIVITE_COULEURS: Record<string, { bg: string; text: string; border: string }> = {
-  INSTALLATION: { bg: "bg-red-500", text: "text-white", border: "border-red-600" },
-  LIVRAISON: { bg: "bg-blue-500", text: "text-white", border: "border-blue-600" },
-  CUEILLETTE: { bg: "bg-yellow-500", text: "text-white", border: "border-yellow-600" },
-  TRANSPORT: { bg: "bg-green-500", text: "text-white", border: "border-green-600" },
-};
-
-// Fonction pour formater les dates
+// Formatage
 const formatDate = (date: string | null) => {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("fr-CA", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(date).toLocaleDateString("fr-CA", { day: "2-digit", month: "short" });
 };
 
 const formatSemaine = (date: string | null) => {
@@ -124,7 +115,6 @@ const formatSemaine = (date: string | null) => {
   return `S${week}`;
 };
 
-// Composant pour afficher un symbole de code
 const CodeSymbol = ({ code, type = "production" }: { code: string | null; type?: "production" | "achat" }) => {
   if (!code) return <span className="text-gray-400">—</span>;
   const symbols = type === "achat" ? ACHAT_SYMBOLS : CODE_SYMBOLS;
@@ -133,10 +123,8 @@ const CodeSymbol = ({ code, type = "production" }: { code: string | null; type?:
   return <span className={`font-bold ${config.color}`}>{config.symbol}</span>;
 };
 
-// Composant pour afficher la couleur
-const CouleurBadge = ({ couleur, personnalisee }: { couleur: string | null; personnalisee?: string | null }) => {
+const CouleurBadge = ({ couleur }: { couleur: string | null }) => {
   if (!couleur) return <span className="text-gray-400">—</span>;
-  
   const couleursMap: Record<string, { bg: string; text: string; label: string }> = {
     NOIR: { bg: "bg-gray-900", text: "text-white", label: "Noir" },
     BLANC: { bg: "bg-gray-100", text: "text-gray-900", label: "Blanc" },
@@ -145,16 +133,10 @@ const CouleurBadge = ({ couleur, personnalisee }: { couleur: string | null; pers
     ARGILE: { bg: "bg-amber-200", text: "text-amber-900", label: "Argile" },
     SPECIALE: { bg: "bg-purple-600", text: "text-white", label: "Spéciale" },
     GRIS_METALLIQUE: { bg: "bg-gray-400", text: "text-gray-900", label: "Gris métallique" },
-    AUTRE: { bg: "bg-blue-400", text: "text-white", label: personnalisee || "Autre" },
+    AUTRE: { bg: "bg-blue-400", text: "text-white", label: "Autre" },
   };
-
   const config = couleursMap[couleur] || { bg: "bg-gray-300", text: "text-gray-900", label: couleur };
-  
-  return (
-    <span className={`inline-block px-2 py-1 rounded-lg text-xs font-medium ${config.bg} ${config.text}`}>
-      {config.label}
-    </span>
-  );
+  return <span className={`inline-block px-2 py-1 rounded-lg text-xs font-medium ${config.bg} ${config.text}`}>{config.label}</span>;
 };
 
 export default function CommandesPage() {
@@ -164,24 +146,31 @@ export default function CommandesPage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ 
-    statut: "", 
-    type: "", 
-    service: "",
-    representantId: "",
-    clientId: "" 
-  });
+  const [filters, setFilters] = useState({ statut: "", type: "", service: "", representantId: "", clientId: "" });
   const [showFilters, setShowFilters] = useState(false);
   const [actionMenu, setActionMenu] = useState<string | null>(null);
   const [deleteModal, setDeleteModal] = useState<Commande | null>(null);
   const [representants, setRepresentants] = useState<{ id: string; nom: string }[]>([]);
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState({
+    coutHeureInstallation: 160,
+    facteurTempsInstallation: 0.7,
+    facteurBarrotin: 1.25,
+    facteurVerre: 1,
+    facteurMur: 4,
+    facteurMainDouble: 2.25,
+    facteurGardexVision: 1,
+    facteurGardexUrbaine: 2,
+    facteurGardexOptimum: 0.75,
+  });
 
-  useEffect(() => { 
-    fetchCommandes(); 
+  useEffect(() => {
+    fetchCommandes();
     fetchRepresentants();
     fetchClients();
-  }, [search, filters.statut, filters.type, filters.service, filters.representantId, filters.clientId]);
+    fetchConfig();
+  }, [search, filters]);
 
   const fetchCommandes = async () => {
     try {
@@ -197,11 +186,60 @@ export default function CommandesPage() {
       const data = await res.json();
       setCommandes(data.commandes || []);
       setStats(data.stats || null);
-      setConfig(data.config || null);
     } catch (error) {
       console.error("Erreur:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch("/api/configurations");
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(data);
+        setConfigForm({
+          coutHeureInstallation: data.coutHeureInstallation || 160,
+          facteurTempsInstallation: data.facteurTempsInstallation || 0.7,
+          facteurBarrotin: data.facteursPiedsLineaires?.barrotin || 1.25,
+          facteurVerre: data.facteursPiedsLineaires?.verre || 1,
+          facteurMur: data.facteursPiedsLineaires?.mur || 4,
+          facteurMainDouble: data.facteursPiedsLineaires?.mainDouble || 2.25,
+          facteurGardexVision: data.facteursPiedsLineaires?.gardexVision || 1,
+          facteurGardexUrbaine: data.facteursPiedsLineaires?.gardexUrbaine || 2,
+          facteurGardexOptimum: data.facteursPiedsLineaires?.gardexOptimum || 0.75,
+        });
+      }
+    } catch (error) {
+      console.error("Erreur chargement config:", error);
+    }
+  };
+
+  const saveConfig = async () => {
+    try {
+      const facteurs = {
+        barrotin: configForm.facteurBarrotin,
+        verre: configForm.facteurVerre,
+        mur: configForm.facteurMur,
+        mainDouble: configForm.facteurMainDouble,
+        gardexVision: configForm.facteurGardexVision,
+        gardexUrbaine: configForm.facteurGardexUrbaine,
+        gardexOptimum: configForm.facteurGardexOptimum,
+      };
+      await fetch("/api/configurations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coutHeureInstallation: configForm.coutHeureInstallation,
+          facteurTempsInstallation: configForm.facteurTempsInstallation,
+          facteursPiedsLineaires: facteurs,
+        }),
+      });
+      setShowConfigModal(false);
+      fetchConfig();
+    } catch (error) {
+      console.error("Erreur sauvegarde config:", error);
     }
   };
 
@@ -238,92 +276,52 @@ export default function CommandesPage() {
     setSearch("");
   };
 
-  // NOUVEAU: Filtrer les commandes actives et complètes pour les stats
-  const commandesActives = commandes.filter(c => c.statut === "ACTIVE");
-  const commandesCompletees = commandes.filter(c => c.statut === "COMPLETEE");
-
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Header avec bouton paramètres */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Commandes</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Gestion des commandes et suivi</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commandes</h1>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Gestion et suivi</p>
         </div>
-        <button
-          onClick={() => router.push("/dashboard/commandes/nouveau")}
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition-all"
-          style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
-        >
-          <Plus size={20} />
-          <span>Nouvelle commande</span>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowConfigModal(true)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
+            style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
+          >
+            <Settings size={20} />
+            <span>Paramètres</span>
+          </button>
+          <button
+            onClick={() => router.push("/dashboard/commandes/nouveau")}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
+            style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
+          >
+            <Plus size={20} />
+            <span>Nouvelle commande</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
       {stats && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-            <StatCard icon={<Package />} label="Total" value={stats.total} color="blue" />
-            <StatCard icon={<CheckCircle2 />} label="Actives" value={stats.actives} color="green" />
-            <StatCard icon={<Clock />} label="En attente" value={stats.parStatut.EN_ATTENTE || 0} color="yellow" />
-            <StatCard icon={<TrendingUp />} label="En production" value={stats.enProduction} color="purple" />
-            <StatCard icon={<AlertTriangle />} label="En retard" value={stats.enRetard} color="red" />
-            <StatCard icon={<CheckCircle2 />} label="Complétées" value={stats.completees} color="emerald" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <StatCard icon={<Package size={20} />} label="Total" value={stats.total} color="blue" />
+            <StatCard icon={<CheckCircle2 size={20} />} label="Actives" value={stats.actives} color="green" />
+            <StatCard icon={<Clock size={20} />} label="En attente" value={stats.parStatut.EN_ATTENTE || 0} color="yellow" />
+            <StatCard icon={<TrendingUp size={20} />} label="En production" value={stats.enProduction} color="purple" />
+            <StatCard icon={<AlertTriangle size={20} />} label="En retard" value={stats.enRetard} color="red" />
+            <StatCard icon={<CheckCircle2 size={20} />} label="Complétées" value={stats.completees} color="emerald" />
           </div>
 
-          {/* NOUVEAU: Stats par service avec couleurs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-red-700 dark:text-red-300">Installation</span>
-                <span className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.parService.INSTALLATION || 0}</span>
-              </div>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Livraison</span>
-                <span className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.parService.LIVRAISON || 0}</span>
-              </div>
-            </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Cueillette</span>
-                <span className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{stats.parService.CUEILLETTE || 0}</span>
-              </div>
-            </div>
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-green-700 dark:text-green-300">Transport</span>
-                <span className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.parService.TRANSPORT || 0}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* NOUVEAU: Commandes actives et complètes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-green-700 dark:text-green-300">Commandes actives</p>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.actives}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
-                  <CheckCircle2 size={20} />
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">Commandes complètes</p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.completees}</p>
-                </div>
-              </div>
-            </div>
+          {/* Stats par service - texte noir en clair, blanc en dark */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <ServiceStat label="Installation" value={stats.parService.INSTALLATION || 0} color="red" />
+            <ServiceStat label="Livraison" value={stats.parService.LIVRAISON || 0} color="blue" />
+            <ServiceStat label="Cueillette" value={stats.parService.CUEILLETTE || 0} color="yellow" />
+            <ServiceStat label="Transport" value={stats.parService.TRANSPORT || 0} color="green" />
           </div>
         </>
       )}
@@ -343,14 +341,14 @@ export default function CommandesPage() {
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border transition-colors ${
+            className={`flex items-center justify-center gap-2 px-5 py-3 rounded-xl border transition-colors ${
               showFilters || Object.values(filters).some(v => v)
                 ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
                 : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
             }`}
           >
             <Filter size={20} />
-            <span className="hidden sm:inline">Filtres</span>
+            <span>Filtres</span>
             {Object.values(filters).filter(Boolean).length > 0 && (
               <span className="w-5 h-5 bg-white text-[var(--color-primary)] rounded-full text-xs font-bold flex items-center justify-center">
                 {Object.values(filters).filter(Boolean).length}
@@ -360,25 +358,25 @@ export default function CommandesPage() {
           {Object.values(filters).some(v => v) && (
             <button
               onClick={resetFilters}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
             >
               <FilterX size={20} />
-              <span className="hidden sm:inline">Réinitialiser</span>
+              <span>Réinitialiser</span>
             </button>
           )}
         </div>
 
         {/* Filtres déroulants */}
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <select
               value={filters.statut}
               onChange={(e) => setFilters({ ...filters, statut: e.target.value })}
               className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Tous les statuts</option>
-              {Object.entries(STATUT_CONFIG).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+              {Object.entries(STATUT_CONFIG).map(([key, c]) => (
+                <option key={key} value={key}>{c.label}</option>
               ))}
             </select>
             <select
@@ -387,8 +385,8 @@ export default function CommandesPage() {
               className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Tous les types</option>
-              {Object.entries(TYPE_CONFIG).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+              {Object.entries(TYPE_CONFIG).map(([key, c]) => (
+                <option key={key} value={key}>{c.label}</option>
               ))}
             </select>
             <select
@@ -397,8 +395,8 @@ export default function CommandesPage() {
               className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
             >
               <option value="">Tous les services</option>
-              {Object.entries(SERVICE_CONFIG).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+              {Object.entries(SERVICE_CONFIG).map(([key, c]) => (
+                <option key={key} value={key}>{c.label}</option>
               ))}
             </select>
             <select
@@ -426,191 +424,289 @@ export default function CommandesPage() {
       </div>
 
       {/* Liste des commandes */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
-          </div>
-        ) : commandes.length === 0 ? (
-          <div className="text-center py-20">
-            <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">Aucune commande trouvée</p>
-          </div>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-auto max-h-[calc(100vh-280px)]">
+  {loading ? (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
+    </div>
+  ) : commandes.length === 0 ? (
+    <div className="text-center py-20">
+      <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+      <p className="text-gray-500 dark:text-gray-400">Aucune commande trouvée</p>
+    </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[2000px]">
-              <thead className="bg-gray-50 dark:bg-gray-900/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Commande</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Client</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Représentant</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Service</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Couleur</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Mesure</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Plan</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Prod.</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Term.</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Install.</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Fibre</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Limons</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Verres</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Colonnes</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Peinture</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Attaches</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Plancher</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date entrée</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date prévue</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date prod.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date mesure</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Statut</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase w-16">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                {commandes.map((commande) => {
-                  const typeConfig = TYPE_CONFIG[commande.typeCommande];
-                  const serviceConfig = SERVICE_CONFIG[commande.service];
-                  const statutConfig = STATUT_CONFIG[commande.statut];
-                  const isLate = commande.datePrevue && new Date(commande.datePrevue) < new Date() && commande.statut === "ACTIVE";
-
-                  return (
-                    <tr
-                      key={commande.id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
-                      onClick={() => router.push(`/dashboard/commandes/${commande.id}`)}
-                    >
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900 dark:text-white">{commande.numero}</span>
-                            {commande.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">R</span>}
-                            {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded">!</span>}
-                            {commande.commentaire && (
-                              <span className="relative group">
-                                <MessageCircle size={14} className="text-blue-500" />
-                                <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap z-50">
-                                  {commande.commentaire}
-                                </span>
-                              </span>
-                            )}
+          <table className="w-full min-w-[1400px] text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-900/50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Commande</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Client</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Rep</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Service</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Couleur</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Plan</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Term.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Install.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Fibre</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Limons</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Verres</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Colonnes</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Peinture</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Attaches</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Plancher</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Entrée</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prévue</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Statut</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {commandes.map((c) => {
+                const isLate = c.datePrevue && new Date(c.datePrevue) < new Date() && c.statut === "ACTIVE";
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => router.push(`/dashboard/commandes/${c.id}`)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900 dark:text-white">{c.numero}</span>
+                        {c.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">R</span>}
+                        {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">!</span>}
+                        {c.commentaire && (
+                          <span className="relative group">
+                            <MessageCircle size={14} className="text-blue-500" />
+                            <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap z-50">
+                              {c.commentaire}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_CONFIG[c.typeCommande].bgColor} ${TYPE_CONFIG[c.typeCommande].color}`}>
+                        {TYPE_CONFIG[c.typeCommande].label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-900 dark:text-white block truncate max-w-[150px]" title={c.client.nom}>
+                        {c.client.nom}
+                      </span>
+                      <span className="text-xs text-gray-500">{c.client.telephone}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-900 dark:text-white">
+                      {c.representant?.nom || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white text-xs font-medium ${SERVICE_CONFIG[c.service].color}`}>
+                        {SERVICE_CONFIG[c.service].icon}
+                        <span className="hidden lg:inline">{SERVICE_CONFIG[c.service].label}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <CouleurBadge couleur={c.couleur} />
+                    </td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.mesure} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.plan} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.envoyeProduction} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.termine} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.installation} /></td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatFibre} type="achat" />
+                      {c.quantiteNonRecueFibre ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueFibre})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatLimons} type="achat" />
+                      {c.quantiteNonRecueLimons ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueLimons})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatVerres} type="achat" />
+                      {c.quantiteNonRecueVerres ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueVerres})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatColonnes} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatPeinture} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatAttaches} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatPlancherAluminium} type="achat" /></td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateEntree)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-sm ${isLate ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}`}>
+                        {formatDate(c.datePrevue)}
+                      </span>
+                      <span className="block text-xs text-gray-500">{formatSemaine(c.datePrevue)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateProduction)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.datePriseMesure)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${STATUT_CONFIG[c.statut].bgColor} ${STATUT_CONFIG[c.statut].color}`}>
+                        {STATUT_CONFIG[c.statut].icon}
+                        <span className="hidden sm:inline">{STATUT_CONFIG[c.statut].label}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === c.id ? null : c.id); }}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        >
+                          <MoreHorizontal size={18} className="text-gray-500" />
+                        </button>
+                        {actionMenu === c.id && (
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}`); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            >
+                              <Eye size={16} />Voir détails
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}/edit`); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            >
+                              <Edit size={16} />Modifier
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteModal(c); setActionMenu(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
+                            >
+                              <Trash2 size={16} />Supprimer
+                            </button>
                           </div>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit mt-1 ${typeConfig.bgColor} ${typeConfig.color}`}>
-                            {typeConfig.label}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-gray-900 dark:text-white text-sm">{commande.client.nom}</span>
-                          <span className="text-xs text-gray-500">{commande.client.telephone}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="text-sm text-gray-900 dark:text-white">
-                          {commande.representant?.nom || "—"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white text-xs font-medium ${serviceConfig.color}`}>
-                          {serviceConfig.icon}
-                          {serviceConfig.label}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <CouleurBadge couleur={commande.couleur} />
-                      </td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.mesure} /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.plan} /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.envoyeProduction} /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.termine} /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.installation} /></td>
-                      <td className="px-4 py-4 text-center">
-                        <CodeSymbol code={commande.achatFibre} type="achat" />
-                        {commande.quantiteNonRecueFibre && commande.quantiteNonRecueFibre > 0 && (
-                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueFibre})</span>
                         )}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <CodeSymbol code={commande.achatLimons} type="achat" />
-                        {commande.quantiteNonRecueLimons && commande.quantiteNonRecueLimons > 0 && (
-                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueLimons})</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <CodeSymbol code={commande.achatVerres} type="achat" />
-                        {commande.quantiteNonRecueVerres && commande.quantiteNonRecueVerres > 0 && (
-                          <span className="ml-1 text-xs text-red-500">({commande.quantiteNonRecueVerres})</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatColonnes} type="achat" /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatPeinture} type="achat" /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatAttaches} type="achat" /></td>
-                      <td className="px-4 py-4 text-center"><CodeSymbol code={commande.achatPlancherAluminium} type="achat" /></td>
-                      <td className="px-4 py-4">
-                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.dateEntree)}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col">
-                          <span className={`text-sm ${isLate ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}`}>
-                            {formatDate(commande.datePrevue)}
-                          </span>
-                          <span className="text-xs text-gray-500">{formatSemaine(commande.datePrevue)}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.dateProduction)}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="text-sm text-gray-900 dark:text-white">{formatDate(commande.datePriseMesure)}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${statutConfig.bgColor} ${statutConfig.color}`}>
-                          {statutConfig.icon}
-                          <span className="hidden sm:inline">{statutConfig.label}</span>
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="relative">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === commande.id ? null : commande.id); }}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                          >
-                            <MoreHorizontal size={18} className="text-gray-500" />
-                          </button>
-                          {actionMenu === commande.id && (
-                            <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${commande.id}`); }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                              >
-                                <Eye size={16} />Voir détails
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${commande.id}/edit`); }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                              >
-                                <Edit size={16} />Modifier
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setDeleteModal(commande); setActionMenu(null); }}
-                                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
-                              >
-                                <Trash2 size={16} />Supprimer
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
-      {/* Modal de suppression */}
+      {/* Modal Paramètres */}
+      {showConfigModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Paramètres</h3>
+              <button onClick={() => setShowConfigModal(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Coût heure installation ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={configForm.coutHeureInstallation}
+                  onChange={e => setConfigForm({...configForm, coutHeureInstallation: parseFloat(e.target.value) || 0})}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Facteur temps installation</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={configForm.facteurTempsInstallation}
+                  onChange={e => setConfigForm({...configForm, facteurTempsInstallation: parseFloat(e.target.value) || 0})}
+                  className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Barrotin</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurBarrotin}
+                    onChange={e => setConfigForm({...configForm, facteurBarrotin: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Verre</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurVerre}
+                    onChange={e => setConfigForm({...configForm, facteurVerre: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Mur</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurMur}
+                    onChange={e => setConfigForm({...configForm, facteurMur: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Main double</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurMainDouble}
+                    onChange={e => setConfigForm({...configForm, facteurMainDouble: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Gardex Vision</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurGardexVision}
+                    onChange={e => setConfigForm({...configForm, facteurGardexVision: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Gardex Urbaine</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurGardexUrbaine}
+                    onChange={e => setConfigForm({...configForm, facteurGardexUrbaine: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Gardex Optimum</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={configForm.facteurGardexOptimum}
+                    onChange={e => setConfigForm({...configForm, facteurGardexOptimum: parseFloat(e.target.value) || 0})}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowConfigModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={saveConfig}
+                className="flex-1 px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl font-medium flex items-center justify-center gap-2"
+              >
+                <Save size={18} /> Sauvegarder
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal suppression */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -633,7 +729,7 @@ export default function CommandesPage() {
   );
 }
 
-// Composant StatCard
+// Composants
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
     blue: "from-blue-500 to-blue-600",
@@ -643,14 +739,37 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
     red: "from-red-500 to-red-600",
     emerald: "from-emerald-500 to-emerald-600",
   };
-
   return (
     <div className={`bg-gradient-to-br ${colors[color]} rounded-xl p-4 text-white shadow-lg`}>
       <div className="flex items-center justify-between">
         <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">{icon}</div>
-        <span className="text-3xl font-bold">{value}</span>
+        <span className="text-2xl font-bold">{value}</span>
       </div>
-      <p className="text-white/80 text-sm mt-2 font-medium">{label}</p>
+      <p className="text-white/80 text-sm mt-1 font-medium">{label}</p>
+    </div>
+  );
+}
+
+function ServiceStat({ label, value, color }: { label: string; value: number; color: string }) {
+  // Couleur de fond selon le service, mais texte noir en clair, blanc en dark
+  const bgColorMap = {
+    red: "bg-red-100 dark:bg-red-900/20",
+    blue: "bg-blue-100 dark:bg-blue-900/20",
+    yellow: "bg-yellow-100 dark:bg-yellow-900/20",
+    green: "bg-green-100 dark:bg-green-900/20",
+  };
+  const borderColorMap = {
+    red: "border-red-200 dark:border-red-800",
+    blue: "border-blue-200 dark:border-blue-800",
+    yellow: "border-yellow-200 dark:border-yellow-800",
+    green: "border-green-200 dark:border-green-800",
+  };
+  return (
+    <div className={`${bgColorMap[color as keyof typeof bgColorMap]} rounded-xl p-4 border ${borderColorMap[color as keyof typeof borderColorMap]}`}>
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-gray-900 dark:text-white">{label}</span>
+        <span className="text-2xl font-bold text-gray-900 dark:text-white">{value}</span>
+      </div>
     </div>
   );
 }

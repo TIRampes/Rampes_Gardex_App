@@ -86,7 +86,7 @@ const SERVICE_OPTIONS = [
   { value: "TRANSPORT", label: "Transport", icon: "🚛" },
 ];
 
-// NOUVEAU: Options de couleur
+// Options de couleur
 const COULEUR_OPTIONS = [
   { value: "", label: "— Sélectionner —" },
   { value: "NOIR", label: "Noir", bg: "bg-gray-900", text: "text-white" },
@@ -99,13 +99,13 @@ const COULEUR_OPTIONS = [
   { value: "AUTRE", label: "Autre", bg: "bg-blue-400", text: "text-white" },
 ];
 
-// NOUVEAU: Options pour statut livraison
+// Options pour statut livraison
 const STATUT_LIVRAISON_OPTIONS = [
   { value: "N_A", label: "N/A" },
   { value: "LIVRE", label: "Livré" },
 ];
 
-// NOUVEAU: Facteurs pour pieds linéaires
+// Facteurs pour pieds linéaires
 const PIEDS_LINEAIRES_FACTEURS = [
   { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
   { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
@@ -138,11 +138,11 @@ export default function NouvelleCommandePage() {
     adresse: "",
     commentaireAdresse: "",
 
-    // NOUVEAU: Couleur
+    // Couleur
     couleur: "",
     couleurPersonnalisee: "",
 
-    // NOUVEAU: Reprise
+    // Reprise
     reprise: false,
     ancienneCommandeNumero: "",
 
@@ -160,10 +160,11 @@ export default function NouvelleCommandePage() {
     dateLivraison: "",
 
     // Prix
-    prixVenteMateriaux: 0,
+    prixTotal: 0,
     prixVenteInstallation: 0,
+    prixVenteMateriaux: 0, // sera calculé automatiquement
 
-    // NOUVEAU: Pieds linéaires par type
+    // Pieds linéaires par type
     piedsLineairesBarrotin: 0,
     piedsLineairesVerre: 0,
     piedsLineairesMur: 0,
@@ -184,9 +185,8 @@ export default function NouvelleCommandePage() {
     piedsRampesGardexVisionUrbaine: 0,
     piedsRampesGardexVisionOptimum: 0,
 
-    // NOUVEAU: Temps installation auto
+    // Temps installation auto
     utiliserCalculAuto: false,
-    tempsInstallationAuto: 0,
 
     // Production
     structure: false,
@@ -198,9 +198,8 @@ export default function NouvelleCommandePage() {
     termine: "",
     statutLivraison: "N_A",
     installation: "",
-    enProduction: false,
 
-    // NOUVEAU: Achats avec nouveaux champs
+    // Achats avec nouveaux champs
     achatFibre: "",
     dateEnvoieFibre: "",
     dateReceptionFibre: "",
@@ -273,12 +272,29 @@ export default function NouvelleCommandePage() {
     fetchData();
   }, []);
 
-  // Calculer prix total
-  const prixTotal = useMemo(() => {
-    return (formData.prixVenteMateriaux || 0) + (formData.prixVenteInstallation || 0);
-  }, [formData.prixVenteMateriaux, formData.prixVenteInstallation]);
+  // Calculer prix matériaux = prix total - prix installation
+  useEffect(() => {
+    const materiaux = Math.max(0, (formData.prixTotal || 0) - (formData.prixVenteInstallation || 0));
+    setFormData(prev => ({ ...prev, prixVenteMateriaux: materiaux }));
+  }, [formData.prixTotal, formData.prixVenteInstallation]);
 
-  // NOUVEAU: Calculer les pieds linéaires totaux avec facteurs
+  // Calculer date production = date prévue - 7 jours
+  useEffect(() => {
+    if (formData.datePrevue) {
+      const datePrev = new Date(formData.datePrevue);
+      const dateProd = new Date(datePrev);
+      dateProd.setDate(dateProd.getDate() - 7);
+      setFormData(prev => ({
+        ...prev,
+        dateProduction: dateProd.toISOString().split("T")[0],
+        dateLivraison: prev.datePrevue, // livraison = date prévue (inchangé)
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, dateProduction: "", dateLivraison: "" }));
+    }
+  }, [formData.datePrevue]);
+
+  // Calculer les pieds linéaires totaux avec facteurs
   const piedsLineairesTotaux = useMemo(() => {
     let total = 0;
     total += (formData.piedsLineairesBarrotin || 0) * 1.25;
@@ -299,26 +315,18 @@ export default function NouvelleCommandePage() {
     formData.piedsLineairesGardexOptimum,
   ]);
 
-  // NOUVEAU: Calculer le temps d'installation auto
-  const tempsInstallationAuto = useMemo(() => {
-    if (!formData.utiliserCalculAuto || formData.prixVenteInstallation <= 0) return 0;
+  // Calculer le temps d'installation auto (utilisé quand la checkbox est cochée)
+  const tempsInstallationCalcule = useMemo(() => {
+    if (formData.prixVenteInstallation <= 0) return 0;
     return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
-  }, [formData.utiliserCalculAuto, formData.prixVenteInstallation, config]);
+  }, [formData.prixVenteInstallation, config]);
 
-  // Auto-calculer dates quand dateProduction change
+  // Appliquer le calcul auto si la case est cochée
   useEffect(() => {
-    if (formData.dateProduction) {
-      const dateProd = new Date(formData.dateProduction);
-      const datePrevue = new Date(dateProd);
-      datePrevue.setDate(datePrevue.getDate() - 7);
-      
-      setFormData(prev => ({
-        ...prev,
-        datePrevue: datePrevue.toISOString().split("T")[0],
-        dateLivraison: datePrevue.toISOString().split("T")[0],
-      }));
+    if (formData.utiliserCalculAuto) {
+      setFormData(prev => ({ ...prev, tempsEstimeInstallation: tempsInstallationCalcule }));
     }
-  }, [formData.dateProduction]);
+  }, [formData.utiliserCalculAuto, tempsInstallationCalcule]);
 
   // Générer les balcons/phases quand le nombre change
   useEffect(() => {
@@ -356,11 +364,6 @@ export default function NouvelleCommandePage() {
       }
     }
   }, [formData.clientId, clients]);
-
-  // Mettre à jour le temps d'installation auto dans le form
-  useEffect(() => {
-    setFormData(prev => ({ ...prev, tempsInstallationAuto }));
-  }, [tempsInstallationAuto]);
 
   const updateBalcon = (index: number, field: keyof Balcon, value: number | boolean | string) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
@@ -400,9 +403,8 @@ export default function NouvelleCommandePage() {
     try {
       const dataToSend = {
         ...formData,
-        prixTotal,
+        prixTotal: formData.prixTotal,
         piedsLineairesRampes: piedsLineairesTotaux,
-        tempsInstallationAuto,
         balcons: balcons.length > 0 ? balcons : undefined,
         structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
         // Convertir les valeurs vides en null
@@ -563,7 +565,7 @@ export default function NouvelleCommandePage() {
               </select>
             </div>
 
-            {/* NOUVEAU: Couleur */}
+            {/* Couleur */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couleur</label>
               <select
@@ -577,7 +579,7 @@ export default function NouvelleCommandePage() {
               </select>
             </div>
 
-            {/* NOUVEAU: Couleur personnalisée si AUTRE */}
+            {/* Couleur personnalisée si AUTRE */}
             {formData.couleur === "AUTRE" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -616,7 +618,7 @@ export default function NouvelleCommandePage() {
             </div>
           </div>
 
-          {/* NOUVEAU: Reprise */}
+          {/* Reprise */}
           <div className="mt-4">
             <label className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800">
               <input
@@ -631,7 +633,7 @@ export default function NouvelleCommandePage() {
             </label>
           </div>
 
-          {/* NOUVEAU: Numéro ancienne commande si reprise */}
+          {/* Numéro ancienne commande si reprise */}
           {formData.reprise && (
             <div className="mt-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -814,7 +816,7 @@ export default function NouvelleCommandePage() {
             />
           </div>
 
-          {/* Commentaire général (déplacé ici) */}
+          {/* Commentaire général */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Commentaire général
@@ -848,22 +850,23 @@ export default function NouvelleCommandePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date de production</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Date prévue
+              </label>
               <input
                 type="date"
-                value={formData.dateProduction}
-                onChange={(e) => setFormData({ ...formData, dateProduction: e.target.value })}
+                value={formData.datePrevue}
+                onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })}
                 className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Date prévue
-                <Info className="inline w-4 h-4 ml-1 text-gray-400"  />
+                Date de production (auto)
               </label>
               <input
                 type="date"
-                value={formData.datePrevue}
+                value={formData.dateProduction}
                 readOnly
                 className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500"
               />
@@ -881,21 +884,25 @@ export default function NouvelleCommandePage() {
           {/* Prix */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix vente matériaux ($)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Prix total ($)
+              </label>
               <div className="relative">
                 <DollarSign className="absolute left-4 top-3 text-gray-400" size={20} />
                 <input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.prixVenteMateriaux}
-                  onChange={(e) => setFormData({ ...formData, prixVenteMateriaux: parseFloat(e.target.value) || 0 })}
+                  value={formData.prixTotal}
+                  onChange={(e) => setFormData({ ...formData, prixTotal: parseFloat(e.target.value) || 0 })}
                   className="w-full pl-12 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix vente installation ($)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Prix installation ($)
+              </label>
               <div className="relative">
                 <DollarSign className="absolute left-4 top-3 text-gray-400" size={20} />
                 <input
@@ -909,18 +916,31 @@ export default function NouvelleCommandePage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix total ($)</label>
-              <div className="px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl">
-                <span className="text-2xl font-bold text-green-700 dark:text-green-300">
-                  {prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix matériaux (auto)</label>
+              <div className="px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl">
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {formData.prixVenteMateriaux.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* NOUVEAU: Temps d'installation auto */}
-          <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center gap-4 mb-3">
+          {/* Temps d'installation */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Temps d'installation estimé (heures)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                value={formData.tempsEstimeInstallation}
+                onChange={(e) => setFormData({ ...formData, tempsEstimeInstallation: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div className="flex items-center pt-8">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -928,37 +948,15 @@ export default function NouvelleCommandePage() {
                   onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })}
                   className="w-4 h-4"
                 />
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                  Calcul automatique du temps d'installation
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Calcul automatique (basé sur le prix installation)
                 </span>
               </label>
             </div>
-            {formData.utiliserCalculAuto && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Coût à l'heure</label>
-                  <div className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg text-sm">
-                    {config.coutHeureInstallation.toFixed(2)} $/h
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Facteur</label>
-                  <div className="px-3 py-2 bg-white dark:bg-gray-800 rounded-lg text-sm">
-                    {config.facteurTempsInstallation}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Temps calculé</label>
-                  <div className="px-3 py-2 bg-blue-100 dark:bg-blue-900 rounded-lg text-sm font-bold text-blue-700">
-                    {tempsInstallationAuto.toFixed(2)} h
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </Section>
 
-        {/* SECTION 3: PIEDS LINÉAIRES ET POTEAUX (anciennement Rampes et Mesures) */}
+        {/* SECTION 3: PIEDS LINÉAIRES ET POTEAUX */}
         <Section
           icon={<Ruler />}
           title="Pieds linéaires et Poteaux"
@@ -1005,7 +1003,7 @@ export default function NouvelleCommandePage() {
             </div>
           </div>
 
-          {/* Anciens champs masqués mais conservés pour compatibilité */}
+          {/* Champ caché pour la compatibilité */}
           <input type="hidden" value={piedsLineairesTotaux} />
         </Section>
 
@@ -1063,7 +1061,7 @@ export default function NouvelleCommandePage() {
               options={CODE_PRODUCTION_OPTIONS}
             />
 
-            {/* NOUVEAU: Statut livraison */}
+            {/* Statut livraison */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut livraison</label>
               <select
@@ -1077,7 +1075,7 @@ export default function NouvelleCommandePage() {
               </select>
             </div>
 
-            {/* NOUVEAU: Installation */}
+            {/* Installation */}
             <SymbolSelect
               label="Installation"
               value={formData.installation}
@@ -1085,18 +1083,7 @@ export default function NouvelleCommandePage() {
               options={CODE_PRODUCTION_OPTIONS}
             />
 
-            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
-              <input
-                type="checkbox"
-                id="enProduction"
-                checked={formData.enProduction}
-                onChange={(e) => setFormData({ ...formData, enProduction: e.target.checked })}
-                className="w-5 h-5 rounded"
-              />
-              <label htmlFor="enProduction" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                En production
-              </label>
-            </div>
+            {/* La checkbox "En production" a été retirée */}
           </div>
         </Section>
 
@@ -1188,7 +1175,7 @@ export default function NouvelleCommandePage() {
             />
           </div>
 
-          {/* NOUVEAU: Option structure */}
+          {/* Option structure */}
           <div className="mt-4">
             <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
               <input
@@ -1203,7 +1190,7 @@ export default function NouvelleCommandePage() {
             </label>
           </div>
 
-          {/* NOUVEAU: Structures d'achat */}
+          {/* Structures d'achat */}
           {formData.structure && (
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
@@ -1393,7 +1380,7 @@ function SymbolSelect({ label, value, onChange, options }: {
   );
 }
 
-// NOUVEAU: Composant Achat avec statut, dates et quantité non reçue
+// Composant Achat avec labels explicites
 function AchatField({ 
   label, statut, dateEnvoie, dateReception, quantiteNonRecue,
   onStatutChange, onDateEnvoieChange, onDateReceptionChange, onQuantiteChange 
@@ -1411,40 +1398,50 @@ function AchatField({
   return (
     <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
       <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{label}</label>
-      <div className="space-y-2">
-        <select
-          value={statut}
-          onChange={(e) => onStatutChange(e.target.value)}
-          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-        >
-          {STATUT_ACHAT_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>
-              {o.symbol ? `${o.symbol} - ${o.label}` : o.label}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={dateEnvoie}
-          onChange={(e) => onDateEnvoieChange(e.target.value)}
-          placeholder="Date d'envoi"
-          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-        />
-        <input
-          type="date"
-          value={dateReception}
-          onChange={(e) => onDateReceptionChange(e.target.value)}
-          placeholder="Date de réception"
-          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-        />
-        <input
-          type="number"
-          min="0"
-          value={quantiteNonRecue || 0}
-          onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)}
-          placeholder="Qté non reçue"
-          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-        />
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Statut</label>
+          <select
+            value={statut}
+            onChange={(e) => onStatutChange(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+          >
+            {STATUT_ACHAT_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>
+                {o.symbol ? `${o.symbol} - ${o.label}` : o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Date d'envoi</label>
+          <input
+            type="date"
+            value={dateEnvoie}
+            onChange={(e) => onDateEnvoieChange(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
+          <input
+            type="date"
+            value={dateReception}
+            onChange={(e) => onDateReceptionChange(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Quantité non reçue</label>
+          <input
+            type="number"
+            min="0"
+            value={quantiteNonRecue || 0}
+            onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)}
+            placeholder="ex: 5"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+          />
+        </div>
       </div>
     </div>
   );
