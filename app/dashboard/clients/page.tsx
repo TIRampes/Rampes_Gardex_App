@@ -147,7 +147,7 @@ export default function ClientsPage() {
       {/* Stats - style comme commandes */}
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-7 gap-2 sm:gap-4">
         <StatCard
-          title={<><span className="hidden xs:inline">Total clients</span><span className="xs:hidden">Total</span></>}
+          title={<><span className="hidden xs:inline">Total clients</span><span className="xs:hidden">Total clients</span></>}
           value={stats.total}
           icon={Users}
           color="gray"
