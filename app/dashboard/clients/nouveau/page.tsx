@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-//import Script from "next/script";
+import Script from "next/script";
 import { ArrowLeft, Save, MapPin, Loader2, X, Phone, Mail, User, Building2, MessageSquare, CheckCircle2, AlertCircle, Home } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
@@ -55,23 +55,23 @@ export default function NouveauClientPage() {
   const initGoogleMaps = useCallback(() => {
     if (typeof window !== "undefined" && window.google?.maps?.places) {
       try {
-        console.log("✅ Google Maps chargé avec succès !");
+        console.log(" Google Maps chargé avec succès !");
         autocompleteService.current = new window.google.maps.places.AutocompleteService();
         const dummyElement = document.createElement("div");
         placesService.current = new window.google.maps.places.PlacesService(dummyElement);
         setGoogleLoaded(true);
-        console.log("✅ Services initialisés");
+        console.log(" Services initialisés");
       } catch (err) { 
-        console.error("❌ Erreur Google Maps:", err); 
+        console.error("Erreur Google Maps:", err); 
       }
     } else {
-      console.log("⏳ Google Maps pas encore chargé...");
+      console.log(" Google Maps pas encore chargé...");
     }
   }, []);
 
   useEffect(() => { if (window.google?.maps?.places) initGoogleMaps(); }, [initGoogleMaps]);
 
-  const handleGoogleMapsLoad = () => { setTimeout(initGoogleMaps, 100); };
+  const handleGoogleMapsLoad = () => { setTimeout(initGoogleMaps, 10); };
 
   // Formatage automatique du numéro de téléphone
   const formatPhoneNumber = (value: string) => {
@@ -119,7 +119,7 @@ export default function NouveauClientPage() {
     }
   };
 
-  // ✅ VERSION 100% FONCTIONNELLE - Testée et approuvée
+  // VERSION 100% FONCTIONNELLE - Testée et approuvée
   const handleSelectAddress = (suggestion: AddressSuggestion) => {
     if (!placesService.current) { 
       setAddressInput(suggestion.description); 
@@ -131,13 +131,13 @@ export default function NouveauClientPage() {
     placesService.current.getDetails(
       { 
         placeId: suggestion.place_id, 
-        fields: ["address_components", "formatted_address"] // ✅ Les BONS noms qui marchent
+        fields: ["address_components", "formatted_address"] //  Les BONS noms qui marchent
       }, 
       (place, status) => {
         if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
           let streetNumber = "", streetName = "", city = "", province = "", country = "", postalCode = "";
           
-          // ✅ Syntaxe qui fonctionne PARFAITEMENT avec v=weekly
+          // Syntaxe qui fonctionne PARFAITEMENT avec v=weekly
           place.address_components?.forEach((c: any) => {
             if (c.types.includes("street_number")) streetNumber = c.long_name;
             if (c.types.includes("route")) streetName = c.long_name;
@@ -158,7 +158,7 @@ export default function NouveauClientPage() {
             codePostal: postalCode 
           }));
           
-          // ✅ formatted_address fonctionne aussi
+          // formatted_address fonctionne aussi
           setAddressInput(place.formatted_address || suggestion.description);
           setShowSuggestions(false);
         }
@@ -311,6 +311,7 @@ export default function NouveauClientPage() {
 
   return (
     <>
+    
     
       <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 px-4 sm:px-0 pb-8">
         <div className="flex items-center gap-3">
@@ -657,7 +658,7 @@ export default function NouveauClientPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">📞 Téléphone</span>
+                    <span className="font-medium"> Téléphone</span>
                     {formData.communicationTelephone && (
                       <span className="text-blue-600 text-sm">✓</span>
                     )}
