@@ -1,11 +1,7 @@
-import React from 'react'
+import { redirect } from "next/navigation";
 
-const calendrier = () => {
-  return (
-    <div>
-      
-    </div>
-  )
+// Redirige vers la page principale avec l'onglet calendrier actif
+// Le calendrier est l'onglet par défaut de /production
+export default function CalendrierPage() {
+  redirect("/production");
 }
-
-export default calendrier

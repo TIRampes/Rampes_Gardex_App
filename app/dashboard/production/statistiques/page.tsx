@@ -1,11 +1,7 @@
-import React from 'react'
+import { redirect } from "next/navigation";
 
-const page = () => {
-  return (
-    <div>
-      
-    </div>
-  )
+// Les statistiques sont intégrées dans l'onglet "Statistiques" 
+// de la page principale de production
+export default function StatistiquesPage() {
+  redirect("/production");
 }
-
-export default page
