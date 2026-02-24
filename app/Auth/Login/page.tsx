@@ -97,7 +97,7 @@ export default function loginPage() {
           </h1>
           
           <p className="text-gray-300 text-lg mb-8 max-w-md mx-auto lg:mx-0">
-            Gérez vos commandes, production et interventions terrain en toute simplicité.
+            Gérez vos commandes, production et installation en toute simplicité.
           </p>
 
           {/* Features - visible seulement sur grand écran */}
