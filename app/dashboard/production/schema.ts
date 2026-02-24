@@ -142,7 +142,7 @@ export const ProductionQuerySchema = z.object({
   limite: z
     .string()
     .transform((v) => parseInt(v, 10))
-    .pipe(z.number().int().min(1).max(100))
+    .pipe(z.number().int().min(1).max(500))
     .optional()
     .default(50),
 });

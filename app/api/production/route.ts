@@ -22,25 +22,28 @@ export async function GET(request: NextRequest) {
     );
 
     // Construction du where dynamique
-    const where: Record<string, unknown> = {
-      statut: params.statut ?? "ACTIVE",
-    };
+    const where: any = {};
 
-    if (params.service) {
-      where.service = params.service;
-    }
+where.statut = params.statut ?? "ACTIVE";
 
-    if (params.enProduction !== undefined) {
-      where.envoyeProduction = params.enProduction ? "COMPLETE" : undefined;
-    }
+if (params.service) {
+  where.service = params.service;
+}
 
-    if (params.productionTerminee !== undefined) {
-      if (params.productionTerminee) {
-        where.productionTerminee = "COMPLETE";
-      } else {
-        where.NOT = { productionTerminee: "COMPLETE" };
-      }
-    }
+if (params.enProduction !== undefined) {
+  if (params.enProduction) {
+  where.envoyeProduction = "COMPLETE";
+}
+}
+
+if (params.productionTerminee !== undefined) {
+  if (params.productionTerminee) {
+    where.productionTerminee = "COMPLETE";
+  } else {
+    where.productionTerminee = null;
+  }
+}
+
 
     if (params.recherche) {
       where.OR = [
