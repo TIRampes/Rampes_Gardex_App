@@ -245,7 +245,11 @@ export default function CommandeDetailsPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={<DollarSign />} label="Prix total" value={commande.prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })} color="green" />
         <StatCard icon={<Ruler />} label="Pieds linéaires" value={`${commande.piedsLineairesRampes} pi`} color="blue" />
-        <StatCard icon={<Clock />} label="Temps installation" value={commande.utiliserCalculAuto ? `${commande.tempsInstallationAuto.toFixed(2)}h` : `${commande.tempsEstimeInstallation}h`} color="purple" />
+        <StatCard icon={<Clock />} label="Temps installation" value={
+  commande.utiliserCalculAuto
+    ? `${Number(commande.tempsInstallationAuto || 0).toFixed(2)}h`
+    : `${Number(commande.tempsEstimeInstallation || 0)}h`
+} color="purple" />
         <StatCard icon={<Package />} label="Interventions" value={commande._count.interventions.toString()} color="orange" />
       </div>
 
@@ -324,7 +328,7 @@ export default function CommandeDetailsPage() {
         {commande.utiliserCalculAuto && commande.config && (
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <p className="text-sm text-blue-700 dark:text-blue-300">
-              Temps installation auto: {commande.tempsInstallationAuto.toFixed(2)}h 
+              Temps installation auto: {Number(commande.tempsInstallationAuto || 0).toFixed(2)}h 
               (basé sur {commande.config.coutHeureInstallation}$/h × facteur {commande.config.facteurTempsInstallation})
             </p>
           </div>
