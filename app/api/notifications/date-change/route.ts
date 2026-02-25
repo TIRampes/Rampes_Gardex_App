@@ -36,21 +36,30 @@ export async function POST(request: Request) {
           <p><strong>Date :</strong> ${new Date().toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           <hr style="border: 1px solid #ddd;" />
           <p><strong>Client :</strong> ${commande.clientNom || ""}</p>
+          <br />
           <p><strong>Représentant :</strong> ${commande.representantNom || ""}</p>
+          <br />
           <p><strong>Commande :</strong> ${commande.numero || ""}</p>
+          <br />
           <p><strong>Référence :</strong> ${commande.reference || ""}</p>
+          <br />
           <p><strong>Ville :</strong> ${commande.ville || ""}</p>
+          <br />
           <p><strong>Type de commande :</strong> ${commande.typeCommande || ""}</p>
+          <br />
           <p><strong>Couleur des rampes :</strong> ${commande.couleur || ""}</p>
           <hr style="border: 1px solid #ddd;" />
           <p><strong>Date modifiée</strong></p>
           <p><strong>Ancienne date de livraison :</strong> ${ancienneSemaine}</p>
+          <br />
           <p><strong>Nouvelle date de livraison :</strong> ${nouvelleSemaine}</p>
+          <br />
           <hr style="border: 1px solid #ddd;" />
           <p><strong>Raison du changement de date :</strong></p>
           <p style="background-color: white; padding: 15px; border-left: 4px solid #003366;">${commande.raison || ""}</p>
           <hr style="border: 1px solid #ddd;" />
-          <p>Pour toutes questions, veuillez communiquer avec votre représentant, ${commande.representantNom || ""}, par courriel au <a href="mailto:${commande.representantEmail || ""}">${commande.representantEmail || ""}</a> ou par téléphone au: ${commande.representantTelephone || ""}.</p>
+          <br />
+          <p>Pour toutes questions, veuillez communiquer avec votre représentant, ${commande.representantNom || ""},<br /> par courriel au <a href="mailto:${commande.representantEmail || ""}">${commande.representantEmail || ""}</a><br /> ou par téléphone au: ${commande.representantTelephone || ""}.</p>
           <p style="font-size: 0.9em; color: #666;">Merci de votre confiance.</p>
         </div>
       </div>
@@ -59,7 +68,21 @@ export async function POST(request: Request) {
     // Envoi des SMS (via Twilio)
     const smsPromises = toSms.map(async (phone: string) => {
       // Simplifier le message pour SMS (caractères limités)
-      const smsMessage = `Les Rampes Gardex: Changement de date pour commande ${commande.numero}. Ancienne: ${ancienneSemaine}, Nouvelle: ${nouvelleSemaine}. Raison: ${commande.raison}. Contactez votre représentant: ${commande.representantNom || ""}, Email: ${commande.representantEmail || ""}, Téléphone: ${commande.representantTelephone || ""}.`;
+      const smsMessage = 
+`Les Rampes Gardex
+
+Changement de date - Commande ${commande.numero}
+
+Ancienne semaine : ${ancienneSemaine}
+Nouvelle semaine : ${nouvelleSemaine}
+
+Raison :
+${commande.raison || "Non spécifiée"}
+
+Contact représentant :
+${commande.representantNom || "—"}
+${commande.representantEmail ? `Email : ${commande.representantEmail}` : ""}
+${commande.representantTelephone ? `Téléphone : ${commande.representantTelephone}` : ""}`;  
       try {
         await twilioClient.messages.create({
           body: smsMessage,
