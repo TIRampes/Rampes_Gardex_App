@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     // Envoi des SMS (via Twilio)
     const smsPromises = toSms.map(async (phone: string) => {
       // Simplifier le message pour SMS (caractères limités)
-      const smsMessage = `Les Rampes Gardex: Changement de date pour commande ${commande.numero}. Ancienne: ${ancienneSemaine}, Nouvelle: ${nouvelleSemaine}. Raison: ${commande.raison}. Contactez votre représentant.`;
+      const smsMessage = `Les Rampes Gardex: Changement de date pour commande ${commande.numero}. Ancienne: ${ancienneSemaine}, Nouvelle: ${nouvelleSemaine}. Raison: ${commande.raison}. Contactez votre représentant: ${commande.representantNom || ""}, Email: ${commande.representantEmail || ""}, Téléphone: ${commande.representantTelephone || ""}.`;
       try {
         await twilioClient.messages.create({
           body: smsMessage,
