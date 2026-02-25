@@ -98,7 +98,7 @@ ${commande.representantTelephone ? `Téléphone : ${commande.representantTelepho
     const emailPromises = toEmails.map(async (email: string) => {
       try {
         await resend.emails.send({
-          from: "Les Rampes Gardex <ti@rampesgardex.com>",
+          from: "...@resend.dev",
           to: email,
           subject: `Avis de changement de date - Commande ${commande.numero}`,
           html: emailHtml,
