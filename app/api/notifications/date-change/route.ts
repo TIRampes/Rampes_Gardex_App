@@ -71,9 +71,10 @@ export async function POST(request: Request) {
       const smsMessage = 
 `Les Rampes Gardex
 
-Changement de date - Commande ${commande.numero}
+Changement de date - Commande numero:${commande.numero}
 
 Ancienne semaine : ${ancienneSemaine}
+
 Nouvelle semaine : ${nouvelleSemaine}
 
 Raison :
