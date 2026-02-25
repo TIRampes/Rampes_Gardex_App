@@ -79,7 +79,7 @@ Nouvelle semaine : ${nouvelleSemaine}
 Raison :
 ${commande.raison || "Non spécifiée"}
 
-Contact représentant :
+Pour plus d'informations, veuillez contacter votre représentant :
 ${commande.representantNom || "—"}
 ${commande.representantEmail ? `Email : ${commande.representantEmail}` : ""}
 ${commande.representantTelephone ? `Téléphone : ${commande.representantTelephone}` : ""}`;  
