@@ -147,6 +147,8 @@ export default function CommandesPage() {
   const [deleteModal, setDeleteModal] = useState<Commande | null>(null);
   const [representants, setRepresentants] = useState<{ id: string; nom: string }[]>([]);
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientMenu, setShowClientMenu] = useState(false);
 
   // États pour le modal de mot de passe
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -189,6 +191,16 @@ export default function CommandesPage() {
     fetchRepresentants();
     fetchClients();
   }, [search, filters]);
+
+  // POUR LE FILTRAGE CLIENT DANS LE MODAL
+  useEffect(() => {
+  if (filters.clientId) {
+    const client = clients.find(c => c.id === filters.clientId);
+    if (client) setClientSearch(client.nom);
+  } else {
+    setClientSearch("");
+  }
+}, [filters.clientId, clients]);
 
   const fetchCommandes = async () => {
     try {
@@ -469,6 +481,7 @@ export default function CommandesPage() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Statut</th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Actions</th>
+   
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
