@@ -47,6 +47,7 @@ export default function ClientsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [activeActionMenu, setActiveActionMenu] = useState<string | null>(null);
+  const [villeSearch, setVilleSearch] = useState("");
 
   const fetchClients = async () => {
     try {
@@ -273,36 +274,58 @@ export default function ClientsPage() {
           </div>
 
           {/* Filter Ville */}
-          {villes.length > 0 && (
-            <div className="relative">
+          {/* Filter Ville */}
+{villes.length > 0 && (
+  <div className="relative">
+    <input
+      type="text"
+      placeholder="Rechercher une ville..."
+      value={villeSearch}
+      onChange={(e) => setVilleSearch(e.target.value)}
+      onFocus={() => setShowVilleMenu(true)}
+      className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+    />
+    {showVilleMenu && (
+      <>
+        <div className="fixed inset-0 z-40" onClick={() => setShowVilleMenu(false)} />
+        <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto">
+          <button
+            onClick={() => {
+              setFilterVille("all");
+              setShowVilleMenu(false);
+              setVilleSearch("");
+            }}
+            className="w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white"
+          >
+            Toutes les villes
+          </button>
+          {villes
+            .filter((ville) => ville.toLowerCase().includes(villeSearch.toLowerCase()))
+            .map((ville) => (
               <button
-                onClick={() => setShowVilleMenu(!showVilleMenu)}
-                className="flex items-center gap-1.5 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm text-gray-700 dark:text-gray-300"
+                key={ville}
+                onClick={() => {
+                  setFilterVille(ville);
+                  setShowVilleMenu(false);
+                  setVilleSearch(ville); // On met le nom de la ville dans l'input
+                }}
+                className="w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white truncate"
               >
-                <MapPin size={16} />
-                <span className="hidden sm:inline max-w-[120px] truncate">
-                  {filterVille === "all" ? "Toutes les villes" : filterVille}
-                </span>
-                <span className="sm:hidden">Ville</span>
-                <ChevronDown size={14} />
+                {ville}
               </button>
-              {showVilleMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowVilleMenu(false)} />
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-60 overflow-y-auto">
-                    <button onClick={() => { setFilterVille("all"); setShowVilleMenu(false); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white">
-                      Toutes les villes
-                    </button>
-                    {villes.map((ville) => (
-                      <button key={ville} onClick={() => { setFilterVille(ville); setShowVilleMenu(false); }} className="w-full px-4 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-sm text-gray-900 dark:text-white truncate">
-                        {ville}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
+            ))}
+          {villes.filter((ville) =>
+            ville.toLowerCase().includes(villeSearch.toLowerCase())
+          ).length === 0 && (
+            <div className="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400 italic">
+              Aucune ville trouvée
             </div>
           )}
+        </div>
+      </>
+    )}
+  </div>
+)}   
         </div>
       </div>
 
