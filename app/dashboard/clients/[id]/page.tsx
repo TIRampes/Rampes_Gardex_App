@@ -159,7 +159,7 @@ export default function ClientDetailsPage({ params }: { params: Promise<{ id: st
       <div className={`relative bg-gradient-to-r ${config.gradient} rounded-2xl p-6 lg:p-8 shadow-lg`}>
         <div className="absolute inset-0 bg-black/10 rounded-2xl" />
         <div className="relative">
-          <button onClick={() => router.back()} className="flex items-center gap-2 text-white/80 hover:text-white mb-6">
+          <button onClick={() => router.push("/dashboard/clients")} className="flex items-center gap-2 text-white/80 hover:text-white mb-6">
             <ArrowLeft size={20} />Retour
           </button>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

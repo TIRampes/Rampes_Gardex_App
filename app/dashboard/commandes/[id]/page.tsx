@@ -206,7 +206,7 @@ export default function CommandeDetailsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button onClick={() => router.push("/dashboard/commandes")} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
             <ArrowLeft size={24} />
           </button>
           <div>

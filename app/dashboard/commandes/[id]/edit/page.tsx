@@ -619,7 +619,7 @@ export default function EditCommandePage() {
 
       if (res.ok) {
         setSuccess(true);
-        setTimeout(() => router.push(`/dashboard/commandes/${params.id}`), 1500);
+        setTimeout(() => router.replace(`/dashboard/commandes/${params.id}`), 150);
       } else {
         const data = await res.json();
         setError(data.error || "Erreur lors de la mise à jour");
