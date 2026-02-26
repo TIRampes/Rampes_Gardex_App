@@ -2,6 +2,7 @@ import { NextResponse,NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { TypeClient, ZoneResidentielle } from "@prisma/client";
 
+// fonction pour récupérer un client par ID, avec ses commandes récentes et le nombre total de commandes
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
+// PUT - Mise à jour complète d'un client
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;

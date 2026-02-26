@@ -275,7 +275,7 @@ export default function EditClientPage({ params }: { params: Promise<{ id: strin
       });
 
       if (res.ok) {
-        router.push(`/dashboard/clients/${id}`);
+        router.replace(`/dashboard/clients/${id}`);
       } else {
         const error = await res.json();
         setError({ field: "general", message: error.error || "Erreur lors de la modification" });
