@@ -319,6 +319,7 @@ model Representant {
 
   commandes   Commande[]
   commissions Commission[]
+  envois      EnvoiAttente[]
 
   @@index([nom])
   @@index([actif])
@@ -603,6 +604,7 @@ model Commande {
   mouvementsStock   MouvementStock[]
   historiqueStatuts HistoriqueStatut[]
   commission        Commission?
+  envoisAttente EnvoiAttente[] @relation("CommandeEnvois")
 
   @@index([numero])
   @@index([clientId])
@@ -1297,13 +1299,55 @@ model Configuration {
 }
 
 model Livre {
-  id          String    @id @default(cuid())
-  titre       String
-  auteur      String
-  annee       Int?
-  isbn        String?   @unique
-  prix        Float
-  disponible  Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  titre      String
+  auteur     String
+  annee      Int?
+  isbn       String?  @unique
+  prix       Float
+  disponible Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// // ============================================
+// ÉNUMÉRATIONS POUR ENVOI_ATTENTE
+// ============================================
+enum TypeEnvoi {
+  INDIVIDUEL
+  GROUPE
+  AUTOMATIQUE
+}
+
+enum StatutEnvoi {
+  ENVOYE
+  ERREUR
+  EN_COURS
+}
+
+// ============================================
+// MODÈLE ENVOI_ATTENTE
+// ============================================
+model EnvoiAttente {
+  id             String       @id @default(cuid())
+
+  representantId String
+  representant   Representant @relation(fields: [representantId], references: [id])
+
+  dateEnvoi      DateTime
+  type           TypeEnvoi
+  nbCommandes    Int
+  statut         StatutEnvoi
+  messageId      String?      @db.VarChar(255)
+  erreur         String?      @db.Text
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  commandes      Commande[]   @relation("CommandeEnvois")
+
+  @@index([representantId])
+  @@index([dateEnvoi])
+  @@index([statut])
+  @@map("envois_attente")
 }
