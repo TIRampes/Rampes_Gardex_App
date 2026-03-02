@@ -412,7 +412,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   </div>
                   <div className="border-t border-gray-100 py-2">
                     <button
-                      onClick={() => signOut({ callbackUrl: "/Auth/login" })}
+                      onClick={() => signOut({ callbackUrl: "/auth/login" })}
                       className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full transition-colors"
                     >
                       <LogOut size={18} />
