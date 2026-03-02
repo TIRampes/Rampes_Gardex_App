@@ -1,6 +1,7 @@
 "use client";
 
 import { useState,FormEvent } from "react";
+import { BarChart, Smartphone, Settings, Package } from "lucide-react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -154,7 +155,7 @@ export default function loginPage() {
         
 
             {/*Formulaire email/mot de passe */}
-            <form onSubmit={handleCredentialsLogin} className="space-y-5">
+          {/* <form onSubmit={handleCredentialsLogin} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Adresse courriel
@@ -191,24 +192,26 @@ export default function loginPage() {
               >
                 {isLoadingCredentials ? <Spinner /> : "Se connecter"}
               </button>
-            </form> 
+            </form> */}
 
             {/* Liens */}
-            <div className="mt-6 text-center space-y-3">
-              <Link 
+           <div className="mt-6 text-center space-y-3">
+             {/* <Link 
                 href="/forgot-password" 
                 className="text-sm text-gardex-orange hover:underline font-medium"
               >
                 Mot de passe oublié ?
               </Link>
-              {/* Lien vers la page d'inscription */}
+              {/* Lien vers la page d'inscription 
               <p className="text-sm text-gray-600">
                 Pas encore de compte ?{" "}
                 <Link href="/auth/register" className="text-gardex-orange hover:underline font-semibold">
                   Créer un compte
                 </Link>
               </p>
+              */}
             </div> 
+            
           </div>
 
           {/* Footer */}
