@@ -11,7 +11,7 @@ export async function GET() {
       data: categories.map((c) => ({ ...c, createdAt: c.createdAt.toISOString(), updatedAt: c.updatedAt.toISOString() })),
     });
   } catch (error) {
-    console.error("[API/inventaire/categories GET]", error);
+    console.error("[api/inventaire/categories GET]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data: { ...categorie, createdAt: categorie.createdAt.toISOString(), updatedAt: categorie.updatedAt.toISOString() } }, { status: 201 });
   } catch (error) {
-    console.error("[API/inventaire/categories POST]", error);
+    console.error("[api/inventaire/categories POST]", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
