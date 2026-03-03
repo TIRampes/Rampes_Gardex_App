@@ -8,7 +8,9 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient({
+  log: ['query', 'info', 'warn', 'error'], // Active les logs Prisma
+})
 
 function parseNumber(str: string | undefined): number {
   if (!str) return 0
@@ -30,48 +32,30 @@ function mapTypeTransaction(type: string): TypeMouvement {
   return TypeMouvement.AJUSTEMENT
 }
 
-// Normalisation pour recherche (supprime espaces, remplace - par ., met en majuscule)
 function normalizeCode(code: string): string {
   return code.replace(/\s+/g, '').replace(/-/g, '.').toUpperCase()
-}
-
-// Cherche un produit par code exact, puis par normalisation. Sinon le crée.
-async function getOrCreateProduit(code: string): Promise<string> {
-  // 1. recherche exacte
-  let produit = await prisma.produit.findUnique({ where: { code } })
-  if (produit) return produit.id
-
-  // 2. recherche normalisée parmi tous les produits
-  const norm = normalizeCode(code)
-  const tous = await prisma.produit.findMany()
-  const found = tous.find(p => normalizeCode(p.code) === norm)
-  if (found) return found.id
-
-  // 3. création automatique
-  console.log(`➕ Création du produit manquant: ${code}`)
-  const newProduit = await prisma.produit.create({
-    data: {
-      code,
-      nom: code,
-      description: `Créé automatiquement lors de l'import des transactions`,
-      quantite: 0,
-      seuilMin: 0,
-    }
-  })
-  return newProduit.id
 }
 
 async function migrateTransactions() {
   console.log('🚀 Début de la migration des transactions...')
 
-  const results: any[] = []
-  const csvPath = path.join(__dirname, '../data/Logistique_Inventaire_Transaction.csv')
+  // Test de connexion DB
+  try {
+    const test = await prisma.$queryRaw`SELECT 1`
+    console.log('✅ Connexion DB OK', test)
+  } catch (err) {
+    console.error('❌ Échec de connexion à la base de données:', err)
+    process.exit(1)
+  }
 
+  const csvPath = path.join(__dirname, '../data/Logistique_Inventaire_Transaction.csv')
   if (!fs.existsSync(csvPath)) {
     console.error(`❌ Fichier non trouvé: ${csvPath}`)
     return
   }
 
+  // Lecture du CSV
+  const results: any[] = []
   await new Promise<void>((resolve, reject) => {
     fs.createReadStream(csvPath)
       .pipe(csv({
@@ -84,21 +68,71 @@ async function migrateTransactions() {
 
   console.log(`📋 ${results.length} transactions trouvées`)
 
+  // Précharger tous les produits
+  console.log('⏳ Préchargement des produits...')
+  const tousProduits = await prisma.produit.findMany()
+  // Maps pour recherche rapide
+  const exactMap = new Map(tousProduits.map(p => [p.code, p.id]))
+  const normalizedMap = new Map(tousProduits.map(p => [normalizeCode(p.code), p.id]))
+  console.log(`✅ ${tousProduits.length} produits préchargés`)
+
   let imported = 0
   let skipped = 0
   let duplicates = 0
+  let createdProducts = 0
 
-  for (const row of results) {
+  for (let i = 0; i < results.length; i++) {
+    const row = results[i]
+
+    // Progression toutes les 500 lignes
+    if (i % 500 === 0) {
+      console.log(`⏳ Progression: ${i}/${results.length} (importés: ${imported})`)
+    }
+
     try {
+      // Log pour suivre la ligne en cours
+      console.log(`Traitement ligne ${i}...`)
+
       const codePieceRaw = row.Piece?.trim()
       if (!codePieceRaw) {
         skipped++
+        console.log(`   → Code vide, ignoré`)
         continue
       }
 
-      const produitId = await getOrCreateProduit(codePieceRaw)
+      // Recherche du produit
+      let produitId = exactMap.get(codePieceRaw)
+      if (!produitId) {
+        const norm = normalizeCode(codePieceRaw)
+        produitId = normalizedMap.get(norm)
+        if (produitId) {
+          console.log(`   → Produit trouvé par normalisation: ${codePieceRaw} -> ${norm}`)
+        }
+      } else {
+        console.log(`   → Produit trouvé exact: ${codePieceRaw}`)
+      }
+
+      // Création si inexistant
+      if (!produitId) {
+        console.log(`   ➕ Création du produit manquant: ${codePieceRaw}`)
+        const newProduit = await prisma.produit.create({
+          data: {
+            code: codePieceRaw,
+            nom: codePieceRaw,
+            description: `Créé automatiquement lors de l'import des transactions`,
+            quantite: 0,
+            seuilMin: 0,
+          }
+        })
+        produitId = newProduit.id
+        // Ajouter aux Maps
+        exactMap.set(codePieceRaw, produitId)
+        normalizedMap.set(normalizeCode(codePieceRaw), produitId)
+        createdProducts++
+      }
 
       const quantite = parseNumber(row.Quantite)
+      console.log(`   → Quantité: ${quantite}`)
 
       const data = {
         produitId,
@@ -116,20 +150,26 @@ async function migrateTransactions() {
         createdAt: parseDate(row.DateTransaction) || new Date(),
       }
 
+      console.log(`   → Tentative de création de la transaction...`)
       await prisma.mouvementStock.create({ data })
       imported++
+      console.log(`   ✅ Transaction importée`)
     } catch (error: any) {
       if (error.code === 'P2002' && error.meta?.target?.includes('noTransaction')) {
         duplicates++
+        console.log(`   ⚠️ Doublon ignoré pour noTransaction: ${row.NoTransaction}`)
       } else {
-        console.error(`❌ Erreur pour la transaction:`, row, error)
+        console.error(`❌ Erreur pour la transaction ligne ${i}:`, error)
+        // Optionnel: décommenter pour arrêter à la première erreur
+        // throw error
       }
     }
   }
 
-  console.log(`✅ ${imported} transactions importées`)
+  console.log(`\n✅ ${imported} transactions importées`)
   console.log(`⚠️ ${skipped} ignorées (code vide)`)
   console.log(`⚠️ ${duplicates} doublons ignorés (noTransaction en double)`)
+  console.log(`🆕 ${createdProducts} produits créés automatiquement`)
 }
 
 migrateTransactions()

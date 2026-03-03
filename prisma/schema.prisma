@@ -903,7 +903,7 @@ model MouvementStock {
   createdAt     DateTime      @default(now())
 
   // Nouveaux champs pour correspondre au CSV
-  noTransaction         String?   @unique @db.VarChar(50) // NoTransaction du CSV
+  noTransaction         String?   @db.VarChar(50) // NoTransaction du CSV
   receptionTransaction  Int? // ReceptionTransaction
   codePiecePeinte       String?   @db.VarChar(50) // Code_Piece_Peinte (référence à un produit)
   dateReceptionPeinture DateTime? // DateReceptionPeinture
