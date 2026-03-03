@@ -78,7 +78,7 @@ export default function InventaireDashboard() {
                 value={String(stats?.totalActives ?? 0)}
                 sub={`${stats?.totalInactives ?? 0} inactives`}
                 color="sky"
-                href="/inventaire/pieces"
+                href="/dashboard/inventaire/pieces"
               />
               <StatCard
                 icon={<AlertTriangle className="w-[1.125rem] h-[1.125rem]" />}
@@ -86,7 +86,7 @@ export default function InventaireDashboard() {
                 value={String(stats?.totalSousSeuil ?? 0)}
                 sub="à commander"
                 color="rose"
-                href="/inventaire/pieces?sousSeuilMin=true"
+                href="/dashboard/inventaire/pieces?sousSeuilMin=true"
               />
               <StatCard
                 icon={<DollarSign className="w-[1.125rem] h-[1.125rem]" />}
@@ -101,15 +101,15 @@ export default function InventaireDashboard() {
                 value={String(fournisseursCount)}
                 sub={`${unitesCount} unités · ${categoriesCount} catégories`}
                 color="amber"
-                href="/inventaire/fournisseurs"
+                href="/dashboard/inventaire/fournisseurs"
               />
             </div>
 
             {/* Quick Access Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-[0.75rem]">
-              <QuickLink href="/inventaire/pieces" icon={Package} label="Pièces" desc="Gérer les pièces et l'inventaire" count={stats?.totalActives ?? 0} />
-              <QuickLink href="/inventaire/fournisseurs" icon={Truck} label="Fournisseurs" desc="Gérer les fournisseurs" count={fournisseursCount} />
-              <QuickLink href="/inventaire/unites" icon={Ruler} label="Unités & Catégories" desc="Configurer les unités et catégories" count={unitesCount + categoriesCount} />
+              <QuickLink href="/dashboard/inventaire/pieces" icon={Package} label="Pièces" desc="Gérer les pièces et l'inventaire" count={stats?.totalActives ?? 0} />
+              <QuickLink href="/dashboard/inventaire/fournisseurs" icon={Truck} label="Fournisseurs" desc="Gérer les fournisseurs" count={fournisseursCount} />
+              <QuickLink href="/dashboard/inventaire/unites" icon={Ruler} label="Unités & Catégories" desc="Configurer les unités et catégories" count={unitesCount + categoriesCount} />
             </div>
 
             {/* Low stock alert table */}
@@ -125,7 +125,7 @@ export default function InventaireDashboard() {
                       <p className="text-[0.6875rem] text-slate-500">Pièces sous le seuil minimum</p>
                     </div>
                   </div>
-                  <Link href="/inventaire/pieces?sousSeuilMin=true" className="text-[0.75rem] text-sky-600 hover:text-sky-800 font-medium flex items-center gap-[0.25rem]">
+                  <Link href="/dashboard/inventaire/pieces?sousSeuilMin=true" className="text-[0.75rem] text-sky-600 hover:text-sky-800 font-medium flex items-center gap-[0.25rem]">
                     Voir tout <ArrowRight className="w-[0.75rem] h-[0.75rem]" />
                   </Link>
                 </div>
