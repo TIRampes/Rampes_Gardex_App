@@ -1,3 +1,5 @@
+// schema.prisma
+
 generator client {
   provider   = "prisma-client-js"
   engineType = "library"
@@ -135,6 +137,7 @@ enum TypeMouvement {
   AJUSTEMENT
   TRANSFERT
   RETOUR
+  SORTIE_PEINTURE // Nouveau pour distinguer les sorties vers peinture
 }
 
 enum TypeReprise {
@@ -247,7 +250,7 @@ enum ZoneResidentielle {
   RIVE_SUD
 }
 
-// NOUVEAU: Énumération pour les couleurs
+// NOUVEAU: Énumération pour les couleurs (à conserver)
 enum Couleur {
   NOIR
   BLANC
@@ -259,10 +262,55 @@ enum Couleur {
   AUTRE
 }
 
-// NOUVEAU: Énumération pour le statut livraison
 enum StatutLivraison {
   N_A
   LIVRE
+}
+
+enum StatutCommission {
+  EN_ATTENTE
+  CALCULEE
+  PAYEE
+  ANNULEE
+}
+
+enum TypeCommission {
+  SOUMISSION
+  VENTE
+  INSTALLATION
+}
+
+enum TypeDeficience {
+  MESURES
+  VENTES
+  FABRICATION
+  FOURNISSEUR
+  INSTALLATION
+  PRODUCTION
+  LIVRAISON
+  CLIENT
+  MULTIPLE
+  PRODUIT
+  AUTRE
+}
+
+enum SecteurDeficience {
+  ANNULE_REPRESENTANT
+  SAUTE_ERREUR
+  SERVICE_APRES_VENTE
+  DEMANDE_PRISE_MESURES
+}
+
+enum TypeEnvoi {
+  INDIVIDUEL
+  GROUPE
+  AUTOMATIQUE
+}
+
+enum StatutEnvoi {
+  ENVOYE
+  ERREUR
+  EN_COURS
 }
 
 // ╔══════════════════════════════════════════╗
@@ -376,7 +424,7 @@ model User {
 }
 
 // ============================================
-// 05. FOURNISSEUR
+// 05. FOURNISSEUR (CORRIGÉ : plus de doublon)
 // ============================================
 model Fournisseur {
   id        String   @id @default(cuid())
@@ -390,9 +438,14 @@ model Fournisseur {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // 🔹 Fournisseur principal
+  produitsPrincipaux Produit[]
+
+  // 🔹 Relation many-to-many
   produits FournisseurProduit[]
-  achats   Achat[]
-  delais   DelaiLivraison[]
+
+  achats Achat[]
+  delais DelaiLivraison[]
 
   @@index([nom])
   @@index([actif])
@@ -400,36 +453,60 @@ model Fournisseur {
 }
 
 // ============================================
-// 06. PRODUIT
+// 06. PRODUIT (CORRIGÉ : uniteLegacy au lieu de unite)
 // ============================================
 model Produit {
   id           String   @id @default(cuid())
-  nom          String   @db.VarChar(255)
-  description  String?  @db.Text
-  categorie    String   @db.VarChar(100)
-  unite        String   @db.VarChar(50)
-  quantite     Int      @default(0)
-  seuilMin     Int      @default(0)
+  code         String   @unique @db.VarChar(50) // Code_Piece
+  nom          String   @db.VarChar(255) // Description_Piece
+  description  String?  @db.Text // (optionnel)
+  categorie    String?  @db.VarChar(100) // ancien champ texte, peut être déprécié
+  uniteLegacy  String?  @db.VarChar(50) // ancien champ texte, renommé pour éviter conflit
+  quantite     Int      @default(0) // Inventaire total (somme des emplacements)
+  seuilMin     Int      @default(0) // PointCommande
   seuilMax     Int?
-  prixUnitaire Decimal? @db.Decimal(10, 2)
-  emplacement  String?  @db.VarChar(100)
+  prixUnitaire Decimal? @db.Decimal(10, 2) // Prix_Piece
+  emplacement  String?  @db.VarChar(100) // Emplacement (principal)
   actif        Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Nouveaux champs issus du CSV
+  couleur                 String?   @db.VarChar(50) // Couleur_Piece (on garde string pour flexibilité)
+  codePieceNonPeinte      String?   @db.VarChar(50) // Code_Piece_NonPeinte (référence à un autre produit)
+  achatFait               Boolean   @default(false) // Achat_fait
+  partiPeinture           Int       @default(0) // PartiPeinture (quantité en transit vers peinture)
+  piecePeinte             Boolean   @default(false) // PiecePeinte (true si c'est une version peinte)
+  emplacement2            String?   @db.VarChar(100) // Emplacement2
+  inventaireEmplacement1  Int       @default(0) // InventaireEmplacement1
+  inventaireEmplacement2  Int       @default(0) // InventaireEmplacement2
+  dateDerniereTransaction DateTime? // DateDerniereTransaction
+
+  // Relations
+  categoriePieceId String? // Clé vers CategoriePiece
+  categoriePiece   CategoriePiece? @relation(fields: [categoriePieceId], references: [id])
+  uniteId          String? // Clé vers Unite
+  unite            Unite?          @relation(fields: [uniteId], references: [id])
+  fournisseurId    String? // Fournisseur principal
+  fournisseur      Fournisseur?    @relation(fields: [fournisseurId], references: [id])
+
+  // Relations existantes
   fournisseurs FournisseurProduit[]
   mouvements   MouvementStock[]
   lignesAchat  AchatLigne[]
 
+  @@index([code])
   @@index([nom])
-  @@index([categorie])
+  @@index([categoriePieceId])
+  @@index([uniteId])
+  @@index([fournisseurId])
   @@index([quantite])
   @@index([actif])
   @@map("produits")
 }
 
 // ============================================
-// 06b. FOURNISSEUR_PRODUIT (Liaison)
+// 06b. FOURNISSEUR_PRODUIT (Liaison) - inchangé
 // ============================================
 model FournisseurProduit {
   id              String      @id @default(cuid())
@@ -451,148 +528,108 @@ model FournisseurProduit {
 }
 
 // ============================================
-// 07. COMMANDE (VERSION COMPLÈTE AVEC NOUVELLES EXIGENCES)
+// 07. COMMANDE (inchangé)
 // ============================================
 model Commande {
-  id                 String          @id @default(cuid())
-  numero             String          @unique @db.VarChar(50)
-  clientId           String
-  client             Client          @relation(fields: [clientId], references: [id])
-  representantId     String?
-  representant       Representant?   @relation(fields: [representantId], references: [id])
-  reference          String?         @db.VarChar(100)
-  typeCommande       TypeCommande    @default(STANDARD)
-  service            ServiceCommande @default(INSTALLATION)
-  statut             StatutCommande  @default(ACTIVE)
-  adresse            String          @db.Text
-  commentaireAdresse String?         @db.Text
-
-  // NOUVEAU: Couleur avec enum
-  couleur Couleur?
-
-  // NOUVEAU: Champ couleur personnalisée si AUTRE est choisi
-  couleurPersonnalisee String? @db.VarChar(50)
-
-  // NOUVEAU: Reprise
-  reprise                Boolean @default(false)
-  ancienneCommandeNumero String? @db.VarChar(50)
-
-  // Dates
-  dateEntree      DateTime  @default(now())
-  datePrevue      DateTime?
-  dateProduction  DateTime?
-  datePriseMesure DateTime?
-  dateLivraison   DateTime?
-  dateCompletion  DateTime?
-  dateAnnulation  DateTime?
-  semainePrevue   String?   @db.VarChar(10)
-
-  // Prix
-  prixVenteMateriaux    Decimal @default(0) @db.Decimal(10, 2)
-  prixVenteInstallation Decimal @default(0) @db.Decimal(10, 2)
-  prixTotal             Decimal @default(0) @db.Decimal(10, 2)
-
-  // NOUVEAU: Temps d'installation automatique
-  tempsInstallationAuto Decimal @default(0) @db.Decimal(10, 2)
-  utiliserCalculAuto    Boolean @default(false)
-
-  // NOUVEAU: Pieds linéaires par type (avec facteurs)
-  piedsLineairesBarrotin      Int @default(0) // Facteur: 1.25
-  piedsLineairesVerre         Int @default(0) // Facteur: 1
-  piedsLineairesMur           Int @default(0) // Facteur: 4
-  piedsLineairesMainDouble    Int @default(0) // Facteur: 2.25
-  piedsLineairesGardexVision  Int @default(0) // Facteur: 1
-  piedsLineairesGardexUrbaine Int @default(0) // Facteur: 2
-  piedsLineairesGardexOptimum Int @default(0) // Facteur: 0.75
-  piedsLineairesRampes        Int @default(0) // Total calculé
-  nombrePoteaux               Int @default(0)
-
-  // Anciens champs conservés pour compatibilité
-  tempsEstimeInstallation        Int  @default(0)
-  piedsCarresFibre               Int?
-  piedsRampesBarrotin            Int  @default(0)
-  piedsRampesVerre               Int  @default(0)
-  piedsRampesMurIntimite         Int  @default(0)
-  piedsRampesMainDouble          Int  @default(0)
-  piedsRampesGardexVision        Int  @default(0)
-  piedsRampesGardexVisionUrbaine Int  @default(0)
-  piedsRampesGardexVisionOptimum Int  @default(0)
-
-  // Commercial / Multiplan / Multiphase
-  nombreBalcons        Int?
-  nombrePhases         Int?
-  piedsLineairesEstime Int?
-  piedsLineairesReels  Int?
-
-  // Production
-  structure          Boolean         @default(false)
-  mesure             CodeProduction?
-  mesureDonneeLe     DateTime?
-  plan               CodeProduction?
-  envoyeProduction   CodeProduction?
-  productionTerminee CodeProduction?
-  termine            CodeProduction?
-
-  // NOUVEAU: Statut livraison avec enum (N/A ou Livré)
-  statutLivraison StatutLivraison @default(N_A)
-
-  // NOUVEAU: Installation avec enum CodeProduction
-  installation CodeProduction?
-
-  // Achats avec nouveaux champs
-  achatFibre            StatutAchat?
-  dateEnvoieFibre       DateTime?
-  dateReceptionFibre    DateTime?
-  quantiteNonRecueFibre Int?
-
-  achatLimons            StatutAchat?
-  dateEnvoieLimons       DateTime?
-  dateReceptionLimons    DateTime?
-  quantiteNonRecueLimons Int?
-
-  achatVerres            StatutAchat?
-  dateEnvoieVerres       DateTime?
-  dateReceptionVerre     DateTime?
-  quantiteNonRecueVerres Int?
-
-  achatColonnes            StatutAchat?
-  dateEnvoieColonnes       DateTime?
-  dateReceptionColonnes    DateTime?
-  quantiteNonRecueColonnes Int?
-
-  achatPeinture            StatutAchat?
-  dateEnvoiePeinture       DateTime?
-  dateReceptionPeinture    DateTime?
-  quantiteNonRecuePeinture Int?
-
-  achatAttaches            StatutAchat?
-  dateEnvoieAttaches       DateTime?
-  dateReceptionAttaches    DateTime?
-  quantiteNonRecueAttaches Int?
-
+  id                                String               @id @default(cuid())
+  numero                            String               @unique @db.VarChar(50)
+  clientId                          String
+  client                            Client               @relation(fields: [clientId], references: [id])
+  representantId                    String?
+  representant                      Representant?        @relation(fields: [representantId], references: [id])
+  reference                         String?              @db.VarChar(100)
+  typeCommande                      TypeCommande         @default(STANDARD)
+  service                           ServiceCommande      @default(INSTALLATION)
+  statut                            StatutCommande       @default(ACTIVE)
+  adresse                           String               @db.Text
+  commentaireAdresse                String?              @db.Text
+  couleur                           Couleur?
+  couleurPersonnalisee              String?              @db.VarChar(50)
+  reprise                           Boolean              @default(false)
+  ancienneCommandeNumero            String?              @db.VarChar(50)
+  dateEntree                        DateTime             @default(now())
+  datePrevue                        DateTime?
+  dateProduction                    DateTime?
+  datePriseMesure                   DateTime?
+  dateLivraison                     DateTime?
+  dateCompletion                    DateTime?
+  dateAnnulation                    DateTime?
+  semainePrevue                     String?              @db.VarChar(10)
+  prixVenteMateriaux                Decimal              @default(0) @db.Decimal(10, 2)
+  prixVenteInstallation             Decimal              @default(0) @db.Decimal(10, 2)
+  prixTotal                         Decimal              @default(0) @db.Decimal(10, 2)
+  tempsInstallationAuto             Decimal              @default(0) @db.Decimal(10, 2)
+  utiliserCalculAuto                Boolean              @default(false)
+  piedsLineairesBarrotin            Int                  @default(0)
+  piedsLineairesVerre               Int                  @default(0)
+  piedsLineairesMur                 Int                  @default(0)
+  piedsLineairesMainDouble          Int                  @default(0)
+  piedsLineairesGardexVision        Int                  @default(0)
+  piedsLineairesGardexUrbaine       Int                  @default(0)
+  piedsLineairesGardexOptimum       Int                  @default(0)
+  piedsLineairesRampes              Int                  @default(0)
+  nombrePoteaux                     Int                  @default(0)
+  tempsEstimeInstallation           Int                  @default(0)
+  piedsCarresFibre                  Int?
+  piedsRampesBarrotin               Int                  @default(0)
+  piedsRampesVerre                  Int                  @default(0)
+  piedsRampesMurIntimite            Int                  @default(0)
+  piedsRampesMainDouble             Int                  @default(0)
+  piedsRampesGardexVision           Int                  @default(0)
+  piedsRampesGardexVisionUrbaine    Int                  @default(0)
+  piedsRampesGardexVisionOptimum    Int                  @default(0)
+  nombreBalcons                     Int?
+  nombrePhases                      Int?
+  piedsLineairesEstime              Int?
+  piedsLineairesReels               Int?
+  structure                         Boolean              @default(false)
+  mesure                            CodeProduction?
+  mesureDonneeLe                    DateTime?
+  plan                              CodeProduction?
+  envoyeProduction                  CodeProduction?
+  productionTerminee                CodeProduction?
+  termine                           CodeProduction?
+  statutLivraison                   StatutLivraison      @default(N_A)
+  installation                      CodeProduction?
+  achatFibre                        StatutAchat?
+  dateEnvoieFibre                   DateTime?
+  dateReceptionFibre                DateTime?
+  quantiteNonRecueFibre             Int?
+  achatLimons                       StatutAchat?
+  dateEnvoieLimons                  DateTime?
+  dateReceptionLimons               DateTime?
+  quantiteNonRecueLimons            Int?
+  achatVerres                       StatutAchat?
+  dateEnvoieVerres                  DateTime?
+  dateReceptionVerre                DateTime?
+  quantiteNonRecueVerres            Int?
+  achatColonnes                     StatutAchat?
+  dateEnvoieColonnes                DateTime?
+  dateReceptionColonnes             DateTime?
+  quantiteNonRecueColonnes          Int?
+  achatPeinture                     StatutAchat?
+  dateEnvoiePeinture                DateTime?
+  dateReceptionPeinture             DateTime?
+  quantiteNonRecuePeinture          Int?
+  achatAttaches                     StatutAchat?
+  dateEnvoieAttaches                DateTime?
+  dateReceptionAttaches             DateTime?
+  quantiteNonRecueAttaches          Int?
   achatPlancherAluminium            StatutAchat?
   dateEnvoiePlancherAluminium       DateTime?
   dateReceptionPlancherAluminium    DateTime?
   quantiteNonRecuePlancherAluminium Int?
+  avertissementClient               AvertissementClient?
+  dateAvertissement                 DateTime?
+  avertissementPriseMesure          AvertissementMesure?
+  dateAvertissementPriseMesure      DateTime?
+  enProduction                      Boolean              @default(false)
+  clientPresent                     Boolean              @default(false)
+  formulaireComplete                Boolean              @default(false)
+  commentaire                       String?              @db.Text
+  createdAt                         DateTime             @default(now())
+  updatedAt                         DateTime             @updatedAt
 
-  // Avertissements
-  avertissementClient          AvertissementClient?
-  dateAvertissement            DateTime?
-  avertissementPriseMesure     AvertissementMesure?
-  dateAvertissementPriseMesure DateTime?
-
-  // Flags
-  enProduction       Boolean @default(false)
-  clientPresent      Boolean @default(false)
-  formulaireComplete Boolean @default(false)
-
-  // Commentaire (déplacé dans infos générales)
-  commentaire String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
   balcons           Balcon[]
   structuresAchat   StructureAchat[]
   planifications    Planification[]
@@ -604,7 +641,7 @@ model Commande {
   mouvementsStock   MouvementStock[]
   historiqueStatuts HistoriqueStatut[]
   commission        Commission?
-  envoisAttente EnvoiAttente[] @relation("CommandeEnvois")
+  envoisAttente     EnvoiAttente[]     @relation("CommandeEnvois")
 
   @@index([numero])
   @@index([clientId])
@@ -620,33 +657,24 @@ model Commande {
 }
 
 // ============================================
-// 08. BALCON / PHASE / PLAN
+// 08. BALCON (inchangé)
 // ============================================
 model Balcon {
-  id         String   @id @default(cuid())
-  commandeId String
-  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-
-  // Identification
-  nom         String @db.VarChar(100)
-  numeroPhase Int?
-
-  // Mesures et coûts
-  piedsLineaires Int     @default(0)
-  poteaux        Int     @default(0)
-  coutBalcon     Decimal @default(0) @db.Decimal(10, 2)
-  prixTotal      Decimal @default(0) @db.Decimal(10, 2)
-
-  // Statuts
-  produit              Boolean @default(false)
-  installationTerminee Boolean @default(false)
-  reprise              Boolean @default(false)
-
-  // Notes
-  notes String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  commandeId           String
+  commande             Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  nom                  String   @db.VarChar(100)
+  numeroPhase          Int?
+  piedsLineaires       Int      @default(0)
+  poteaux              Int      @default(0)
+  coutBalcon           Decimal  @default(0) @db.Decimal(10, 2)
+  prixTotal            Decimal  @default(0) @db.Decimal(10, 2)
+  produit              Boolean  @default(false)
+  installationTerminee Boolean  @default(false)
+  reprise              Boolean  @default(false)
+  notes                String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([commandeId])
   @@index([numeroPhase])
@@ -655,7 +683,7 @@ model Balcon {
 }
 
 // ============================================
-// 09. PLANIFICATION
+// 09. PLANIFICATION (inchangé)
 // ============================================
 model Planification {
   id                  String              @id @default(cuid())
@@ -683,7 +711,7 @@ model Planification {
 }
 
 // ============================================
-// 10. PRODUCTION
+// 10. PRODUCTION (inchangé)
 // ============================================
 model Production {
   id              String           @id @default(cuid())
@@ -711,87 +739,70 @@ model Production {
 }
 
 // ============================================
-// 11. INTERVENTION
+// 11. INTERVENTION (inchangé)
 // ============================================
 model Intervention {
-  id            String             @id @default(cuid())
-  commandeId    String
-  commande      Commande           @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-  equipeId      String?
-  equipe        Equipe?            @relation(fields: [equipeId], references: [id])
-  responsableId String?
-  responsable   User?              @relation(fields: [responsableId], references: [id])
-  type          TypeIntervention
-  datePrevue    DateTime
-  heureDebut    String?            @db.VarChar(10)
-  heureFin      String?            @db.VarChar(10)
-  statut        StatutIntervention @default(PLANIFIEE)
-
-  // Formulaire commun
-  heureArrivee      String? @db.VarChar(10)
-  heureDepart       String? @db.VarChar(10)
-  personneRessource String? @db.VarChar(255)
-  telephone         String? @db.VarChar(20)
-
-  // Installation - Avant
-  accessibiliteBalcon  String? @db.VarChar(10)
-  balconEncombre       String? @db.VarChar(10)
-  niveauBalconConforme String? @db.VarChar(10)
-  backingConforme      String? @db.VarChar(10)
-  colonneCapage        String? @db.VarChar(10)
-  noteAvant            String? @db.Text
-
-  // Installation - Travaux
-  travauxNonComplete     Boolean @default(false)
-  travauxNonCompleteNote String? @db.Text
-
-  // Installation - Fin
-  mainsInstallees    String? @db.VarChar(10)
-  cacheVisInstallees String? @db.VarChar(10)
-  capsulesPoteaux    String? @db.VarChar(10)
-  vuEnsemble         String? @db.VarChar(10)
-  noteApres          String? @db.Text
-
-  // Livraison
-  materielComplet      String? @db.VarChar(10)
-  etatMateriel         String? @db.VarChar(50)
-  quantiteConforme     String? @db.VarChar(10)
-  emplacementLivraison String? @db.VarChar(255)
-  accessibilite        String? @db.VarChar(10)
-  noteLivraison        String? @db.Text
-
-  // Cueillette
-  materielIdentifie     String? @db.VarChar(10)
-  etatMaterielRecupere  String? @db.VarChar(100)
-  quantiteRecuperee     Int?
-  emplacementCueillette String? @db.VarChar(255)
-  difficulteAcces       String? @db.VarChar(10)
-  noteCueillette        String? @db.Text
-  listeMateriels        Json?
-
-  // Transport
-  adresseDepart         String? @db.Text
-  adresseArrivee        String? @db.Text
-  vehiculeInspecte      String? @db.VarChar(10)
-  chargementSecurise    String? @db.VarChar(10)
-  documentationComplete String? @db.VarChar(10)
-  kmDepart              Int?
-  kmArrivee             Int?
-  membresEquipe         Json?
-  materielTransporte    String? @db.Text
-  noteTransport         String? @db.Text
-
-  // Signatures
-  signatureInstallateur String?   @db.LongText
-  signatureClient       String?   @db.LongText
-  signatureLivreur      String?   @db.LongText
-  signatureChauffeur    String?   @db.LongText
-  dateSignature         DateTime?
-
-  formulaireComplete Boolean  @default(false)
-  notes              String?  @db.Text
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                     String             @id @default(cuid())
+  commandeId             String
+  commande               Commande           @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  equipeId               String?
+  equipe                 Equipe?            @relation(fields: [equipeId], references: [id])
+  responsableId          String?
+  responsable            User?              @relation(fields: [responsableId], references: [id])
+  type                   TypeIntervention
+  datePrevue             DateTime
+  heureDebut             String?            @db.VarChar(10)
+  heureFin               String?            @db.VarChar(10)
+  statut                 StatutIntervention @default(PLANIFIEE)
+  heureArrivee           String?            @db.VarChar(10)
+  heureDepart            String?            @db.VarChar(10)
+  personneRessource      String?            @db.VarChar(255)
+  telephone              String?            @db.VarChar(20)
+  accessibiliteBalcon    String?            @db.VarChar(10)
+  balconEncombre         String?            @db.VarChar(10)
+  niveauBalconConforme   String?            @db.VarChar(10)
+  backingConforme        String?            @db.VarChar(10)
+  colonneCapage          String?            @db.VarChar(10)
+  noteAvant              String?            @db.Text
+  travauxNonComplete     Boolean            @default(false)
+  travauxNonCompleteNote String?            @db.Text
+  mainsInstallees        String?            @db.VarChar(10)
+  cacheVisInstallees     String?            @db.VarChar(10)
+  capsulesPoteaux        String?            @db.VarChar(10)
+  vuEnsemble             String?            @db.VarChar(10)
+  noteApres              String?            @db.Text
+  materielComplet        String?            @db.VarChar(10)
+  etatMateriel           String?            @db.VarChar(50)
+  quantiteConforme       String?            @db.VarChar(10)
+  emplacementLivraison   String?            @db.VarChar(255)
+  accessibilite          String?            @db.VarChar(10)
+  noteLivraison          String?            @db.Text
+  materielIdentifie      String?            @db.VarChar(10)
+  etatMaterielRecupere   String?            @db.VarChar(100)
+  quantiteRecuperee      Int?
+  emplacementCueillette  String?            @db.VarChar(255)
+  difficulteAcces        String?            @db.VarChar(10)
+  noteCueillette         String?            @db.Text
+  listeMateriels         Json?
+  adresseDepart          String?            @db.Text
+  adresseArrivee         String?            @db.Text
+  vehiculeInspecte       String?            @db.VarChar(10)
+  chargementSecurise     String?            @db.VarChar(10)
+  documentationComplete  String?            @db.VarChar(10)
+  kmDepart               Int?
+  kmArrivee              Int?
+  membresEquipe          Json?
+  materielTransporte     String?            @db.Text
+  noteTransport          String?            @db.Text
+  signatureInstallateur  String?            @db.LongText
+  signatureClient        String?            @db.LongText
+  signatureLivreur       String?            @db.LongText
+  signatureChauffeur     String?            @db.LongText
+  dateSignature          DateTime?
+  formulaireComplete     Boolean            @default(false)
+  notes                  String?            @db.Text
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   photos Photo[]
 
@@ -805,7 +816,7 @@ model Intervention {
 }
 
 // ============================================
-// 12. PHOTO
+// 12. PHOTO (inchangé)
 // ============================================
 model Photo {
   id             String       @id @default(cuid())
@@ -822,7 +833,7 @@ model Photo {
 }
 
 // ============================================
-// 13. ACHAT
+// 13. ACHAT (inchangé)
 // ============================================
 model Achat {
   id               String      @id @default(cuid())
@@ -854,7 +865,7 @@ model Achat {
 }
 
 // ============================================
-// 13b. ACHAT_LIGNE
+// 13b. ACHAT_LIGNE (inchangé)
 // ============================================
 model AchatLigne {
   id            String   @id @default(cuid())
@@ -875,7 +886,7 @@ model AchatLigne {
 }
 
 // ============================================
-// 14. MOUVEMENT_STOCK
+// 14. MOUVEMENT_STOCK (enrichi)
 // ============================================
 model MouvementStock {
   id            String        @id @default(cuid())
@@ -891,15 +902,25 @@ model MouvementStock {
   notes         String?       @db.Text
   createdAt     DateTime      @default(now())
 
+  // Nouveaux champs pour correspondre au CSV
+  noTransaction         String?   @unique @db.VarChar(50) // NoTransaction du CSV
+  receptionTransaction  Int? // ReceptionTransaction
+  codePiecePeinte       String?   @db.VarChar(50) // Code_Piece_Peinte (référence à un produit)
+  dateReceptionPeinture DateTime? // DateReceptionPeinture
+  noOrdrePeinture       String?   @db.VarChar(50) // NoOrdrePeinture
+  heureTransaction      String?   @db.VarChar(10) // HeureTransaction
+  emplacement           String?   @db.VarChar(100) // Emplacement (peut être '0' ou 'Magasin' etc.)
+
   @@index([produitId])
   @@index([commandeId])
   @@index([type])
   @@index([createdAt])
+  @@index([noTransaction])
   @@map("mouvements_stock")
 }
 
 // ============================================
-// 15. REPRISE
+// 15. REPRISE (inchangé)
 // ============================================
 model Reprise {
   id             String          @id @default(cuid())
@@ -936,7 +957,7 @@ model Reprise {
 }
 
 // ============================================
-// 16. NON_CONFORMITE
+// 16. NON_CONFORMITE (inchangé)
 // ============================================
 model NonConformite {
   id               String              @id @default(cuid())
@@ -962,7 +983,7 @@ model NonConformite {
 }
 
 // ============================================
-// 17. PROJET_MULTI
+// 17. PROJET_MULTI (inchangé)
 // ============================================
 model ProjetMulti {
   id          String          @id @default(cuid())
@@ -991,7 +1012,7 @@ model ProjetMulti {
 }
 
 // ============================================
-// 18. PHASE
+// 18. PHASE (inchangé)
 // ============================================
 model Phase {
   id          String      @id @default(cuid())
@@ -1015,7 +1036,7 @@ model Phase {
 }
 
 // ============================================
-// 19. BATIMENT
+// 19. BATIMENT (inchangé)
 // ============================================
 model Batiment {
   id              String         @id @default(cuid())
@@ -1043,7 +1064,7 @@ model Batiment {
 }
 
 // ============================================
-// 20. VEHICULE
+// 20. VEHICULE (inchangé)
 // ============================================
 model Vehicule {
   id        String         @id @default(cuid())
@@ -1062,7 +1083,7 @@ model Vehicule {
 }
 
 // ============================================
-// 21. CHAUFFEUR
+// 21. CHAUFFEUR (inchangé)
 // ============================================
 model Chauffeur {
   id        String          @id @default(cuid())
@@ -1081,7 +1102,7 @@ model Chauffeur {
 }
 
 // ============================================
-// 22. NOTIFICATION
+// 22. NOTIFICATION (inchangé)
 // ============================================
 model Notification {
   id        String           @id @default(cuid())
@@ -1102,7 +1123,7 @@ model Notification {
 }
 
 // ============================================
-// 23. ATTENTE
+// 23. ATTENTE (inchangé)
 // ============================================
 model Attente {
   id             String      @id @default(cuid())
@@ -1124,7 +1145,7 @@ model Attente {
 }
 
 // ============================================
-// 24. DELAI_LIVRAISON
+// 24. DELAI_LIVRAISON (inchangé)
 // ============================================
 model DelaiLivraison {
   id            String      @id @default(cuid())
@@ -1145,7 +1166,7 @@ model DelaiLivraison {
 }
 
 // ============================================
-// 25. HISTORIQUE_STATUT
+// 25. HISTORIQUE_STATUT (inchangé)
 // ============================================
 model HistoriqueStatut {
   id             String         @id @default(cuid())
@@ -1162,48 +1183,25 @@ model HistoriqueStatut {
 }
 
 // ============================================
-// 26. COMMISSION
+// 26. COMMISSION (inchangé)
 // ============================================
-enum StatutCommission {
-  EN_ATTENTE
-  CALCULEE
-  PAYEE
-  ANNULEE
-}
-
-enum TypeCommission {
-  SOUMISSION
-  VENTE
-  INSTALLATION
-}
-
 model Commission {
-  id             String       @id @default(cuid())
-  commandeId     String       @unique
-  commande       Commande     @relation(fields: [commandeId], references: [id])
-  representantId String
-  representant   Representant @relation(fields: [representantId], references: [id])
-
-  // Montants
-  montantSoumission Decimal @db.Decimal(10, 2)
-  pourcentage       Float
-  montantCommission Decimal @db.Decimal(10, 2)
-
-  // Statuts
-  statut         StatutCommission @default(EN_ATTENTE)
-  typeCommission TypeCommission   @default(SOUMISSION)
-
-  // Paiement
-  paye          Boolean   @default(false)
-  datePaiement  DateTime?
-  numeroFacture String?   @db.VarChar(50)
-  depotGarantie Decimal?  @db.Decimal(10, 2)
-
-  // Suivi
-  motifDeficience String? @db.Text
-  notes           String? @db.Text
-
-  // Dates
+  id                   String                @id @default(cuid())
+  commandeId           String                @unique
+  commande             Commande              @relation(fields: [commandeId], references: [id])
+  representantId       String
+  representant         Representant          @relation(fields: [representantId], references: [id])
+  montantSoumission    Decimal               @db.Decimal(10, 2)
+  pourcentage          Float
+  montantCommission    Decimal               @db.Decimal(10, 2)
+  statut               StatutCommission      @default(EN_ATTENTE)
+  typeCommission       TypeCommission        @default(SOUMISSION)
+  paye                 Boolean               @default(false)
+  datePaiement         DateTime?
+  numeroFacture        String?               @db.VarChar(50)
+  depotGarantie        Decimal?              @db.Decimal(10, 2)
+  motifDeficience      String?               @db.Text
+  notes                String?               @db.Text
   dateSoumission       DateTime
   dateCalcul           DateTime?
   createdAt            DateTime              @default(now())
@@ -1219,41 +1217,18 @@ model Commission {
 }
 
 // ============================================
-// 27. DEFICIENCE_COMMISSION
+// 27. DEFICIENCE_COMMISSION (inchangé)
 // ============================================
-enum TypeDeficience {
-  MESURES
-  VENTES
-  FABRICATION
-  FOURNISSEUR
-  INSTALLATION
-  PRODUCTION
-  LIVRAISON
-  CLIENT
-  MULTIPLE
-  PRODUIT
-  AUTRE
-}
-
-enum SecteurDeficience {
-  ANNULE_REPRESENTANT
-  SAUTE_ERREUR
-  SERVICE_APRES_VENTE
-  DEMANDE_PRISE_MESURES
-}
-
 model DeficienceCommission {
-  id           String     @id @default(cuid())
-  commissionId String     @unique
-  commission   Commission @relation(fields: [commissionId], references: [id])
-
-  type        TypeDeficience
-  secteur     SecteurDeficience?
-  description String             @db.Text
-  raison      String?            @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String             @id @default(cuid())
+  commissionId String             @unique
+  commission   Commission         @relation(fields: [commissionId], references: [id])
+  type         TypeDeficience
+  secteur      SecteurDeficience?
+  description  String             @db.Text
+  raison       String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@index([commissionId])
   @@index([type])
@@ -1261,29 +1236,26 @@ model DeficienceCommission {
 }
 
 // ============================================
-// 28. STRUCTURE_ACHAT (NOUVEAU MODÈLE)
+// 28. STRUCTURE_ACHAT (inchangé)
 // ============================================
 model StructureAchat {
-  id         String   @id @default(cuid())
-  commandeId String
-  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-
-  nom         String      @db.VarChar(255)
-  statutAchat StatutAchat @default(A_FAIRE)
-
+  id               String      @id @default(cuid())
+  commandeId       String
+  commande         Commande    @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  nom              String      @db.VarChar(255)
+  statutAchat      StatutAchat @default(A_FAIRE)
   dateEnvoie       DateTime?
   dateReception    DateTime?
   quantiteNonRecue Int?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   @@index([commandeId])
   @@map("structures_achat")
 }
 
 // ============================================
-// 29. CONFIGURATION (NOUVEAU MODÈLE POUR LES PARAMÈTRES GLOBAUX)
+// 29. CONFIGURATION (inchangé)
 // ============================================
 model Configuration {
   id          String   @id @default(cuid())
@@ -1298,52 +1270,21 @@ model Configuration {
   @@map("configurations")
 }
 
-model Livre {
-  id         String   @id @default(cuid())
-  titre      String
-  auteur     String
-  annee      Int?
-  isbn       String?  @unique
-  prix       Float
-  disponible Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-// // ============================================
-// ÉNUMÉRATIONS POUR ENVOI_ATTENTE
 // ============================================
-enum TypeEnvoi {
-  INDIVIDUEL
-  GROUPE
-  AUTOMATIQUE
-}
-
-enum StatutEnvoi {
-  ENVOYE
-  ERREUR
-  EN_COURS
-}
-
-// ============================================
-// MODÈLE ENVOI_ATTENTE
+// 30. ENVOI_ATTENTE (inchangé)
 // ============================================
 model EnvoiAttente {
   id             String       @id @default(cuid())
-
   representantId String
   representant   Representant @relation(fields: [representantId], references: [id])
-
   dateEnvoi      DateTime
   type           TypeEnvoi
   nbCommandes    Int
   statut         StatutEnvoi
   messageId      String?      @db.VarChar(255)
   erreur         String?      @db.Text
-
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-
   commandes      Commande[]   @relation("CommandeEnvois")
 
   @@index([representantId])
@@ -1351,3 +1292,37 @@ model EnvoiAttente {
   @@index([statut])
   @@map("envois_attente")
 }
+
+// ============================================
+// 31. CATEGORIE_PIECE (nouveau)
+// ============================================
+model CategoriePiece {
+  id        String   @id @default(cuid())
+  nom       String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  produits Produit[]
+
+  @@index([nom])
+  @@map("categories_piece")
+}
+
+// ============================================
+// 32. UNITE (nouveau)
+// ============================================
+model Unite {
+  id          String   @id @default(cuid())
+  unite       String   @unique @db.VarChar(50) // ex: "Unité", "Boîte"
+  qtePar      Int      @default(1) // QtéPar (quantité par unité)
+  description String?  @db.Text // Description
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  produits Produit[]
+
+  @@index([unite])
+  @@map("unites")
+}
+
+

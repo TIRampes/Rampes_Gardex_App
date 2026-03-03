@@ -12,6 +12,11 @@
     "migrate:representants": "tsx scripts/migrate-representants.ts",
     "migrate:commandes": "tsx scripts/migrate-commandes.ts",
     "migrate-fournisseurs": "ts-node scripts/migrate-fournisseurs.ts",
+    "migrate:categories": "ts-node scripts/migrate-categories.ts",
+    "migrate:unites": "ts-node scripts/migrate-unites.ts",
+    "migrate:pieces": "ts-node scripts/migrate-pieces.ts",
+    "migrate:transactions": "ts-node scripts/migrate-transactions.ts",
+    "migrate:all": "ts-node scripts/migrateAll.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
