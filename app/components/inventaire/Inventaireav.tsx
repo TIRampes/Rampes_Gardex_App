@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Package, Truck, Ruler, Tags, LayoutDashboard } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/inventaire", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
-  { href: "/inventaire/pieces", label: "Pièces", icon: Package, exact: false },
-  { href: "/inventaire/fournisseurs", label: "Fournisseurs", icon: Truck, exact: false },
-  { href: "/inventaire/unites", label: "Unités", icon: Ruler, exact: false },
-  { href: "/inventaire/categories", label: "Catégories", icon: Tags, exact: false },
+  { href: "/dashboard/inventaire", label: "Tableau de bord", icon: LayoutDashboard, exact: true },
+  { href: "/dashboard/inventaire/pieces", label: "Pièces", icon: Package, exact: false },
+  { href: "/dashboard/inventaire/fournisseurs", label: "Fournisseurs", icon: Truck, exact: false },
+  { href: "/dashboard/inventaire/unites", label: "Unités", icon: Ruler, exact: false },
+  { href: "/dashboard/inventaire/categories", label: "Catégories", icon: Tags, exact: false },
 ];
 
 export default function InventaireNav() {
