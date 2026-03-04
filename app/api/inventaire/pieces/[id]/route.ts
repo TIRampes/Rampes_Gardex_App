@@ -7,32 +7,80 @@ const PIECE_INCLUDE = {
   fournisseur: { select: { id: true, nom: true } },
 } as const;
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  _: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const piece = await prisma.produit.findUnique({ where: { id: params.id }, include: PIECE_INCLUDE });
-    if (!piece) return NextResponse.json({ error: "Pièce non trouvée" }, { status: 404 });
+    const { id } = await params;
+
+    const piece = await prisma.produit.findUnique({
+      where: { id },
+      include: PIECE_INCLUDE,
+    });
+
+    if (!piece) {
+      return NextResponse.json(
+        { error: "Pièce non trouvée" },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
-      data: { ...piece, prixUnitaire: piece.prixUnitaire ? Number(piece.prixUnitaire) : null, createdAt: piece.createdAt.toISOString(), updatedAt: piece.updatedAt.toISOString(), dateDerniereTransaction: piece.dateDerniereTransaction?.toISOString() ?? null },
+      data: {
+        ...piece,
+        prixUnitaire: piece.prixUnitaire
+          ? Number(piece.prixUnitaire)
+          : null,
+        createdAt: piece.createdAt.toISOString(),
+        updatedAt: piece.updatedAt.toISOString(),
+        dateDerniereTransaction:
+          piece.dateDerniereTransaction?.toISOString() ?? null,
+      },
     });
   } catch (error) {
     console.error("[API/inventaire/pieces/[id] GET]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
     const body = await request.json();
-    const existing = await prisma.produit.findUnique({ where: { id: params.id } });
-    if (!existing) return NextResponse.json({ error: "Pièce non trouvée" }, { status: 404 });
+
+    const existing = await prisma.produit.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Pièce non trouvée" },
+        { status: 404 }
+      );
+    }
 
     if (body.code && body.code !== existing.code) {
-      const duplicate = await prisma.produit.findUnique({ where: { code: body.code } });
-      if (duplicate) return NextResponse.json({ error: "Ce code existe déjà" }, { status: 409 });
+      const duplicate = await prisma.produit.findUnique({
+        where: { code: body.code },
+      });
+
+      if (duplicate) {
+        return NextResponse.json(
+          { error: "Ce code existe déjà" },
+          { status: 409 }
+        );
+      }
     }
 
     const piece = await prisma.produit.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(body.code !== undefined && { code: body.code }),
         ...(body.nom !== undefined && { nom: body.nom }),
@@ -57,26 +105,74 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     });
 
     return NextResponse.json({
-      data: { ...piece, prixUnitaire: piece.prixUnitaire ? Number(piece.prixUnitaire) : null, createdAt: piece.createdAt.toISOString(), updatedAt: piece.updatedAt.toISOString(), dateDerniereTransaction: piece.dateDerniereTransaction?.toISOString() ?? null },
+      data: {
+        ...piece,
+        prixUnitaire: piece.prixUnitaire
+          ? Number(piece.prixUnitaire)
+          : null,
+        createdAt: piece.createdAt.toISOString(),
+        updatedAt: piece.updatedAt.toISOString(),
+        dateDerniereTransaction:
+          piece.dateDerniereTransaction?.toISOString() ?? null,
+      },
     });
   } catch (error) {
     console.error("[API/inventaire/pieces/[id] PUT]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  _: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const existing = await prisma.produit.findUnique({ where: { id: params.id }, include: { mouvements: { take: 1 }, lignesAchat: { take: 1 } } });
-    if (!existing) return NextResponse.json({ error: "Pièce non trouvée" }, { status: 404 });
-    if (existing.mouvements.length > 0 || existing.lignesAchat.length > 0) {
-      await prisma.produit.update({ where: { id: params.id }, data: { actif: false } });
-      return NextResponse.json({ data: { id: params.id, action: "desactivee" } });
+    const { id } = await params;
+
+    const existing = await prisma.produit.findUnique({
+      where: { id },
+      include: {
+        mouvements: { take: 1 },
+        lignesAchat: { take: 1 },
+      },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Pièce non trouvée" },
+        { status: 404 }
+      );
     }
-    await prisma.produit.delete({ where: { id: params.id } });
-    return NextResponse.json({ data: { id: params.id, action: "supprimee" } });
+
+    if (
+      existing.mouvements.length > 0 ||
+      existing.lignesAchat.length > 0
+    ) {
+      await prisma.produit.update({
+        where: { id },
+        data: { actif: false },
+      });
+
+      return NextResponse.json({
+        data: { id, action: "desactivee" },
+      });
+    }
+
+    await prisma.produit.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({
+      data: { id, action: "supprimee" },
+    });
   } catch (error) {
     console.error("[API/inventaire/pieces/[id] DELETE]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur serveur" },
+      { status: 500 }
+    );
   }
 }
