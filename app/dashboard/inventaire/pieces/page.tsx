@@ -5,7 +5,7 @@ import { Package, Plus, Search, X, Filter, Loader2, Download, ChevronLeft, Chevr
 import InventaireNav from "@/app/components/inventaire/Inventaireav";
 import SlidePanel from "@/app/components/inventaire/Slidepanel";
 import { ActionMenu, ConfirmDialog, Toast, Field, SelectField, ToggleField } from "@/app/components/inventaire/Shareui";
-import { usePieces, useCategories, useUnites, useFournisseurs } from "@/app/hooks/useinventaire";
+import { usePieces, useCategories, useUnites, useFournisseurs } from "@/app/hooks/useInventaire";
 import type { Piece } from "@/app/types/inventaire";
 
 export default function PiecesPage() {

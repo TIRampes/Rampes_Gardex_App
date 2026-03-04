@@ -5,7 +5,7 @@ import { Truck, Plus, Search, X, Loader2, Pencil, Trash2, ToggleLeft, ToggleRigh
 import InventaireNav from "@/app/components/inventaire/Inventaireav";
 import SlidePanel from"@/app/components/inventaire/Slidepanel";
 import { ActionMenu, ConfirmDialog, Toast, Field, ToggleField } from "@/app/components/inventaire/Shareui";
-import { useFournisseurs } from "@/app/hooks/useinventaire";
+import { useFournisseurs } from "@/app/hooks/useInventaire";
 import type { FournisseurInv } from "@/app/types/inventaire";
 
 export default function FournisseursPage() {

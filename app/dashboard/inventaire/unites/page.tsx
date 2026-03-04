@@ -5,7 +5,7 @@ import { Ruler, Plus, Loader2, Pencil, Trash2, Package } from "lucide-react";
 import InventaireNav from "@/app/components/inventaire/Inventaireav";
 import SlidePanel from "@/app/components/inventaire/Slidepanel";
 import { ActionMenu, ConfirmDialog, Toast, Field } from "@/app/components/inventaire/Shareui";
-import { useUnites } from "@/app/hooks/useinventaire";
+import { useUnites } from "@/app/hooks/useInventaire";
 import type { UniteInv } from "@/app/types/inventaire";
 
 export default function UnitesPage() {

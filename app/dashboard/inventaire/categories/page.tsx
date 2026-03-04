@@ -5,7 +5,7 @@ import { Tags, Plus, Loader2, Pencil, Trash2, Package } from "lucide-react";
 import InventaireNav from "@/app/components/inventaire/Inventaireav";
 import SlidePanel from "@/app/components/inventaire/Slidepanel";
 import { ActionMenu, ConfirmDialog, Toast, Field } from "@/app/components/inventaire/Shareui";
-import { useCategories } from "@/app/hooks/useinventaire";
+import { useCategories } from "@/app/hooks/useInventaire";
 import type { CategorieInv } from "@/app/types/inventaire";
 
 // Palette de couleurs pour les catégories
