@@ -1,5 +1,5 @@
 "use client";
-export const dynamic = 'force-dynamic';
+
 import { useState, useCallback, useMemo } from "react";
 import {
   Users,
@@ -16,7 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import { usePlanification } from "@/app/hooks/usePlanifications";
+import { usePlanification } from "@/app/hooks/usePlanification";
 import {
   getInstallationsForDate,
   formatDateKey,

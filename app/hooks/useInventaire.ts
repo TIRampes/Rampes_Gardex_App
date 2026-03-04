@@ -1,175 +1,336 @@
-"use client";
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'react-hot-toast'
 
-import { useState, useCallback } from "react";
-import type { Piece, FournisseurInv, UniteInv, CategorieInv } from "@/app/types/inventaire";
-
-// ══════════════════════════════════════════
-// GENERIC FETCH HELPERS
-// ══════════════════════════════════════════
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...options, headers: { "Content-Type": "application/json", ...options?.headers } });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json.error || "Erreur serveur");
-  return json;
+export interface Produit {
+  id: string
+  code: string
+  nom: string
+  description?: string | null
+  categoriePieceId?: string | null
+  categoriePiece?: { id: string; nom: string } | null
+  couleur?: string | null
+  uniteId?: string | null
+  unite?: { id: string; unite: string } | null
+  fournisseurId?: string | null
+  fournisseur?: { id: string; nom: string } | null
+  quantite: number
+  seuilMin: number
+  prixUnitaire?: number | null
+  emplacement?: string | null
+  codePieceNonPeinte?: string | null
+  piecePeinte: boolean
+  achatFait: boolean
+  partiPeinture: number
+  // ... autres champs
 }
 
-// ══════════════════════════════════════════
-// HOOK PIÈCES
-// ══════════════════════════════════════════
-
-export function usePieces() {
-  const [pieces, setPieces] = useState<Piece[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<{ totalActives: number; totalInactives: number; totalSousSeuil: number; valeurStock: number } | null>(null);
-  const [pagination, setPagination] = useState({ page: 1, limite: 50, total: 0, totalPages: 0 });
-
-  const charger = useCallback(async (params?: Record<string, string>) => {
-    setLoading(true);
-    try {
-      const qs = new URLSearchParams(params ?? {}).toString();
-      const res = await apiFetch<{ data: Piece[]; pagination: typeof pagination; stats: typeof stats }>(`/api/inventaire/pieces?${qs}`);
-      setPieces(res.data);
-      setPagination(res.pagination);
-      if (res.stats) setStats(res.stats);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const creer = useCallback(async (data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: Piece }>("/api/inventaire/pieces", { method: "POST", body: JSON.stringify(data) });
-    setPieces((prev) => [res.data, ...prev]);
-    return res.data;
-  }, []);
-
-  const modifier = useCallback(async (id: string, data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: Piece }>(`/api/inventaire/pieces/${id}`, { method: "PUT", body: JSON.stringify(data) });
-    setPieces((prev) => prev.map((p) => (p.id === id ? res.data : p)));
-    return res.data;
-  }, []);
-
-  const supprimer = useCallback(async (id: string) => {
-    await apiFetch(`/api/inventaire/pieces/${id}`, { method: "DELETE" });
-    setPieces((prev) => prev.filter((p) => p.id !== id));
-  }, []);
-
-  return { pieces, loading, stats, pagination, charger, creer, modifier, supprimer };
+export interface Fournisseur {
+  id: string
+  nom: string
+  contact?: string
+  telephone?: string
+  email?: string
+  adresse?: string
+  notes?: string
 }
 
-// ══════════════════════════════════════════
-// HOOK FOURNISSEURS
-// ══════════════════════════════════════════
-
-export function useFournisseurs() {
-  const [fournisseurs, setFournisseurs] = useState<FournisseurInv[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [pagination, setPagination] = useState({ page: 1, limite: 50, total: 0, totalPages: 0 });
-
-  const charger = useCallback(async (params?: Record<string, string>) => {
-    setLoading(true);
-    try {
-      const qs = new URLSearchParams(params ?? {}).toString();
-      const res = await apiFetch<{ data: FournisseurInv[]; pagination: typeof pagination }>(`/api/inventaire/fournisseurs?${qs}`);
-      setFournisseurs(res.data);
-      setPagination(res.pagination);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const creer = useCallback(async (data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: FournisseurInv }>("/api/inventaire/fournisseurs", { method: "POST", body: JSON.stringify(data) });
-    setFournisseurs((prev) => [res.data, ...prev]);
-    return res.data;
-  }, []);
-
-  const modifier = useCallback(async (id: string, data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: FournisseurInv }>(`/api/inventaire/fournisseurs/${id}`, { method: "PUT", body: JSON.stringify(data) });
-    setFournisseurs((prev) => prev.map((f) => (f.id === id ? res.data : f)));
-    return res.data;
-  }, []);
-
-  const supprimer = useCallback(async (id: string) => {
-    await apiFetch(`/api/inventaire/fournisseurs/${id}`, { method: "DELETE" });
-    setFournisseurs((prev) => prev.filter((f) => f.id !== id));
-  }, []);
-
-  return { fournisseurs, loading, pagination, charger, creer, modifier, supprimer };
+export interface Unite {
+  id: string
+  unite: string
+  qtePar: number
+  description?: string
 }
 
-// ══════════════════════════════════════════
-// HOOK UNITÉS
-// ══════════════════════════════════════════
-
-export function useUnites() {
-  const [unites, setUnites] = useState<UniteInv[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const charger = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch<{ data: UniteInv[] }>("/api/inventaire/unites");
-      setUnites(res.data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const creer = useCallback(async (data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: UniteInv }>("/api/inventaire/unites", { method: "POST", body: JSON.stringify(data) });
-    setUnites((prev) => [...prev, res.data].sort((a, b) => a.unite.localeCompare(b.unite)));
-    return res.data;
-  }, []);
-
-  const modifier = useCallback(async (id: string, data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: UniteInv }>(`/api/inventaire/unites/${id}`, { method: "PUT", body: JSON.stringify(data) });
-    setUnites((prev) => prev.map((u) => (u.id === id ? res.data : u)));
-    return res.data;
-  }, []);
-
-  const supprimer = useCallback(async (id: string) => {
-    await apiFetch(`/api/inventaire/unites/${id}`, { method: "DELETE" });
-    setUnites((prev) => prev.filter((u) => u.id !== id));
-  }, []);
-
-  return { unites, loading, charger, creer, modifier, supprimer };
+export interface Categorie {
+  id: string
+  nom: string
 }
 
-// ══════════════════════════════════════════
-// HOOK CATÉGORIES
-// ══════════════════════════════════════════
+export interface Mouvement {
+  id: string
+  produitId: string
+  produit: Produit
+  commandeId?: string
+  type: string
+  quantite: number
+  quantiteAvant: number
+  quantiteApres: number
+  reference?: string
+  notes?: string
+  createdAt: string
+}
 
-export function useCategories() {
-  const [categories, setCategories] = useState<CategorieInv[]>([]);
-  const [loading, setLoading] = useState(false);
+// Fonctions API
+const api = {
+  produits: {
+    list: async (params?: URLSearchParams) => {
+      const url = `/api/produits${params ? `?${params}` : ''}`
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Erreur chargement produits')
+      return res.json()
+    },
+    create: async (data: Partial<Produit>) => {
+      const res = await fetch('/api/produits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur création produit')
+      return res.json()
+    },
+    update: async (id: string, data: Partial<Produit>) => {
+      const res = await fetch(`/api/produits/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur mise à jour produit')
+      return res.json()
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`/api/produits/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Erreur suppression produit')
+      return res.json()
+    },
+  },
+  fournisseurs: {
+    list: async (search?: string) => {
+      const url = search ? `/api/fournisseurs?search=${search}` : '/api/fournisseurs'
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Erreur chargement fournisseurs')
+      return res.json()
+    },
+    create: async (data: Partial<Fournisseur>) => {
+      const res = await fetch('/api/fournisseurs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur création fournisseur')
+      return res.json()
+    },
+    update: async (id: string, data: Partial<Fournisseur>) => {
+      const res = await fetch(`/api/fournisseurs/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur mise à jour fournisseur')
+      return res.json()
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`/api/fournisseurs/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Erreur suppression fournisseur')
+      return res.json()
+    },
+  },
+  unites: {
+    list: async () => {
+      const res = await fetch('/api/unites')
+      if (!res.ok) throw new Error('Erreur chargement unités')
+      return res.json()
+    },
+    create: async (data: Partial<Unite>) => {
+      const res = await fetch('/api/unites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur création unité')
+      return res.json()
+    },
+    delete: async (id: string) => {
+      const res = await fetch(`/api/unites/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Erreur suppression unité')
+      return res.json()
+    },
+  },
+  categories: {
+    list: async () => {
+      const res = await fetch('/api/categories')
+      if (!res.ok) throw new Error('Erreur chargement catégories')
+      return res.json()
+    },
+  },
+  mouvements: {
+    list: async (produitId?: string, debut?: string, fin?: string) => {
+      const params = new URLSearchParams()
+      if (produitId) params.set('produitId', produitId)
+      if (debut) params.set('debut', debut)
+      if (fin) params.set('fin', fin)
+      const res = await fetch(`/api/mouvements?${params}`)
+      if (!res.ok) throw new Error('Erreur chargement mouvements')
+      return res.json()
+    },
+    create: async (data: Partial<Mouvement>) => {
+      const res = await fetch('/api/mouvements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (!res.ok) throw new Error('Erreur création mouvement')
+      return res.json()
+    },
+  },
+}
 
-  const charger = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch<{ data: CategorieInv[] }>("/api/inventaire/categories");
-      setCategories(res.data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+export function useInventaire() {
+  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useState<URLSearchParams>(new URLSearchParams())
 
-  const creer = useCallback(async (data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: CategorieInv }>("/api/inventaire/categories", { method: "POST", body: JSON.stringify(data) });
-    setCategories((prev) => [...prev, res.data].sort((a, b) => a.nom.localeCompare(b.nom)));
-    return res.data;
-  }, []);
+  // Produits
+  const produitsQuery = useQuery({
+    queryKey: ['produits', searchParams.toString()],
+    queryFn: () => api.produits.list(searchParams),
+  })
 
-  const modifier = useCallback(async (id: string, data: Record<string, unknown>) => {
-    const res = await apiFetch<{ data: CategorieInv }>(`/api/inventaire/categories/${id}`, { method: "PUT", body: JSON.stringify(data) });
-    setCategories((prev) => prev.map((c) => (c.id === id ? res.data : c)));
-    return res.data;
-  }, []);
+  const createProduitMutation = useMutation({
+    mutationFn: api.produits.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['produits'] })
+      toast.success('Produit créé avec succès')
+    },
+    onError: (error) => toast.error(error.message),
+  })
 
-  const supprimer = useCallback(async (id: string) => {
-    await apiFetch(`/api/inventaire/categories/${id}`, { method: "DELETE" });
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+  const updateProduitMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Produit> }) =>
+      api.produits.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['produits'] })
+      toast.success('Produit mis à jour')
+    },
+    onError: (error) => toast.error(error.message),
+  })
 
-  return { categories, loading, charger, creer, modifier, supprimer };
+  const deleteProduitMutation = useMutation({
+    mutationFn: api.produits.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['produits'] })
+      toast.success('Produit supprimé')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  // Fournisseurs
+  const fournisseursQuery = useQuery({
+    queryKey: ['fournisseurs'],
+    queryFn: () => api.fournisseurs.list(),
+  })
+
+  const createFournisseurMutation = useMutation({
+    mutationFn: api.fournisseurs.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fournisseurs'] })
+      toast.success('Fournisseur créé')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const updateFournisseurMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Fournisseur> }) =>
+      api.fournisseurs.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fournisseurs'] })
+      toast.success('Fournisseur mis à jour')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const deleteFournisseurMutation = useMutation({
+    mutationFn: api.fournisseurs.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fournisseurs'] })
+      toast.success('Fournisseur supprimé')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  // Unités
+  const unitesQuery = useQuery({
+    queryKey: ['unites'],
+    queryFn: api.unites.list,
+  })
+
+  const createUniteMutation = useMutation({
+    mutationFn: api.unites.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unites'] })
+      toast.success('Unité créée')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  const deleteUniteMutation = useMutation({
+    mutationFn: api.unites.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unites'] })
+      toast.success('Unité supprimée')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  // Catégories
+  const categoriesQuery = useQuery({
+    queryKey: ['categories'],
+    queryFn: api.categories.list,
+  })
+
+  // Mouvements
+  const mouvementsQuery = (produitId?: string, debut?: string, fin?: string) =>
+    useQuery({
+      queryKey: ['mouvements', produitId, debut, fin],
+      queryFn: () => api.mouvements.list(produitId, debut, fin),
+    })
+
+  const createMouvementMutation = useMutation({
+    mutationFn: api.mouvements.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['produits'] })
+      queryClient.invalidateQueries({ queryKey: ['mouvements'] })
+      toast.success('Mouvement enregistré')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+
+  return {
+    // Produits
+    produits: produitsQuery.data ?? [],
+    isLoadingProduits: produitsQuery.isLoading,
+    refetchProduits: produitsQuery.refetch,
+    createProduit: createProduitMutation.mutate,
+    updateProduit: updateProduitMutation.mutate,
+    deleteProduit: deleteProduitMutation.mutate,
+
+    // Fournisseurs
+    fournisseurs: fournisseursQuery.data ?? [],
+    isLoadingFournisseurs: fournisseursQuery.isLoading,
+    createFournisseur: createFournisseurMutation.mutate,
+    updateFournisseur: updateFournisseurMutation.mutate,
+    deleteFournisseur: deleteFournisseurMutation.mutate,
+
+    // Unités
+    unites: unitesQuery.data ?? [],
+    isLoadingUnites: unitesQuery.isLoading,
+    createUnite: createUniteMutation.mutate,
+    deleteUnite: deleteUniteMutation.mutate,
+
+    // Catégories
+    categories: categoriesQuery.data ?? [],
+
+    // Mouvements
+    useMouvements: mouvementsQuery,
+    createMouvement: createMouvementMutation.mutate,
+
+    // Filtres
+    searchParams,
+    setSearchParam: (key: string, value: string) => {
+      const newParams = new URLSearchParams(searchParams)
+      if (value) newParams.set(key, value)
+      else newParams.delete(key)
+      setSearchParams(newParams)
+    },
+    clearFilters: () => setSearchParams(new URLSearchParams()),
+  }
 }
