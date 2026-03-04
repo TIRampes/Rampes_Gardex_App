@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Package, Truck, Ruler, Tags, AlertTriangle, DollarSign, Activity, Loader2, ArrowRight, TrendingDown } from "lucide-react";
 import Link from "next/link";
 import InventaireNav from "@/app/components/inventaire/Inventaireav";
-import { usePieces } from "@/app/hooks/useinventaire";
+
 
 interface DashStats {
   totalActives: number;
