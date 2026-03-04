@@ -1,196 +1,81 @@
-"use client";
+// hooks/useAttentes.ts
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import type {
-  CommandeAttente,
-  Representant,
-  FiltresAttentes,
-  StatsAttentes,
-  EnvoiAttente,
-} from "@/app/types/attentes";
-import { FILTRES_ATTENTES_DEFAUT } from "@/app/types/attentes";
-import {
-  filtrerAttentes,
-  calculerStatsAttentes,
-} from "@/app/services/attentes.service";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import { Commande, Representant } from '@prisma/client';
 
-// ╔══════════════════════════════════════════════════════════════╗
-// ║   HOOK — useAttentes                                        ║
-// ╚══════════════════════════════════════════════════════════════╝
+interface CommandeWithRelations extends Commande {
+  representant: Representant | null;
+  client: { nom: string; telephone?: string; email?: string };
+}
 
 export function useAttentes() {
-  // ── State ──
-  const [commandes, setCommandes] = useState<CommandeAttente[]>([]);
-  const [representants, setRepresentants] = useState<Representant[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filtres, setFiltres] = useState<FiltresAttentes>(FILTRES_ATTENTES_DEFAUT);
-  const [totalActives, setTotalActives] = useState(0);
-  const [envoiEnCours, setEnvoiEnCours] = useState(false);
-  const [dernierResultatEnvoi, setDernierResultatEnvoi] = useState<{
-    success: boolean;
-    message: string;
-    details?: unknown[];
-  } | null>(null);
+  const queryClient = useQueryClient();
 
-  // ── Fetch commandes en attente ──
-  const fetchCommandes = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Récupérer la liste des attentes avec filtres
+  const useListeAttentes = (selectedRepresentants: string[] = []) => {
+    const params = new URLSearchParams();
+    selectedRepresentants.forEach(r => params.append('representant', r));
 
-      const params = new URLSearchParams();
-      if (filtres.representantIds.length > 0) {
-        params.set("representantIds", filtres.representantIds.join(","));
-      }
-      if (filtres.typeAttente !== "tous") params.set("typeAttente", filtres.typeAttente);
-      if (filtres.service !== "tous") params.set("service", filtres.service);
-      if (filtres.recherche) params.set("recherche", filtres.recherche);
-      params.set("tri", filtres.tri.champ);
-      params.set("ordre", filtres.tri.ordre);
+    return useQuery<CommandeWithRelations[]>({
+      queryKey: ['attentes', selectedRepresentants],
+      queryFn: async () => {
+        const res = await fetch(`/api/attentes?${params}`);
+        if (!res.ok) throw new Error('Erreur chargement');
+        return res.json();
+      },
+    });
+  };
 
-      const res = await fetch(`/api/attentes?${params.toString()}`);
-      if (!res.ok) throw new Error("Erreur chargement des attentes");
-      const json = await res.json();
+  // Récupérer la liste des représentants
+  const useRepresentants = () => {
+    return useQuery<Representant[]>({
+      queryKey: ['representants'],
+      queryFn: async () => {
+        const res = await fetch('/api/attentes/representants');
+        if (!res.ok) throw new Error('Erreur chargement');
+        return res.json();
+      },
+    });
+  };
 
-      setCommandes(json.data ?? []);
-      setTotalActives(json.meta?.totalActives ?? 0);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur inconnue");
-    } finally {
-      setLoading(false);
-    }
-  }, [filtres]);
+  // Récupérer le détail d'une commande
+  const useCommande = (id: string | null) => {
+    return useQuery<CommandeWithRelations>({
+      queryKey: ['commande', id],
+      queryFn: async () => {
+        if (!id) throw new Error('ID manquant');
+        const res = await fetch(`/api/attentes/commandes/${id}`);
+        if (!res.ok) throw new Error('Erreur chargement');
+        return res.json();
+      },
+      enabled: !!id,
+    });
+  };
 
-  // ── Fetch représentants ──
-  const fetchRepresentants = useCallback(async () => {
-    try {
-      const res = await fetch("/api/representants");
-      if (!res.ok) return;
-      const json = await res.json();
-      setRepresentants(json.data ?? []);
-    } catch {
-      // Non bloquant
-    }
-  }, []);
-
-  // ── Initial load ──
-  useEffect(() => {
-    fetchCommandes();
-    fetchRepresentants();
-  }, [fetchCommandes, fetchRepresentants]);
-
-  // ── Données filtrées (côté client pour filtrage instantané) ──
-  const commandesFiltrees = useMemo(
-    () => filtrerAttentes(commandes, filtres),
-    [commandes, filtres]
-  );
-
-  // ── Statistiques ──
-  const stats = useMemo<Omit<StatsAttentes, "prochainEnvoiAuto" | "envoisCetteSemaine">>(
-    () => calculerStatsAttentes(commandes, totalActives),
-    [commandes, totalActives]
-  );
-
-  // ── Envoi individuel ──
-  const envoyerIndividuel = useCallback(
-    async (representantId: string, commandeIds?: string[], notes?: string) => {
-      try {
-        setEnvoiEnCours(true);
-        const res = await fetch("/api/attentes/envoi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "individuel", representantId, commandeIds, notes }),
-        });
-        const json = await res.json();
-
-        setDernierResultatEnvoi({
-          success: json.success,
-          message: json.success
-            ? `Email envoyé à ${json.representant} (${json.nbCommandes} commande(s))`
-            : `Erreur: ${json.error}`,
-        });
-
-        if (json.success) {
-          await fetchCommandes(); // Refresh pour mise à jour du statut
-        }
-        return json.success;
-      } catch {
-        setDernierResultatEnvoi({ success: false, message: "Erreur réseau" });
-        return false;
-      } finally {
-        setEnvoiEnCours(false);
-      }
+  // Mutation pour envoyer les emails
+  const envoyerEmails = useMutation({
+    mutationFn: async (representantIds: string[]) => {
+      const res = await fetch('/api/attentes/envoyer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ representantIds }),
+      });
+      if (!res.ok) throw new Error('Erreur envoi');
+      return res.json();
     },
-    [fetchCommandes]
-  );
-
-  // ── Envoi groupé ──
-  const envoyerGroupe = useCallback(
-    async (representantIds: string[], notes?: string) => {
-      try {
-        setEnvoiEnCours(true);
-        const res = await fetch("/api/attentes/envoi", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "groupe", representantIds, notes }),
-        });
-        const json = await res.json();
-
-        setDernierResultatEnvoi({
-          success: json.success,
-          message: json.success
-            ? `${json.nbSuccess}/${json.total} email(s) envoyé(s) avec succès`
-            : "Erreur lors de l'envoi",
-          details: json.details,
-        });
-
-        if (json.success) {
-          await fetchCommandes();
-        }
-        return json.success;
-      } catch {
-        setDernierResultatEnvoi({ success: false, message: "Erreur réseau" });
-        return false;
-      } finally {
-        setEnvoiEnCours(false);
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attentes'] });
+      toast.success('Emails envoyés avec succès');
     },
-    [fetchCommandes]
-  );
-
-  // ── Envoi à tous ──
-  const envoyerTous = useCallback(
-    async (notes?: string) => {
-      const repIds = stats.parRepresentant.map((r) => r.representantId);
-      if (repIds.length === 0) return false;
-      return envoyerGroupe(repIds, notes);
-    },
-    [stats.parRepresentant, envoyerGroupe]
-  );
-
-  // ── Reset notification ──
-  const clearResultatEnvoi = useCallback(() => setDernierResultatEnvoi(null), []);
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   return {
-    // Data
-    commandes,
-    commandesFiltrees,
-    representants,
-    stats,
-    totalActives,
-    // State
-    loading,
-    error,
-    filtres,
-    envoiEnCours,
-    dernierResultatEnvoi,
-    // Actions
-    setFiltres,
-    fetchCommandes,
-    envoyerIndividuel,
-    envoyerGroupe,
-    envoyerTous,
-    clearResultatEnvoi,
+    useListeAttentes,
+    useRepresentants,
+    useCommande,
+    envoyerEmails,
   };
 }

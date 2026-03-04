@@ -2,6 +2,8 @@
 // ║   TYPES — MODULE INVENTAIRE (Rampes Gardex)                 ║
 // ╚══════════════════════════════════════════════════════════════╝
 
+import { Pi } from "lucide-react";
+
 export interface Piece {
   id: string;
   code: string;
@@ -117,5 +119,26 @@ export interface StatsInventaire {
   valeurTotaleStock: number;
   derniersMovements: number;
 }
+
+export interface Transaction {
+  id: string;
+  type: 'ENTREE' | 'SORTIE';
+  pieceId: string;
+  piece: { id: string; code: string; nom: string } | null;
+  quantite: number;
+  date: string;
+  fournisseurId?: string;
+  fournisseur?: { id: string; nom: string } | null;
+}
+
+export interface TransactionForm {
+  type: 'ENTREE' | 'SORTIE';
+  pieceId: string;
+  quantite: number;
+  date: string;
+  fournisseurId?: string;
+}
+
+
 
 export type OngletInventaire = "dashboard" | "pieces" | "fournisseurs" | "unites" | "categories";

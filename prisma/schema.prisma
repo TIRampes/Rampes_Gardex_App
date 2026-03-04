@@ -629,6 +629,8 @@ model Commande {
   commentaire                       String?              @db.Text
   createdAt                         DateTime             @default(now())
   updatedAt                         DateTime             @updatedAt
+  attenteEnvoyee                    Boolean?             @default(false) // true si la dernière attente a été envoyée
+  dateDernierEnvoiAttente           DateTime? // date du dernier envoi d'attente
 
   balcons           Balcon[]
   structuresAchat   StructureAchat[]
@@ -1324,5 +1326,3 @@ model Unite {
   @@index([unite])
   @@map("unites")
 }
-
-

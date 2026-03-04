@@ -1,15 +1,21 @@
-import { icons } from 'lucide-react'
-import { cn } from '@/lib/utils'
+'use client';
 
-export type IconName = keyof typeof icons
+import * as Icons from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+export type IconName = keyof typeof Icons;
 
 interface IconProps {
-  name: IconName
-  size?: number
-  className?: string
+  name: IconName;
+  size?: number;
+  className?: string;
 }
 
-export const Icon: React.FC<IconProps> = ({ name, size = 20, className }) => {
-  const LucideIcon = icons[name] as React.ElementType
-  return <LucideIcon size={size} className={cn('shrink-0', className)} />
-}
+export const Icon = ({ name, size = 20, className }: IconProps) => {
+  const LucideIcon = Icons[name] as React.ElementType;
+  if (!LucideIcon) {
+    console.warn(`Icone "${name}" non trouvée`);
+    return null;
+  }
+  return <LucideIcon size={size} className={cn('shrink-0', className)} />;
+};
