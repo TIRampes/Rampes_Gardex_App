@@ -152,67 +152,10 @@ export default function loginPage() {
               </div>
             </div>
 
-        
-
-            {/*Formulaire email/mot de passe */}
-          {/* <form onSubmit={handleCredentialsLogin} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Adresse courriel
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="votre.nom@rampesgardex.com"
-                  className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gardex-orange focus:border-transparent transition-all duration-200 outline-none text-gray-900 placeholder-gray-400"
-                  required
-                />
-              </div>
-
-           
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mot de passe
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="••••••••"
-                  className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gardex-orange focus:border-transparent transition-all duration-200 outline-none text-gray-900"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoadingCredentials}
-                className="w-full bg-gradient-to-r from-gardex-orange to-[#e6951f] hover:from-[#e6951f] hover:to-gardex-orange text-white font-bold px-6 py-4 rounded-xl transition-all duration-300 disabled:opacity-50 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-              >
-                {isLoadingCredentials ? <Spinner /> : "Se connecter"}
-              </button>
-            </form> */}
-
             {/* Liens */}
            <div className="mt-6 text-center space-y-3">
-             {/* <Link 
-                href="/forgot-password" 
-                className="text-sm text-gardex-orange hover:underline font-medium"
-              >
-                Mot de passe oublié ?
-              </Link>
-              {/* Lien vers la page d'inscription 
-              <p className="text-sm text-gray-600">
-                Pas encore de compte ?{" "}
-                <Link href="/auth/register" className="text-gardex-orange hover:underline font-semibold">
-                  Créer un compte
-                </Link>
-              </p>
-              */}
-            </div> 
-            
-          </div>
+           </div> 
+            </div>
 
           {/* Footer */}
           <p className="text-center text-gray-400 text-sm mt-6">

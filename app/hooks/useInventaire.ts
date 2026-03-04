@@ -10,20 +10,37 @@ import type {
   StatsInventaire,
 } from '@/app/api/inventaire/PieceSchema';
 
-// === Helper fetch ===
+// ==============================
+// Helper fetch sécurisé
+// ==============================
 async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
-    throw new Error(err.error || `Erreur ${res.status}`);
+
+  let data: any = {};
+
+  try {
+    const text = await res.text();
+    if (text) data = JSON.parse(text);
+  } catch {
+    // JSON invalide, on reste avec un objet vide
   }
-  return res.json();
+
+  if (!res.ok) {
+    const message = data && typeof data === 'object' && typeof data.error === 'string'
+      ? data.error
+      : `Erreur ${res.status}`;
+    throw new Error(message);
+  }
+
+  return data as T;
 }
 
-// === PIÈCES ===
+// ==============================
+// Hook Pieces
+// ==============================
 export function usePieces() {
   const [pieces, setPieces] = useState<Piece[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +52,7 @@ export function usePieces() {
     try {
       const query = new URLSearchParams({ tous: 'true', ...params }).toString();
       const res = await apiFetch<any>(`/api/inventaire/pieces?${query}`);
-      setPieces(res.data);
+      setPieces(res.data ?? []);
       if (res.pagination) setPagination(res.pagination);
       if (res.stats) setStats(res.stats);
     } catch (e) {
@@ -46,40 +63,41 @@ export function usePieces() {
   }, []);
 
   const creer = useCallback(async (form: PieceForm) => {
-    const res = await apiFetch<Piece>('/api/inventaire/pieces', {
+    return apiFetch<Piece>('/api/inventaire/pieces', {
       method: 'POST',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const modifier = useCallback(async (id: string, form: Partial<PieceForm>) => {
-    const res = await apiFetch<Piece>(`/api/inventaire/pieces/${id}`, {
+    return apiFetch<Piece>(`/api/inventaire/pieces/${id}`, {
       method: 'PUT',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const supprimer = useCallback(async (id: string) => {
-    const res = await apiFetch<any>(`/api/inventaire/pieces/${id}`, { method: 'DELETE' });
-    return res;
+    return apiFetch<any>(`/api/inventaire/pieces/${id}`, { method: 'DELETE' });
   }, []);
 
   return { pieces, loading, stats, pagination, charger, creer, modifier, supprimer };
 }
 
-// === FOURNISSEURS ===
+// ==============================
+// Hook Fournisseurs
+// ==============================
 export function useFournisseurs() {
   const [fournisseurs, setFournisseurs] = useState<FournisseurInv[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, limite: 50, total: 0, totalPages: 0 });
 
   const charger = useCallback(async (params?: Record<string, string>) => {
     setLoading(true);
     try {
       const query = params ? new URLSearchParams(params).toString() : '';
       const res = await apiFetch<any>(`/api/inventaire/fournisseurs${query ? `?${query}` : ''}`);
-      setFournisseurs(res.data);
+      setFournisseurs(res.data ?? []);
+      if (res.pagination) setPagination(res.pagination);
     } catch (e) {
       console.error('Erreur chargement fournisseurs:', e);
     } finally {
@@ -88,30 +106,29 @@ export function useFournisseurs() {
   }, []);
 
   const creer = useCallback(async (form: FournisseurForm) => {
-    const res = await apiFetch<FournisseurInv>('/api/inventaire/fournisseurs', {
+    return apiFetch<FournisseurInv>('/api/inventaire/fournisseurs', {
       method: 'POST',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const modifier = useCallback(async (id: string, form: Partial<FournisseurForm>) => {
-    const res = await apiFetch<FournisseurInv>(`/api/inventaire/fournisseurs/${id}`, {
+    return apiFetch<FournisseurInv>(`/api/inventaire/fournisseurs/${id}`, {
       method: 'PUT',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const supprimer = useCallback(async (id: string) => {
-    const res = await apiFetch<any>(`/api/inventaire/fournisseurs/${id}`, { method: 'DELETE' });
-    return res;
+    return apiFetch<any>(`/api/inventaire/fournisseurs/${id}`, { method: 'DELETE' });
   }, []);
 
-  return { fournisseurs, loading, charger, creer, modifier, supprimer };
+  return { fournisseurs, loading, pagination, charger, creer, modifier, supprimer };
 }
 
-// === UNITÉS ===
+// ==============================
+// Hook Unites
+// ==============================
 export function useUnites() {
   const [unites, setUnites] = useState<UniteInv[]>([]);
   const [loading, setLoading] = useState(false);
@@ -120,7 +137,7 @@ export function useUnites() {
     setLoading(true);
     try {
       const res = await apiFetch<any>('/api/inventaire/unites');
-      setUnites(res.data);
+      setUnites(res.data ?? []);
     } catch (e) {
       console.error('Erreur chargement unités:', e);
     } finally {
@@ -129,30 +146,29 @@ export function useUnites() {
   }, []);
 
   const creer = useCallback(async (form: UniteForm) => {
-    const res = await apiFetch<UniteInv>('/api/inventaire/unites', {
+    return apiFetch<UniteInv>('/api/inventaire/unites', {
       method: 'POST',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const modifier = useCallback(async (id: string, form: Partial<UniteForm>) => {
-    const res = await apiFetch<UniteInv>(`/api/inventaire/unites/${id}`, {
+    return apiFetch<UniteInv>(`/api/inventaire/unites/${id}`, {
       method: 'PUT',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const supprimer = useCallback(async (id: string) => {
-    const res = await apiFetch<any>(`/api/inventaire/unites/${id}`, { method: 'DELETE' });
-    return res;
+    return apiFetch<any>(`/api/inventaire/unites/${id}`, { method: 'DELETE' });
   }, []);
 
   return { unites, loading, charger, creer, modifier, supprimer };
 }
 
-// === CATÉGORIES ===
+// ==============================
+// Hook Categories
+// ==============================
 export function useCategories() {
   const [categories, setCategories] = useState<CategorieInv[]>([]);
   const [loading, setLoading] = useState(false);
@@ -161,7 +177,7 @@ export function useCategories() {
     setLoading(true);
     try {
       const res = await apiFetch<any>('/api/inventaire/categories');
-      setCategories(res.data);
+      setCategories(res.data ?? []);
     } catch (e) {
       console.error('Erreur chargement catégories:', e);
     } finally {
@@ -170,30 +186,29 @@ export function useCategories() {
   }, []);
 
   const creer = useCallback(async (form: CategorieForm) => {
-    const res = await apiFetch<CategorieInv>('/api/inventaire/categories', {
+    return apiFetch<CategorieInv>('/api/inventaire/categories', {
       method: 'POST',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const modifier = useCallback(async (id: string, form: CategorieForm) => {
-    const res = await apiFetch<CategorieInv>(`/api/inventaire/categories/${id}`, {
+    return apiFetch<CategorieInv>(`/api/inventaire/categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   const supprimer = useCallback(async (id: string) => {
-    const res = await apiFetch<any>(`/api/inventaire/categories/${id}`, { method: 'DELETE' });
-    return res;
+    return apiFetch<any>(`/api/inventaire/categories/${id}`, { method: 'DELETE' });
   }, []);
 
   return { categories, loading, charger, creer, modifier, supprimer };
 }
 
-// === TRANSACTIONS ===
+// ==============================
+// Hook Transactions
+// ==============================
 export function useTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -204,7 +219,7 @@ export function useTransactions() {
     try {
       const query = params ? new URLSearchParams(params).toString() : '';
       const res = await apiFetch<any>(`/api/inventaire/transactions${query ? `?${query}` : ''}`);
-      setTransactions(res.data);
+      setTransactions(res.data ?? []);
       if (res.pagination) setPagination(res.pagination);
     } catch (e) {
       console.error('Erreur chargement transactions:', e);
@@ -214,12 +229,11 @@ export function useTransactions() {
   }, []);
 
   const creer = useCallback(async (form: TransactionForm) => {
-    const res = await apiFetch<Transaction>('/api/inventaire/transactions', {
+    return apiFetch<Transaction>('/api/inventaire/transactions', {
       method: 'POST',
       body: JSON.stringify(form),
     });
-    return res;
   }, []);
 
   return { transactions, loading, pagination, charger, creer };
-}
+}''
