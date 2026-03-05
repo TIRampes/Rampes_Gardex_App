@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { TransactionFormSchema } from '@/app/api/inventaire/PieceSchema';
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { TransactionFormSchema } from '@/app/api/inventaire/PieceSchema'
 
 // GET /api/inventaire/transactions
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const recherche = searchParams.get('recherche') || '';
-    const dateDebut = searchParams.get('dateDebut') || '';
-    const produitId = searchParams.get('produitId') || '';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limite = parseInt(searchParams.get('limite') || '50');
+    const { searchParams } = new URL(request.url)
+    const recherche = searchParams.get('recherche') || ''
+    const dateDebut = searchParams.get('dateDebut') || ''
+    const produitId = searchParams.get('produitId') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limite = parseInt(searchParams.get('limite') || '50')
 
-    const where: any = {};
+    const where: any = {}
 
     if (recherche) {
       where.produit = {
@@ -20,22 +20,20 @@ export async function GET(request: NextRequest) {
           { code: { contains: recherche } },
           { nom: { contains: recherche } },
         ],
-      };
+      }
     }
-    if (produitId) where.produitId = produitId;
-    if (dateDebut) where.createdAt = { gte: new Date(dateDebut) };
+    if (produitId) where.produitId = produitId
+    if (dateDebut) where.createdAt = { gte: new Date(dateDebut) }
 
-    const total = await prisma.mouvementStock.count({ where });
+    const total = await prisma.mouvementStock.count({ where })
 
     const data = await prisma.mouvementStock.findMany({
       where,
-      include: {
-        produit: { select: { id: true, code: true, nom: true } },
-      },
+      include: { produit: { select: { id: true, code: true, nom: true } } },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limite,
       take: limite,
-    });
+    })
 
     return NextResponse.json({
       data,
@@ -45,49 +43,46 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limite),
       },
-    });
+    })
   } catch (error) {
-    console.error('GET /api/inventaire/transactions erreur:', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+    console.error('GET /api/inventaire/transactions erreur:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
 
 // POST /api/inventaire/transactions
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const parsed = TransactionFormSchema.safeParse(body);
+    const body = await request.json()
+    const parsed = TransactionFormSchema.safeParse(body)
 
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Données invalides', details: parsed.error.flatten() },
         { status: 400 }
-      );
+      )
     }
 
-    const { produitId, type, quantite, notes, emplacement } = parsed.data;
+    const { produitId, type, quantite, notes, emplacement } = parsed.data
 
     // Récupérer la pièce actuelle
-    const piece = await prisma.produit.findUnique({ where: { id: produitId } });
-    if (!piece) {
-      return NextResponse.json({ error: 'Pièce non trouvée' }, { status: 404 });
-    }
+    const piece = await prisma.produit.findUnique({ where: { id: produitId } })
+    if (!piece) return NextResponse.json({ error: 'Pièce non trouvée' }, { status: 404 })
 
-    const quantiteAvant = piece.quantite;
-    let quantiteApres = quantiteAvant;
+    let quantiteApres = piece.quantite
 
-    // Calculer la nouvelle quantité selon le type
+    // Calculer la nouvelle quantité
     switch (type) {
       case 'ENTREE':
-        quantiteApres = quantiteAvant + quantite;
-        break;
+        quantiteApres += quantite
+        break
       case 'SORTIE':
       case 'SORTIE_PEINTURE':
-        quantiteApres = Math.max(0, quantiteAvant - quantite);
-        break;
+        quantiteApres = Math.max(0, quantiteApres - quantite)
+        break
       case 'AJUSTEMENT':
-        quantiteApres = quantite; // Mise à jour directe
-        break;
+        quantiteApres = quantite
+        break
     }
 
     // Transaction atomique : créer mouvement + mettre à jour stock
@@ -97,28 +92,28 @@ export async function POST(request: NextRequest) {
           produitId,
           type,
           quantite,
-          quantiteAvant,
+          quantiteAvant: piece.quantite,
           quantiteApres,
           notes: notes || null,
           emplacement: emplacement || null,
         },
-        include: {
-          produit: { select: { id: true, code: true, nom: true } },
-        },
+        include: { produit: { select: { id: true, code: true, nom: true } } },
       }),
       prisma.produit.update({
         where: { id: produitId },
         data: {
           quantite: quantiteApres,
           dateDerniereTransaction: new Date(),
-          ...(type === 'SORTIE_PEINTURE' ? { partiPeinture: piece.partiPeinture + quantite } : {}),
+          ...(type === 'SORTIE_PEINTURE'
+            ? { partiPeinture: piece.partiPeinture + quantite }
+            : {}),
         },
       }),
-    ]);
+    ])
 
-    return NextResponse.json(mouvement, { status: 201 });
+    return NextResponse.json(mouvement, { status: 201 })
   } catch (error) {
-    console.error('POST /api/inventaire/transactions erreur:', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+    console.error('POST /api/inventaire/transactions erreur:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }
