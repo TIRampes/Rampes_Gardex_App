@@ -1,81 +1,60 @@
-// hooks/useAttentes.ts
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'react-hot-toast';
-import { Commande, Representant } from '@prisma/client';
+import { useState, useCallback } from 'react';
+import type { CommandeAttente, Representant, StatsAttentes } from '@/app/api/attentes/schema';
 
-interface CommandeWithRelations extends Commande {
-  representant: Representant | null;
-  client: { nom: string; telephone?: string; email?: string };
+async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
+    throw new Error(err.error || `Erreur ${res.status}`);
+  }
+  return res.json();
 }
 
 export function useAttentes() {
-  const queryClient = useQueryClient();
+  const [commandes, setCommandes] = useState<CommandeAttente[]>([]);
+  const [representants, setRepresentants] = useState<Representant[]>([]);
+  const [stats, setStats] = useState<StatsAttentes | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
-  // Récupérer la liste des attentes avec filtres
-  const useListeAttentes = (selectedRepresentants: string[] = []) => {
-    const params = new URLSearchParams();
-    selectedRepresentants.forEach(r => params.append('representant', r));
+  const charger = useCallback(async (filtres?: { representantIds?: string[]; recherche?: string }) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filtres?.representantIds?.length) params.set('representantIds', filtres.representantIds.join(','));
+      if (filtres?.recherche) params.set('recherche', filtres.recherche);
+      const query = params.toString();
+      const res = await apiFetch<any>(`/api/attentes${query ? `?${query}` : ''}`);
+      setCommandes(res.commandes || []);
+      setRepresentants(res.representants || []);
+      setStats(res.stats || null);
+    } catch (e) {
+      console.error('Erreur chargement attentes:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    return useQuery<CommandeWithRelations[]>({
-      queryKey: ['attentes', selectedRepresentants],
-      queryFn: async () => {
-        const res = await fetch(`/api/attentes?${params}`);
-        if (!res.ok) throw new Error('Erreur chargement');
-        return res.json();
-      },
-    });
-  };
-
-  // Récupérer la liste des représentants
-  const useRepresentants = () => {
-    return useQuery<Representant[]>({
-      queryKey: ['representants'],
-      queryFn: async () => {
-        const res = await fetch('/api/attentes/representants');
-        if (!res.ok) throw new Error('Erreur chargement');
-        return res.json();
-      },
-    });
-  };
-
-  // Récupérer le détail d'une commande
-  const useCommande = (id: string | null) => {
-    return useQuery<CommandeWithRelations>({
-      queryKey: ['commande', id],
-      queryFn: async () => {
-        if (!id) throw new Error('ID manquant');
-        const res = await fetch(`/api/attentes/commandes/${id}`);
-        if (!res.ok) throw new Error('Erreur chargement');
-        return res.json();
-      },
-      enabled: !!id,
-    });
-  };
-
-  // Mutation pour envoyer les emails
-  const envoyerEmails = useMutation({
-    mutationFn: async (representantIds: string[]) => {
-      const res = await fetch('/api/attentes/envoyer', {
+  const envoyerAttentes = useCallback(async (representantIds: string[], notes?: string): Promise<boolean> => {
+    setEnvoiEnCours(true);
+    try {
+      const res = await apiFetch<any>('/api/attentes/envoi', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ representantIds }),
+        body: JSON.stringify({ representantIds, notes }),
       });
-      if (!res.ok) throw new Error('Erreur envoi');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attentes'] });
-      toast.success('Emails envoyés avec succès');
-    },
-    onError: (error: Error) => toast.error(error.message),
-  });
+      return res.success;
+    } catch (e) {
+      console.error('Erreur envoi attentes:', e);
+      return false;
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  }, []);
 
-  return {
-    useListeAttentes,
-    useRepresentants,
-    useCommande,
-    envoyerEmails,
-  };
+  return { commandes, representants, stats, loading, envoiEnCours, charger, envoyerAttentes };
 }
