@@ -60,7 +60,7 @@ export function proxy(request: NextRequest) {
   }
 
   // 4️⃣ Vérification session dashboard (optionnel)
-  /*
+  
   const dashboardRoutes = [
     '/attentes',
     '/inventaire',
@@ -80,7 +80,7 @@ export function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
   }
-  */
+  
 
   return NextResponse.next()
 }
