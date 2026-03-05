@@ -3,12 +3,10 @@ import { prisma } from '@/lib/prisma'
 import { PieceFormSchema } from '@/app/api/inventaire/PieceSchema'
 
 // GET /api/inventaire/pieces/[id]
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: any) {
   try {
-    const { id } = params
+    const { id } = context.params as { id: string }
+
     const piece = await prisma.produit.findUnique({
       where: { id },
       include: {
@@ -38,12 +36,9 @@ export async function GET(
 }
 
 // PUT /api/inventaire/pieces/[id]
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, context: any) {
   try {
-    const { id } = params
+    const { id } = context.params as { id: string }
     const body = await request.json()
     const parsed = PieceFormSchema.partial().safeParse(body)
 
@@ -56,7 +51,6 @@ export async function PUT(
 
     const { categoriePieceId, uniteId, fournisseurId, ...rest } = parsed.data
 
-    // Vérifier code unique si changé
     if (rest.code) {
       const existing = await prisma.produit.findFirst({
         where: { code: rest.code, NOT: { id } },
@@ -99,12 +93,9 @@ export async function PUT(
 }
 
 // DELETE /api/inventaire/pieces/[id]
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: any) {
   try {
-    const { id } = params
+    const { id } = context.params as { id: string }
 
     const piece = await prisma.produit.findUnique({
       where: { id },
