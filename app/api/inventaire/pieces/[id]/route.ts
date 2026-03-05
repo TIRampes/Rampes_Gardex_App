@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { PieceFormSchema } from '@/app/api/inventaire/PieceSchema'
 
-// ✅ Types simplifiés pour Next 16
-type RouteParams = { params: { id: string } }
-
 // GET /api/inventaire/pieces/[id]
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const { id } = params
     const piece = await prisma.produit.findUnique({
@@ -38,7 +38,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 }
 
 // PUT /api/inventaire/pieces/[id]
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const { id } = params
     const body = await request.json()
@@ -96,7 +99,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 }
 
 // DELETE /api/inventaire/pieces/[id]
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const { id } = params
 
@@ -109,7 +115,6 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Pièce non trouvée' }, { status: 404 })
     }
 
-    // Désactiver si relations existantes, sinon supprimer
     if (piece._count.mouvements > 0 || piece._count.lignesAchat > 0) {
       await prisma.produit.update({ where: { id }, data: { actif: false } })
       return NextResponse.json({ message: 'Pièce désactivée (relations existantes)', desactivee: true })
