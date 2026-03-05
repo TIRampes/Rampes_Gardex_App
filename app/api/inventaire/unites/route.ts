@@ -2,18 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UniteFormSchema } from '@/app/api/inventaire/PieceSchema'
 
-// Helper pour extraire l'id de l'URL
-function extractId(request: NextRequest) {
-  const parts = new URL(request.url).pathname.split('/')
-  return parts[parts.length - 1] // dernier segment = id
+// GET /api/inventaire/unites
+export async function GET() {
+  try {
+    const data = await prisma.unite.findMany({
+      include: { _count: { select: { produits: true } } },
+      orderBy: { unite: 'asc' },
+    })
+    return NextResponse.json({ data })
+  } catch (error) {
+    console.error('GET /api/inventaire/unites erreur:', error)
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+  }
 }
 
-// PUT /api/inventaire/unites/[id]
-export async function PUT(request: NextRequest) {
+// POST /api/inventaire/unites
+export async function POST(request: NextRequest) {
   try {
-    const id = extractId(request)
     const body = await request.json()
-    const parsed = UniteFormSchema.partial().safeParse(body)
+    const parsed = UniteFormSchema.safeParse(body)
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -22,47 +29,17 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const unite = await prisma.unite.update({
-      where: { id },
+    const unite = await prisma.unite.create({
       data: parsed.data,
       include: { _count: { select: { produits: true } } },
     })
 
-    return NextResponse.json(unite)
+    return NextResponse.json(unite, { status: 201 })
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'Cette unité existe déjà' }, { status: 409 })
     }
-    console.error('PUT /api/inventaire/unites/[id] erreur:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
-  }
-}
-
-// DELETE /api/inventaire/unites/[id]
-export async function DELETE(request: NextRequest) {
-  try {
-    const id = extractId(request)
-
-    const unite = await prisma.unite.findUnique({
-      where: { id },
-      include: { _count: { select: { produits: true } } },
-    })
-
-    if (!unite) {
-      return NextResponse.json({ error: 'Unité non trouvée' }, { status: 404 })
-    }
-
-    if (unite._count.produits > 0) {
-      return NextResponse.json(
-        { error: `Impossible de supprimer : ${unite._count.produits} pièce(s) utilisent cette unité` },
-        { status: 409 }
-      )
-    }
-
-    await prisma.unite.delete({ where: { id } })
-    return NextResponse.json({ message: 'Unité supprimée' })
-  } catch (error) {
-    console.error('DELETE /api/inventaire/unites/[id] erreur:', error)
+    console.error('POST /api/inventaire/unites erreur:', error)
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
   }
 }

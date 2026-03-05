@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { UniteFormSchema } from '@/app/api/inventaire/PieceSchema'
 
+// Helper pour extraire l'id de l'URL
+function extractId(request: NextRequest) {
+  const parts = new URL(request.url).pathname.split('/').filter(Boolean)
+  return parts[parts.length - 1]
+}
+
 // PUT /api/inventaire/unites/[id]
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest) {
+  const id = extractId(request)
   try {
-    const { id } = params
     const body = await request.json()
     const parsed = UniteFormSchema.partial().safeParse(body)
 
@@ -33,10 +39,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/inventaire/unites/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest) {
+  const id = extractId(request)
   try {
-    const { id } = params
-
     const unite = await prisma.unite.findUnique({
       where: { id },
       include: { _count: { select: { produits: true } } },
