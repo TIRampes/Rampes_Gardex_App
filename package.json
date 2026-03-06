@@ -65,5 +65,12 @@
       "path": "prisma/migrations",
       "seed": "tsx prisma/seed.ts"
     }
-  }
+  },
+
+  "crons": [
+    { "path": "/api/reprises/cron-conseils", "schedule": "0 8 */3 * *" },
+    { "path": "/api/attentes/cron", "schedule": "0 8 * * 1" }
+  ]
+
+
 }
