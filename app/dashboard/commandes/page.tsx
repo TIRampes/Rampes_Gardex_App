@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
@@ -90,12 +90,11 @@ const SERVICE_CONFIG: Record<string, { label: string; color: string; icon: React
 };
 
 const STATUT_CONFIG: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  ACTIVE: { label: "Active", color: "text-green-700", bgColor: "bg-green-100", icon: <CheckCircle2 size={16} /> },
-  EN_ATTENTE: { label: "En attente", color: "text-yellow-700", bgColor: "bg-yellow-100", icon: <Clock size={16} /> },
-  COMPLETEE: { label: "Complétée", color: "text-blue-700", bgColor: "bg-blue-100", icon: <CheckCircle2 size={16} /> },
-  ANNULEE: { label: "Annulée", color: "text-red-700", bgColor: "bg-red-100", icon: <XCircle size={16} /> },
+  ACTIVE: { label: "Active", color: "text-green-700", bgColor: "bg-green-100 dark:bg-green-900/30", icon: <CheckCircle2 size={14} /> },
+  EN_ATTENTE: { label: "En attente", color: "text-yellow-700", bgColor: "bg-yellow-100 dark:bg-yellow-900/30", icon: <Clock size={14} /> },
+  COMPLETEE: { label: "Complétée", color: "text-blue-700", bgColor: "bg-blue-100 dark:bg-blue-900/30", icon: <CheckCircle2 size={14} /> },
+  ANNULEE: { label: "Annulée", color: "text-red-700", bgColor: "bg-red-100 dark:bg-red-900/30", icon: <XCircle size={14} /> },
 };
-
 
 // Formatage
 const formatDate = (date: string | null) => {
@@ -149,6 +148,7 @@ export default function CommandesPage() {
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientMenu, setShowClientMenu] = useState(false);
+  const clientContainerRef = useRef<HTMLDivElement>(null);
 
   // États pour le modal de mot de passe
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -192,7 +192,7 @@ export default function CommandesPage() {
     fetchClients();
   }, [search, filters]);
 
-  // POUR LE FILTRAGE CLIENT DANS LE MODAL
+  // Mettre à jour clientSearch quand filters.clientId change (ex: reset)
   useEffect(() => {
     if (filters.clientId) {
       const client = clients.find(c => c.id === filters.clientId);
@@ -201,6 +201,17 @@ export default function CommandesPage() {
       setClientSearch("");
     }
   }, [filters.clientId, clients]);
+
+  // Fermer le menu client quand on clique ailleurs
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showClientMenu && clientContainerRef.current && !clientContainerRef.current.contains(event.target as Node)) {
+        setShowClientMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showClientMenu]);
 
   const fetchCommandes = async () => {
     try {
@@ -429,16 +440,53 @@ export default function CommandesPage() {
                 <option key={r.id} value={r.id}>{r.nom}</option>
               ))}
             </select>
-            <select
-              value={filters.clientId}
-              onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
-              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-            >
-              <option value="">Tous les clients</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
+
+            {/* Recherche client avec autocomplete */}
+            <div className="relative client-search-container" ref={clientContainerRef}>
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => {
+                  setClientSearch(e.target.value);
+                  if (e.target.value === "") {
+                    setFilters({ ...filters, clientId: "" });
+                  }
+                }}
+                onFocus={() => setShowClientMenu(true)}
+                placeholder="Rechercher un client..."
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+              />
+              {showClientMenu && (
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-auto">
+                  {clients
+                    .filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
+                    .map(c => (
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          setFilters({ ...filters, clientId: c.id });
+                          setClientSearch(c.nom);
+                          setShowClientMenu(false);
+                        }}
+                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
+                      >
+                        {c.nom}
+                      </div>
+                    ))}
+                </div>
+              )}
+              {filters.clientId && (
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, clientId: "" });
+                    setClientSearch("");
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -622,7 +670,7 @@ export default function CommandesPage() {
         )}
       </div>
 
-      {/* Modals (inchangés) */}
+      {/* Modal de mot de passe */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -662,6 +710,7 @@ export default function CommandesPage() {
         </div>
       )}
 
+      {/* Modal Paramètres */}
       {showConfigModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -783,6 +832,7 @@ export default function CommandesPage() {
         </div>
       )}
 
+      {/* Modal suppression */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -805,7 +855,7 @@ export default function CommandesPage() {
   );
 }
 
-// Composants auxiliaires (inchangés)
+// Composants auxiliaires
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
     blue: "from-blue-500 to-blue-600",
