@@ -343,7 +343,7 @@ export default function ClientsPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
