@@ -1,10 +1,10 @@
 "use client";
-import {useMemo } from "react";
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
-  MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
+  ChevronDown, MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
   CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers,
   MessageCircle, User, Users, FilterX, Settings, Save, X, Lock
 } from "lucide-react";
@@ -148,7 +148,6 @@ export default function CommandesPage() {
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientMenu, setShowClientMenu] = useState(false);
-  const clientContainerRef = useRef<HTMLDivElement>(null);
 
   // États pour le modal de mot de passe
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -192,26 +191,15 @@ export default function CommandesPage() {
     fetchClients();
   }, [search, filters]);
 
-  // Mettre à jour clientSearch quand filters.clientId change (ex: reset)
+  // POUR LE FILTRAGE CLIENT DANS LE MODAL
   useEffect(() => {
-    if (filters.clientId) {
-      const client = clients.find(c => c.id === filters.clientId);
-      if (client) setClientSearch(client.nom);
-    } else {
-      setClientSearch("");
-    }
-  }, [filters.clientId, clients]);
-
-  // Fermer le menu client quand on clique ailleurs
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showClientMenu && clientContainerRef.current && !clientContainerRef.current.contains(event.target as Node)) {
-        setShowClientMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showClientMenu]);
+  if (filters.clientId) {
+    const client = clients.find(c => c.id === filters.clientId);
+    if (client) setClientSearch(client.nom);
+  } else {
+    setClientSearch("");
+  }
+}, [filters.clientId, clients]);
 
   const fetchCommandes = async () => {
     try {
@@ -440,59 +428,22 @@ export default function CommandesPage() {
                 <option key={r.id} value={r.id}>{r.nom}</option>
               ))}
             </select>
-
-            {/* Recherche client avec autocomplete */}
-            <div className="relative client-search-container" ref={clientContainerRef}>
-              <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => {
-                  setClientSearch(e.target.value);
-                  if (e.target.value === "") {
-                    setFilters({ ...filters, clientId: "" });
-                  }
-                }}
-                onFocus={() => setShowClientMenu(true)}
-                placeholder="Rechercher un client..."
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-              />
-              {showClientMenu && (
-                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-auto">
-                  {clients
-                    .filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
-                    .map(c => (
-                      <div
-                        key={c.id}
-                        onClick={() => {
-                          setFilters({ ...filters, clientId: c.id });
-                          setClientSearch(c.nom);
-                          setShowClientMenu(false);
-                        }}
-                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
-                      >
-                        {c.nom}
-                      </div>
-                    ))}
-                </div>
-              )}
-              {filters.clientId && (
-                <button
-                  onClick={() => {
-                    setFilters({ ...filters, clientId: "" });
-                    setClientSearch("");
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+            <select
+              value={filters.clientId}
+              onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
+              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+            >
+              <option value="">Tous les clients</option>
+              {clients.map(c => (
+                <option key={c.id} value={c.id}>{c.nom}</option>
+              ))}
+            </select>
           </div>
         )}
       </div>
 
-      {/* Liste des commandes en cartes */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 overflow-auto max-h-[calc(100vh-280px)]">
+      {/* Liste des commandes */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-auto max-h-[calc(100vh-280px)]">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-[var(--color-primary)]" />
@@ -503,170 +454,153 @@ export default function CommandesPage() {
             <p className="text-gray-500 dark:text-gray-400">Aucune commande trouvée</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {commandes.map((c) => {
-              const isLate = c.datePrevue && new Date(c.datePrevue) < new Date() && c.statut === "ACTIVE";
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => router.push(`/dashboard/commandes/${c.id}`)}
-                  className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md transition cursor-pointer space-y-3"
-                >
-                  {/* En-tête avec numéro et indicateurs */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-gray-900 dark:text-white">{c.numero}</span>
-                      {c.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">R</span>}
-                      {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">!</span>}
-                      {c.commentaire && (
-                        <span className="relative group">
-                          <MessageCircle size={14} className="text-blue-500" />
-                          <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap z-50">
-                            {c.commentaire}
+          <table className="w-full min-w-[1400px] text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Commande</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Client</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Rep</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Service</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Couleur</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Plan</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Term.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Install.</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Fibre</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Limons</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Verres</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Colonnes</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Peinture</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Attaches</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Plancher</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Entrée</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prévue</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Statut</th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Actions</th>
+   
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {commandes.map((c) => {
+                const isLate = c.datePrevue && new Date(c.datePrevue) < new Date() && c.statut === "ACTIVE";
+                return (
+                  <tr
+                    key={c.id}
+                    onClick={() => router.push(`/dashboard/commandes/${c.id}`)}
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900 dark:text-white">{c.numero}</span>
+                        {c.reprise && <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded">R</span>}
+                        {isLate && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs font-bold rounded">!</span>}
+                        {c.commentaire && (
+                          <span className="relative group">
+                            <MessageCircle size={14} className="text-blue-500" />
+                            <span className="absolute left-0 top-full mt-1 hidden group-hover:block bg-gray-900 text-white text-xs rounded-lg p-2 whitespace-nowrap z-50">
+                              {c.commentaire}
+                            </span>
                           </span>
-                        </span>
-                      )}
-                    </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_CONFIG[c.typeCommande].bgColor} ${TYPE_CONFIG[c.typeCommande].color}`}>
-                      {TYPE_CONFIG[c.typeCommande].label}
-                    </span>
-                  </div>
-
-                  {/* Section Client */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</h3>
-                    <div className="mt-1 text-sm">
-                      <div className="font-medium text-gray-900 dark:text-white">{c.client.nom}</div>
-                      <div className="text-gray-500 text-xs">{c.client.telephone}</div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">
-                        Réf: <span className="font-mono">{c.reference || "—"}</span>
+                        )}
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Section Représentant */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Représentant</h3>
-                    <div className="mt-1 text-sm text-gray-900 dark:text-white">
-                      {c.representant?.nom || "—"}
-                    </div>
-                  </div>
-
-                  {/* Section Service */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Service</h3>
-                    <div className="mt-1 flex items-center gap-2 text-sm">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-white text-xs ${SERVICE_CONFIG[c.service].color}`}>
-                        {SERVICE_CONFIG[c.service].icon}
-                        <span>{SERVICE_CONFIG[c.service].label}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${TYPE_CONFIG[c.typeCommande].bgColor} ${TYPE_CONFIG[c.typeCommande].color}`}>
+                        {TYPE_CONFIG[c.typeCommande].label}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-medium text-gray-900 dark:text-white block truncate max-w-[150px]" title={c.client.nom}>
+                        {c.client.nom}
+                      </span>
+                      <span className="text-xs text-gray-500">{c.client.telephone}</span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-900 dark:text-white">
+                      {c.representant?.nom || "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white text-xs font-medium ${SERVICE_CONFIG[c.service].color}`}>
+                        {SERVICE_CONFIG[c.service].icon}
+                        <span className="hidden lg:inline">{SERVICE_CONFIG[c.service].label}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
                       <CouleurBadge couleur={c.couleur} />
-                    </div>
-                  </div>
-
-                  {/* Section Dates */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Dates</h3>
-                    <div className="mt-1 grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-500">Entrée:</span> {formatDate(c.dateEntree)}
+                    </td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.mesure} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.plan} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.envoyeProduction} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.termine} /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.installation} /></td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatFibre} type="achat" />
+                      {c.quantiteNonRecueFibre ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueFibre})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatLimons} type="achat" />
+                      {c.quantiteNonRecueLimons ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueLimons})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <CodeSymbol code={c.achatVerres} type="achat" />
+                      {c.quantiteNonRecueVerres ? <span className="ml-1 text-xs text-red-500">({c.quantiteNonRecueVerres})</span> : null}
+                    </td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatColonnes} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatPeinture} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatAttaches} type="achat" /></td>
+                    <td className="px-4 py-3 text-center"><CodeSymbol code={c.achatPlancherAluminium} type="achat" /></td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateEntree)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-sm ${isLate ? 'text-red-600 font-bold' : 'text-gray-900 dark:text-white'}`}>
+                        {formatDate(c.datePrevue)}
+                      </span>
+                      <span className="block text-xs text-gray-500">{formatSemaine(c.datePrevue)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateProduction)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.datePriseMesure)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${STATUT_CONFIG[c.statut].bgColor} ${STATUT_CONFIG[c.statut].color}`}>
+                        {STATUT_CONFIG[c.statut].icon}
+                        <span className="hidden sm:inline">{STATUT_CONFIG[c.statut].label}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === c.id ? null : c.id); }}
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                        >
+                          <MoreHorizontal size={18} className="text-gray-500" />
+                        </button>
+                        {actionMenu === c.id && (
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}`); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            >
+                              <Eye size={16} />Voir détails
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}/edit`); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            >
+                              <Edit size={16} />Modifier
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteModal(c); setActionMenu(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
+                            >
+                              <Trash2 size={16} />Supprimer
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <span className="text-gray-500">Prévue:</span> {formatDate(c.datePrevue)}
-                        <span className="block text-gray-400">{formatSemaine(c.datePrevue)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Production:</span> {formatDate(c.dateProduction)}
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Mesure:</span> {formatDate(c.datePriseMesure)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Section Codes production */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Production</h3>
-                    <div className="mt-1 flex flex-wrap gap-3 text-xs">
-                      <div><span className="text-gray-500">Mesure:</span> <CodeSymbol code={c.mesure} /></div>
-                      <div><span className="text-gray-500">Plan:</span> <CodeSymbol code={c.plan} /></div>
-                      <div><span className="text-gray-500">Prod.:</span> <CodeSymbol code={c.envoyeProduction} /></div>
-                      <div><span className="text-gray-500">Term.:</span> <CodeSymbol code={c.termine} /></div>
-                      <div><span className="text-gray-500">Install.:</span> <CodeSymbol code={c.installation} /></div>
-                    </div>
-                  </div>
-
-                  {/* Section Achats */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Achats</h3>
-                    <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-500">Fibre:</span> <CodeSymbol code={c.achatFibre} type="achat" />
-                        {c.quantiteNonRecueFibre ? <span className="ml-1 text-red-500">({c.quantiteNonRecueFibre})</span> : null}
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Limons:</span> <CodeSymbol code={c.achatLimons} type="achat" />
-                        {c.quantiteNonRecueLimons ? <span className="ml-1 text-red-500">({c.quantiteNonRecueLimons})</span> : null}
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Verres:</span> <CodeSymbol code={c.achatVerres} type="achat" />
-                        {c.quantiteNonRecueVerres ? <span className="ml-1 text-red-500">({c.quantiteNonRecueVerres})</span> : null}
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Colonnes:</span> <CodeSymbol code={c.achatColonnes} type="achat" />
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Peinture:</span> <CodeSymbol code={c.achatPeinture} type="achat" />
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Attaches:</span> <CodeSymbol code={c.achatAttaches} type="achat" />
-                      </div>
-                      <div className="col-span-3">
-                        <span className="text-gray-500">Plancher Alu:</span> <CodeSymbol code={c.achatPlancherAluminium} type="achat" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Adresse et actions */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2 flex justify-between items-center">
-                    <div className="text-xs text-gray-500 truncate max-w-[200px]" title={c.adresse}>
-                      {c.adresse}
-                    </div>
-                    <div className="relative">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setActionMenu(actionMenu === c.id ? null : c.id); }}
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                      >
-                        <MoreHorizontal size={16} className="text-gray-500" />
-                      </button>
-                      {actionMenu === c.id && (
-                        <div className="absolute right-0 bottom-full mb-1 w-36 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden text-xs">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}`); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                          >
-                            <Eye size={14} /> Voir
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/commandes/${c.id}/edit`); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                          >
-                            <Edit size={14} /> Modifier
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteModal(c); setActionMenu(null); }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
-                          >
-                            <Trash2 size={14} /> Supprimer
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
