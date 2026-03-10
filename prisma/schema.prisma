@@ -631,6 +631,7 @@ model Commande {
   updatedAt                         DateTime             @updatedAt
   attenteEnvoyee                    Boolean?             @default(false) // true si la dernière attente a été envoyée
   dateDernierEnvoiAttente           DateTime? // date du dernier envoi d'attente
+  planApprobationEnvoyeLe DateTime? // date d'envoi pour approbation du plan
 
   balcons           Balcon[]
   structuresAchat   StructureAchat[]
@@ -644,6 +645,7 @@ model Commande {
   historiqueStatuts HistoriqueStatut[]
   commission        Commission?
   envoisAttente     EnvoiAttente[]     @relation("CommandeEnvois")
+  achatPhases       AchatPhase[]
 
   @@index([numero])
   @@index([clientId])
@@ -661,6 +663,7 @@ model Commande {
 // ============================================
 // 08. BALCON (inchangé)
 // ============================================
+
 model Balcon {
   id                   String   @id @default(cuid())
   commandeId           String
@@ -675,8 +678,21 @@ model Balcon {
   installationTerminee Boolean  @default(false)
   reprise              Boolean  @default(false)
   notes                String?  @db.Text
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+
+  // Nouveaux champs pour les dates et prix par phase
+  datePrevue            DateTime? // Date prévue pour cette phase
+  prixVenteInstallation Decimal?  @db.Decimal(10, 2) // Prix d'installation pour cette phase
+
+  // Nouveaux champs pour les codes de production
+  mesure                  CodeProduction?
+  plan                    CodeProduction?
+  planApprobationEnvoyeLe DateTime? // Date d'envoi pour approbation du plan
+  envoyeProduction        CodeProduction?
+  termine                 CodeProduction?
+  installation            CodeProduction?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([commandeId])
   @@index([numeroPhase])
@@ -1325,4 +1341,35 @@ model Unite {
 
   @@index([unite])
   @@map("unites")
+}
+
+model AchatPhase {
+  id               String      @id @default(cuid())
+  commandeId       String
+  commande         Commande    @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  phaseNumero      Int
+  typeAchat        String // "FIBRE", "LIMONS", etc.
+  statut           StatutAchat @default(A_FAIRE)
+  dateEnvoie       DateTime?
+  dateReception    DateTime?
+  quantiteNonRecue Int?
+  // Champs spécifiques (on peut les mettre tous optionnels ou utiliser un champ JSON)
+  codeProduit      String?
+  description      String?
+  quantite         Int?
+  prixUnitaire     Decimal?    @db.Decimal(10, 2)
+  couleur          String?     @db.VarChar(50)
+  epaisseur        String?     @db.VarChar(10)
+  typeVerre        String?     @db.VarChar(50)
+  longueur         Int?
+  hauteur          Int?
+  notes            String?     @db.Text
+  // Pour stocker les détails spécifiques non couverts, on peut ajouter un champ JSON
+  details          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([commandeId])
+  @@map("achats_phase")
 }

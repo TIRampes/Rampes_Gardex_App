@@ -19,11 +19,41 @@ interface Client {
 interface Representant { id: string; nom: string; telephone?: string; }
 interface Balcon {
   id: string; nom: string; numeroPhase: number; piedsLineaires: number;
-  poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;coutBalcon?: number; prixTotal?: number;
+  poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;
+  coutBalcon?: number; prixTotal?: number;
+  // Nouveaux champs
+  datePrevue?: string;
+  prixVenteInstallation?: number;
+  mesure?: string;
+  plan?: string;
+  planApprobationEnvoyeLe?: string;
+  envoyeProduction?: string;
+  termine?: string;
+  installation?: string;
 }
 interface StructureAchat {
   id: string; nom: string; statutAchat: string;
   dateEnvoie?: string; dateReception?: string; quantiteNonRecue?: number;
+}
+interface AchatPhase {
+  id: string;
+  phaseNumero: number;
+  typeAchat: string;
+  statut: string;
+  dateEnvoie?: string;
+  dateReception?: string;
+  quantiteNonRecue?: number;
+  codeProduit?: string;
+  description?: string;
+  quantite?: number;
+  prixUnitaire?: number;
+  couleur?: string;
+  epaisseur?: string;
+  typeVerre?: string;
+  longueur?: number;
+  hauteur?: number;
+  notes?: string;
+  details?: any;
 }
 interface Intervention {
   id: string; type: string; datePrevue: string; statut: string;
@@ -37,6 +67,7 @@ interface Commande {
   service: string; statut: string; adresse: string; commentaireAdresse?: string;
   client: Client; representant?: Representant; balcons: Balcon[];
   structuresAchat: StructureAchat[];
+  achatsPhase: AchatPhase[]; // Nouveau
   dateEntree: string; datePrevue?: string; dateProduction?: string;
   datePriseMesure?: string; dateLivraison?: string; semainePrevue?: string;
   prixTotal: number; prixVenteMateriaux: number; prixVenteInstallation: number;
@@ -56,7 +87,8 @@ interface Commande {
   // Production
   structure: boolean; couleur?: string; couleurPersonnalisee?: string;
   mesure?: string; mesureDonneeLe?: string;
-  plan?: string; envoyeProduction?: string; productionTerminee?: string;
+  plan?: string; planApprobationEnvoyeLe?: string; // Nouveau
+  envoyeProduction?: string; productionTerminee?: string;
   termine?: string; statutLivraison: string; installation?: string;
   enProduction: boolean; reprise: boolean; ancienneCommandeNumero?: string;
   // Achats avec nouveaux champs
@@ -97,6 +129,7 @@ const CODE_SYMBOLS: Record<string, { symbol: string; label: string; color: strin
   ATTENTE_CAROL_MESURE: { symbol: "C-RM", label: "Attente Carol mesure", color: "text-pink-700", bgColor: "bg-pink-100" },
   BACK_ORDER: { symbol: "B/O", label: "Back order", color: "text-red-700", bgColor: "bg-red-100" },
   ATTENTE_REPRESENTANT: { symbol: "At.Rep", label: "Attente rep.", color: "text-indigo-700", bgColor: "bg-indigo-100" },
+  APPROBATION_PLAN: { symbol: "AP", label: "Approbation plan", color: "text-purple-700", bgColor: "bg-purple-100" }, // Nouveau
 };
 
 const ACHAT_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bgColor: string }> = {
@@ -247,10 +280,10 @@ export default function CommandeDetailsPage() {
         <StatCard icon={<DollarSign />} label="Prix total" value={commande.prixTotal.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })} color="green" />
         <StatCard icon={<Ruler />} label="Pieds linéaires" value={`${commande.piedsLineairesRampes} pi`} color="blue" />
         <StatCard icon={<Clock />} label="Temps installation" value={
-  commande.utiliserCalculAuto
-    ? `${Number(commande.tempsInstallationAuto || 0).toFixed(2)}h`
-    : `${Number(commande.tempsEstimeInstallation || 0)}h`
-} color="purple" />
+          commande.utiliserCalculAuto
+            ? `${Number(commande.tempsInstallationAuto || 0).toFixed(2)}h`
+            : `${Number(commande.tempsEstimeInstallation || 0)}h`
+        } color="purple" />
         <StatCard icon={<Package />} label="Interventions" value={commande._count.interventions.toString()} color="orange" />
       </div>
 
@@ -374,6 +407,9 @@ export default function CommandeDetailsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           <CodeField label="Mesure" code={commande.mesure} />
           <CodeField label="Plan" code={commande.plan} />
+          {commande.planApprobationEnvoyeLe && (
+            <DateField label="Date envoi approbation" value={commande.planApprobationEnvoyeLe} />
+          )}
           <CodeField label="Envoyé production" code={commande.envoyeProduction} />
           <CodeField label="Production terminée" code={commande.productionTerminee} />
           <CodeField label="Terminé" code={commande.termine} />
@@ -389,7 +425,7 @@ export default function CommandeDetailsPage() {
         </div>
       </SectionCard>
 
-      {/* SECTION: ACHATS */}
+      {/* SECTION: ACHATS GLOBAUX */}
       <SectionCard icon={<ShoppingCart />} title="Achats">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <AchatField label="Fibre" code={commande.achatFibre} dateEnvoie={commande.dateEnvoieFibre} dateReception={commande.dateReceptionFibre} quantiteNonRecue={commande.quantiteNonRecueFibre} />
@@ -430,41 +466,90 @@ export default function CommandeDetailsPage() {
         )}
       </SectionCard>
 
-      {/* SECTION: BALCONS/PHASES si applicable */}
+      {/* SECTION: BALCONS/PHASES enrichie */}
       {commande.balcons && commande.balcons.length > 0 && (
         <SectionCard 
           icon={commande.typeCommande === "COMMERCIAL" ? <Building2 /> : <Layers />} 
           title={commande.typeCommande === "COMMERCIAL" ? "Balcons" : commande.typeCommande === "MULTI_PHASE" ? "Phases" : "Plans"}
         >
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-700">
-                  <th className="px-3 py-2 text-left text-xs font-semibold">Nom</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold">Pieds lin.</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold">Poteaux</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold">Coût</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold">Prix</th>
-                  <th className="px-3 py-2 text-center text-xs font-semibold">Produit</th>
-                  <th className="px-3 py-2 text-center text-xs font-semibold">Installé</th>
-                  <th className="px-3 py-2 text-center text-xs font-semibold">Reprise</th>
+                  <th className="px-2 py-2 text-left font-semibold">Nom</th>
+                  <th className="px-2 py-2 text-right font-semibold">Pieds lin.</th>
+                  <th className="px-2 py-2 text-right font-semibold">Poteaux</th>
+                  <th className="px-2 py-2 text-left font-semibold">Date prévue</th>
+                  <th className="px-2 py-2 text-right font-semibold">Prix total</th>
+                  <th className="px-2 py-2 text-right font-semibold">Prix install</th>
+                  <th className="px-2 py-2 text-center font-semibold">Mesure</th>
+                  <th className="px-2 py-2 text-center font-semibold">Plan</th>
+                  <th className="px-2 py-2 text-left font-semibold">Date envoi plan</th>
+                  <th className="px-2 py-2 text-center font-semibold">Env. prod</th>
+                  <th className="px-2 py-2 text-center font-semibold">Term.</th>
+                  <th className="px-2 py-2 text-center font-semibold">Install.</th>
                 </tr>
               </thead>
               <tbody>
                 {commande.balcons.map(b => (
                   <tr key={b.id} className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-3 py-2 font-medium">{b.nom}</td>
-                    <td className="px-3 py-2 text-right">{b.piedsLineaires}</td>
-                    <td className="px-3 py-2 text-right">{b.poteaux}</td>
-                    <td className="px-3 py-2 text-right">{b.coutBalcon?.toFixed(2) ?? "0.00"} $</td>
-                    <td className="px-3 py-2 text-right">{b.prixTotal?.toFixed(2) ?? "0.00"} $</td>
-                    <td className="px-3 py-2 text-center">{b.produit ? <CheckCircle2 size={16} className="text-green-500 mx-auto" /> : "—"}</td>
-                    <td className="px-3 py-2 text-center">{b.installationTerminee ? <CheckCircle2 size={16} className="text-green-500 mx-auto" /> : "—"}</td>
-                    <td className="px-3 py-2 text-center">{b.reprise ? <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded">Oui</span> : "—"}</td>
+                    <td className="px-2 py-2 font-medium">{b.nom}</td>
+                    <td className="px-2 py-2 text-right">{b.piedsLineaires}</td>
+                    <td className="px-2 py-2 text-right">{b.poteaux}</td>
+                    <td className="px-2 py-2">{formatDate(b.datePrevue)}</td>
+                    <td className="px-2 py-2 text-right">{b.prixTotal?.toFixed(2) ?? "0.00"} $</td>
+                    <td className="px-2 py-2 text-right">{b.prixVenteInstallation?.toFixed(2) ?? "0.00"} $</td>
+                    <td className="px-2 py-2 text-center"><CodeBadge code={b.mesure} /></td>
+                    <td className="px-2 py-2 text-center"><CodeBadge code={b.plan} /></td>
+                    <td className="px-2 py-2">{formatDate(b.planApprobationEnvoyeLe)}</td>
+                    <td className="px-2 py-2 text-center"><CodeBadge code={b.envoyeProduction} /></td>
+                    <td className="px-2 py-2 text-center"><CodeBadge code={b.termine} /></td>
+                    <td className="px-2 py-2 text-center"><CodeBadge code={b.installation} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* SECTION: ACHATS PAR PHASE */}
+      {commande.achatsPhase && commande.achatsPhase.length > 0 && (
+        <SectionCard icon={<ShoppingCart />} title="Achats par phase">
+          <div className="space-y-4">
+            {commande.achatsPhase.map(a => {
+              const phase = commande.balcons.find(b => b.numeroPhase === a.phaseNumero);
+              return (
+                <div key={a.id} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      Phase {a.phaseNumero} - {phase?.nom || `Phase ${a.phaseNumero}`}
+                    </span>
+                    <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                      ACHAT_SYMBOLS[a.statut]?.bgColor || "bg-gray-100"
+                    } ${ACHAT_SYMBOLS[a.statut]?.color || "text-gray-600"}`}>
+                      {ACHAT_SYMBOLS[a.statut]?.symbol || a.statut}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
+                    <div><span className="text-gray-500">Type:</span> {a.typeAchat}</div>
+                    {a.codeProduit && <div><span className="text-gray-500">Code:</span> {a.codeProduit}</div>}
+                    {a.description && <div><span className="text-gray-500">Description:</span> {a.description}</div>}
+                    {a.quantite && <div><span className="text-gray-500">Quantité:</span> {a.quantite}</div>}
+                    {a.prixUnitaire && <div><span className="text-gray-500">Prix unitaire:</span> {a.prixUnitaire.toFixed(2)} $</div>}
+                    {a.couleur && <div><span className="text-gray-500">Couleur:</span> {a.couleur}</div>}
+                    {a.epaisseur && <div><span className="text-gray-500">Épaisseur:</span> {a.epaisseur} mm</div>}
+                    {a.typeVerre && <div><span className="text-gray-500">Type verre:</span> {a.typeVerre}</div>}
+                    {a.longueur && <div><span className="text-gray-500">Longueur:</span> {a.longueur} mm</div>}
+                    {a.hauteur && <div><span className="text-gray-500">Hauteur:</span> {a.hauteur} mm</div>}
+                    {a.dateEnvoie && <div><span className="text-gray-500">Envoi:</span> {formatDate(a.dateEnvoie)}</div>}
+                    {a.dateReception && <div><span className="text-gray-500">Réception:</span> {formatDate(a.dateReception)}</div>}
+                    {a.quantiteNonRecue && a.quantiteNonRecue > 0 && <div><span className="text-red-600">Non reçu: {a.quantiteNonRecue}</span></div>}
+                    {a.notes && <div className="col-span-3"><span className="text-gray-500">Notes:</span> {a.notes}</div>}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
       )}
@@ -544,7 +629,7 @@ export default function CommandeDetailsPage() {
   );
 }
 
-// Composants
+// Composants auxiliaires
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   const colors: Record<string, string> = {
     green: "from-green-500 to-green-600",
@@ -612,6 +697,15 @@ function CodeField({ label, code }: { label: string; code?: string }) {
       )}
     </div>
   );
+}
+
+function CodeBadge({ code }: { code?: string }) {
+  const config = code ? CODE_SYMBOLS[code] : null;
+  return config ? (
+    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${config.bgColor} ${config.color}`}>
+      {config.symbol}
+    </span>
+  ) : <span className="text-gray-400">—</span>;
 }
 
 function AchatField({ label, code, dateEnvoie, dateReception, quantiteNonRecue }: { 

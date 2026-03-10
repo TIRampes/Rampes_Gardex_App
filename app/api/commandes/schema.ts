@@ -17,6 +17,7 @@ export const CodeProduction = z.enum([
   "ATTENTE_CAROL_MESURE",
   "BACK_ORDER",
   "ATTENTE_REPRESENTANT",
+  "APPROBATION_PLAN", // Nouveau
 ]);
 
 export const StatutAchat = z.enum([
@@ -53,6 +54,20 @@ export const Couleur = z.enum([
 // NOUVEAU: Enum pour le statut livraison
 export const StatutLivraison = z.enum(["N_A", "LIVRE"]);
 
+// NOUVEAU: Type pour les achats par phase
+export const TypeAchatPhase = z.enum([
+  "FIBRE",
+  "LIMONS",
+  "VERRES",
+  "COLONNES",
+  "PEINTURE",
+  "ATTACHES",
+  "PLANCHER_ALUMINIUM",
+  "EUROFORGINGS",
+  "PEINTURE_DJ",
+  "VERRE_LEPAGE",
+]);
+
 // NOUVEAU: Mapping des couleurs avec labels
 export const COULEUR_LABELS: Record<string, { label: string; color: string; bgColor: string }> = {
   NOIR: { label: "Noir", color: "text-gray-900", bgColor: "bg-gray-200" },
@@ -77,6 +92,7 @@ export const CODE_PRODUCTION_SYMBOLS: Record<string, { symbol: string; label: st
   ATTENTE_CAROL_MESURE: { symbol: "C-RM", label: "Attente Carol mesure", color: "text-pink-600 bg-pink-100" },
   BACK_ORDER: { symbol: "B/O", label: "Back order", color: "text-red-600 bg-red-100" },
   ATTENTE_REPRESENTANT: { symbol: "At.Rep", label: "Attente représentant", color: "text-indigo-600 bg-indigo-100" },
+  APPROBATION_PLAN: { symbol: "AP", label: "Approbation plan", color: "text-purple-600 bg-purple-100" }, // Nouveau
 };
 
 // Mapping des statuts d'achat vers symboles
@@ -128,7 +144,7 @@ export const achatDetailSchema = z.object({
   quantiteNonRecue: z.number().optional().nullable(),
 });
 
-// Schema pour les balcons/phases
+// Schema pour les balcons/phases (mis à jour avec les nouveaux champs)
 export const balconSchema = z.object({
   id: z.string().optional(),
   nom: z.string().min(1, "Le nom est obligatoire"),
@@ -141,6 +157,15 @@ export const balconSchema = z.object({
   installationTerminee: z.boolean().default(false),
   reprise: z.boolean().default(false),
   notes: z.string().optional(),
+  // Nouveaux champs
+  datePrevue: z.string().or(z.date()).optional().nullable(),
+  prixVenteInstallation: z.number().optional().nullable(),
+  mesure: CodeProduction.optional().nullable(),
+  plan: CodeProduction.optional().nullable(),
+  planApprobationEnvoyeLe: z.string().or(z.date()).optional().nullable(),
+  envoyeProduction: CodeProduction.optional().nullable(),
+  termine: CodeProduction.optional().nullable(),
+  installation: CodeProduction.optional().nullable(),
 });
 
 // NOUVEAU: Schema pour structure d'achat
@@ -151,9 +176,32 @@ export const structureAchatSchema = z.object({
   dateEnvoie: z.string().or(z.date()).optional().nullable(),
   dateReception: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecue: z.number().optional().nullable(),
+  phase: z.number().optional().nullable(), // pour lier à une phase
 });
 
-// Schema principal de commande
+// NOUVEAU: Schema pour achat par phase
+export const achatPhaseSchema = z.object({
+  id: z.string().optional(),
+  phaseNumero: z.number(),
+  typeAchat: TypeAchatPhase,
+  statut: StatutAchat.default("A_FAIRE"),
+  dateEnvoie: z.string().or(z.date()).optional().nullable(),
+  dateReception: z.string().or(z.date()).optional().nullable(),
+  quantiteNonRecue: z.number().optional().nullable(),
+  // Champs spécifiques (optionnels)
+  codeProduit: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  quantite: z.number().optional().nullable(),
+  prixUnitaire: z.number().optional().nullable(),
+  couleur: z.string().optional().nullable(),
+  epaisseur: z.string().optional().nullable(),
+  typeVerre: z.string().optional().nullable(),
+  longueur: z.number().optional().nullable(),
+  hauteur: z.number().optional().nullable(),
+  notes: z.string().optional().nullable(),
+});
+
+// Schema principal de commande (mis à jour)
 export const commandeSchema = z.object({
   // Informations générales
   numero: z.string().min(1, "Le numéro est obligatoire"),
@@ -224,6 +272,7 @@ export const commandeSchema = z.object({
   mesure: CodeProduction.optional().nullable(),
   mesureDonneeLe: z.string().or(z.date()).optional().nullable(),
   plan: CodeProduction.optional().nullable(),
+  planApprobationEnvoyeLe: z.string().or(z.date()).optional().nullable(), // Nouveau
   envoyeProduction: CodeProduction.optional().nullable(),
   productionTerminee: CodeProduction.optional().nullable(),
   termine: CodeProduction.optional().nullable(),
@@ -289,11 +338,15 @@ export const commandeSchema = z.object({
 
   // NOUVEAU: Structures d'achat
   structuresAchat: z.array(structureAchatSchema).optional(),
+
+  // NOUVEAU: Achats par phase
+  achatsPhase: z.array(achatPhaseSchema).optional(),
 });
 
 export type CommandeInput = z.infer<typeof commandeSchema>;
 export type BalconInput = z.infer<typeof balconSchema>;
 export type StructureAchatInput = z.infer<typeof structureAchatSchema>;
+export type AchatPhaseInput = z.infer<typeof achatPhaseSchema>;
 
 // Types pour les statistiques
 export interface CommandeStats {

@@ -14,6 +14,29 @@ import { useConfig } from "@/app/context/ConfigContext";
 // Types
 interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; cellulaire?: string; emails: string[]; }
 interface Representant { id: string; nom: string; email?: string; telephone?: string; }
+
+// Nouveau type pour AchatPhase (identique à celui utilisé dans la création)
+interface AchatPhase {
+  id?: string;
+  phaseNumero: number;
+  typeAchat: string;
+  statut: string;
+  dateEnvoie?: string;
+  dateReception?: string;
+  quantiteNonRecue?: number;
+  codeProduit?: string;
+  description?: string;
+  quantite?: number;
+  prixUnitaire?: number;
+  couleur?: string;
+  epaisseur?: string;
+  typeVerre?: string;
+  longueur?: number;
+  hauteur?: number;
+  notes?: string;
+  details?: any;
+}
+
 interface Balcon {
   id?: string;
   nom: string;
@@ -26,7 +49,17 @@ interface Balcon {
   installationTerminee: boolean;
   reprise: boolean;
   notes?: string;
+  // Nouveaux champs
+  datePrevue?: string;
+  prixVenteInstallation?: number;
+  mesure?: string;
+  plan?: string;
+  planApprobationEnvoyeLe?: string;
+  envoyeProduction?: string;
+  termine?: string;
+  installation?: string;
 }
+
 interface StructureAchat {
   id?: string;
   nom: string;
@@ -35,6 +68,7 @@ interface StructureAchat {
   dateReception?: string;
   quantiteNonRecue?: number;
 }
+
 interface Commande {
   id: string;
   numero: string;
@@ -86,6 +120,7 @@ interface Commande {
   mesure?: string;
   mesureDonneeLe?: string;
   plan?: string;
+  planApprobationEnvoyeLe?: string; // Nouveau
   envoyeProduction?: string;
   productionTerminee?: string;
   termine?: string;
@@ -125,9 +160,10 @@ interface Commande {
   commentaire?: string;
   balcons: Balcon[];
   structuresAchat: StructureAchat[];
+  achatsPhase?: AchatPhase[]; // Nouveau
 }
 
-// Options de commentaires prédéfinis
+// Options de commentaires prédéfinis (inchangé)
 const PREDEFINED_COMMENTS = [
   "Un bris de production nous oblige à repousser votre commande. Nous faisons tout notre possible pour que votre commande soit prête le plus rapidement possible.",
   "Dû aux mauvaises conditions météo des derniers jours, nos installations ont été retardées. Nous sommes donc contraints de retarder votre installation.",
@@ -139,7 +175,7 @@ const PREDEFINED_COMMENTS = [
   "Autre"
 ];
 
-// Mapping codes production (copié depuis la page de création)
+// Mappings (copiés depuis la création)
 const CODE_PRODUCTION_OPTIONS = [
   { value: "", label: "— Sélectionner —", symbol: "", color: "" },
   { value: "COMPLETE", label: "Complété", symbol: "✓", color: "text-green-600" },
@@ -152,6 +188,7 @@ const CODE_PRODUCTION_OPTIONS = [
   { value: "ATTENTE_CAROL_MESURE", label: "Attente Carol mesure", symbol: "C-RM", color: "text-pink-600" },
   { value: "BACK_ORDER", label: "Back order", symbol: "B/O", color: "text-red-600" },
   { value: "ATTENTE_REPRESENTANT", label: "Attente représentant", symbol: "At.Rep", color: "text-indigo-600" },
+  { value: "APPROBATION_PLAN", label: "Approbation plan", symbol: "AP", color: "text-purple-600" }, // Nouveau
 ];
 
 const STATUT_ACHAT_OPTIONS = [
@@ -222,6 +259,20 @@ const PIEDS_LINEAIRES_FACTEURS = [
   { key: "piedsLineairesGardexVision", label: "Gardex Vision", facteur: 1 },
   { key: "piedsLineairesGardexUrbaine", label: "Gardex Urbaine", facteur: 2 },
   { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
+];
+
+// Nouveau: types d'achats pour phase
+const TYPE_ACHAT_OPTIONS = [
+  { value: "FIBRE", label: "Fibre" },
+  { value: "LIMONS", label: "Limons" },
+  { value: "VERRES", label: "Verres" },
+  { value: "COLONNES", label: "Colonnes" },
+  { value: "PEINTURE", label: "Peinture" },
+  { value: "ATTACHES", label: "Attaches" },
+  { value: "PLANCHER_ALUMINIUM", label: "Plancher aluminium" },
+  { value: "EUROFORGINGS", label: "EuroForgings" },
+  { value: "PEINTURE_DJ", label: "Peinture DJ" },
+  { value: "VERRE_LEPAGE", label: "Verre Lepage" },
 ];
 
 const formatDateForInput = (date?: string) => date ? new Date(date).toISOString().split("T")[0] : "";
@@ -300,6 +351,7 @@ export default function EditCommandePage() {
     mesure: "",
     mesureDonneeLe: "",
     plan: "",
+    planApprobationEnvoyeLe: "", // Nouveau
     envoyeProduction: "",
     productionTerminee: "",
     termine: "",
@@ -341,6 +393,7 @@ export default function EditCommandePage() {
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
   const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
+  const [achatsPhase, setAchatsPhase] = useState<AchatPhase[]>([]); // Nouveau
 
   // Charger clients, représentants et commande
   useEffect(() => {
@@ -356,7 +409,7 @@ export default function EditCommandePage() {
         if (repsRes.ok) setRepresentants(await repsRes.json());
 
         if (commandeRes.ok) {
-          const c = await commandeRes.json();
+          const c: Commande = await commandeRes.json();
           setOriginalCommande(c);
           setOriginalDatePrevue(c.datePrevue || null);
           setFormData({
@@ -407,6 +460,7 @@ export default function EditCommandePage() {
             mesure: c.mesure || "",
             mesureDonneeLe: formatDateForInput(c.mesureDonneeLe),
             plan: c.plan || "",
+            planApprobationEnvoyeLe: formatDateForInput(c.planApprobationEnvoyeLe), // Nouveau
             envoyeProduction: c.envoyeProduction || "",
             productionTerminee: c.productionTerminee || "",
             termine: c.termine || "",
@@ -447,6 +501,7 @@ export default function EditCommandePage() {
           });
           if (c.balcons) setBalcons(c.balcons);
           if (c.structuresAchat) setStructuresAchat(c.structuresAchat);
+          if (c.achatsPhase) setAchatsPhase(c.achatsPhase); // Nouveau
         }
       } catch (err) {
         console.error("Erreur:", err);
@@ -459,10 +514,8 @@ export default function EditCommandePage() {
     if (params.id) fetchData();
   }, [params.id]);
 
-  // Calculs
-  const prixTotal = useMemo(() => {
-    return (formData.prixTotal || 0);
-  }, [formData.prixTotal]);
+  // Calculs (inchangés)
+  const prixTotal = useMemo(() => (formData.prixTotal || 0), [formData.prixTotal]);
 
   const piedsLineairesTotaux = useMemo(() => {
     let total = 0;
@@ -516,10 +569,12 @@ export default function EditCommandePage() {
     setFormData(prev => ({ ...prev, prixVenteMateriaux: materiaux }));
   }, [formData.prixTotal, formData.prixVenteInstallation]);
 
+  // Fonctions pour balcons (avec nouveaux champs)
   const updateBalcon = (index: number, field: keyof Balcon, value: any) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
   };
 
+  // Fonctions pour structures (inchangées)
   const addStructure = () => {
     setStructuresAchat(prev => [
       ...prev,
@@ -541,6 +596,30 @@ export default function EditCommandePage() {
     setStructuresAchat(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Fonctions pour achats par phase
+  const addAchatPhase = () => {
+    setAchatsPhase(prev => [
+      ...prev,
+      {
+        phaseNumero: balcons.length > 0 ? balcons[0].numeroPhase : 1,
+        typeAchat: "FIBRE",
+        statut: "A_FAIRE",
+        quantite: 0,
+        prixUnitaire: 0,
+        quantiteNonRecue: 0,
+      },
+    ]);
+  };
+
+  const updateAchatPhase = (index: number, field: keyof AchatPhase, value: any) => {
+    setAchatsPhase(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
+  };
+
+  const removeAchatPhase = (index: number) => {
+    setAchatsPhase(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Modal et soumission (inchangé, mais on inclut achatsPhase dans pendingFormData)
   const handleAddEmail = () => {
     if (newEmail && /^\S+@\S+\.\S+$/.test(newEmail)) {
       setAdditionalEmails([...additionalEmails, newEmail]);
@@ -553,10 +632,7 @@ export default function EditCommandePage() {
   };
 
   const handleCommentToggle = (comment: string) => {
-    if (comment === "Autre") {
-      // Pour "Autre", on ne le met pas dans selectedComments, on utilise customComment
-      return;
-    }
+    if (comment === "Autre") return;
     setSelectedComments(prev =>
       prev.includes(comment) ? prev.filter(c => c !== comment) : [...prev, comment]
     );
@@ -566,18 +642,14 @@ export default function EditCommandePage() {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!formData.numero.trim()) { setError("Le numéro est obligatoire"); return; }
     if (!formData.clientId) { setError("Le client est obligatoire"); return; }
     if (!formData.adresse.trim()) { setError("L'adresse est obligatoire"); return; }
 
-    // Vérifier si la date prévue a changé
     if (originalDatePrevue !== formData.datePrevue) {
-      // Ouvrir le modal avec les données actuelles
-      setPendingFormData({ ...formData, balcons, structuresAchat });
+      setPendingFormData({ ...formData, balcons, structuresAchat, achatsPhase });
       setShowDateChangeModal(true);
     } else {
-      // Pas de changement de date, soumettre directement
       await submitForm(formData);
     }
   };
@@ -591,11 +663,13 @@ export default function EditCommandePage() {
         piedsLineairesRampes: piedsLineairesTotaux,
         balcons: balcons.length > 0 ? balcons : undefined,
         structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
+        achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined, // Nouveau
         representantId: dataToSend.representantId || null,
         couleur: dataToSend.couleur || null,
         couleurPersonnalisee: dataToSend.couleur === "AUTRE" ? dataToSend.couleurPersonnalisee : null,
         mesure: dataToSend.mesure || null,
         plan: dataToSend.plan || null,
+        planApprobationEnvoyeLe: dataToSend.planApprobationEnvoyeLe || null,
         envoyeProduction: dataToSend.envoyeProduction || null,
         productionTerminee: dataToSend.productionTerminee || null,
         termine: dataToSend.termine || null,
@@ -632,14 +706,12 @@ export default function EditCommandePage() {
   };
 
   const handleSendNotification = async () => {
-    // Construire le commentaire complet
     let fullComment = selectedComments.join(" ");
     if (customComment.trim()) {
       fullComment += (fullComment ? " " : "") + customComment.trim();
     }
     if (!fullComment) fullComment = "Changement de date sans raison spécifiée.";
 
-    // Destinataires
     const client = clients.find(c => c.id === formData.clientId);
     const representant = representants.find(r => r.id === formData.representantId);
 
@@ -649,7 +721,6 @@ export default function EditCommandePage() {
     if (sendToRepresentantEmail && representant?.email) toEmails.push(representant.email);
     toEmails.push(...additionalEmails);
 
-    // Préparer les données pour l'API
     const notificationData = {
       commande: {
         numero: formData.numero,
@@ -658,7 +729,7 @@ export default function EditCommandePage() {
         representantNom: representant?.nom,
         representantEmail: representant?.email,
         representantTelephone: representant?.telephone,
-        ville: client?.adresse?.split('\n')[0] || "", // approximation
+        ville: client?.adresse?.split('\n')[0] || "",
         typeCommande: formData.typeCommande,
         couleur: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : formData.couleur,
         ancienneDate: originalDatePrevue,
@@ -671,18 +742,14 @@ export default function EditCommandePage() {
     };
 
     try {
-      const res = await fetch("/api/notifications/date-change", {
+      await fetch("/api/notifications/date-change", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(notificationData),
       });
-      if (!res.ok) {
-        console.error("Erreur envoi notification");
-      }
     } catch (err) {
       console.error("Erreur réseau notification", err);
     } finally {
-      // Soumettre le formulaire
       setShowDateChangeModal(false);
       await submitForm(pendingFormData);
     }
@@ -884,6 +951,7 @@ export default function EditCommandePage() {
             <SymbolSelect label="Mesure" value={formData.mesure} onChange={(v) => setFormData({ ...formData, mesure: v })} options={CODE_PRODUCTION_OPTIONS} />
             <div><label className="block text-sm font-medium mb-2">Mesure donnée le</label><input type="date" value={formData.mesureDonneeLe} onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <SymbolSelect label="Plan" value={formData.plan} onChange={(v) => setFormData({ ...formData, plan: v })} options={CODE_PRODUCTION_OPTIONS} />
+            <div><label className="block text-sm font-medium mb-2">Date envoi approbation</label><input type="date" value={formData.planApprobationEnvoyeLe} onChange={(e) => setFormData({ ...formData, planApprobationEnvoyeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
             <SymbolSelect label="Envoyé production" value={formData.envoyeProduction} onChange={(v) => setFormData({ ...formData, envoyeProduction: v })} options={CODE_PRODUCTION_OPTIONS} />
             <SymbolSelect label="Production terminée" value={formData.productionTerminee} onChange={(v) => setFormData({ ...formData, productionTerminee: v })} options={CODE_PRODUCTION_OPTIONS} />
             <SymbolSelect label="Terminé" value={formData.termine} onChange={(v) => setFormData({ ...formData, termine: v })} options={CODE_PRODUCTION_OPTIONS} />
@@ -897,7 +965,7 @@ export default function EditCommandePage() {
           </div>
         </Section>
 
-        {/* SECTION 5: ACHATS */}
+        {/* SECTION 5: ACHATS GLOBAUX */}
         <Section icon={<ShoppingCart />} title="Achats" isOpen={activeSection === "achats"} onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <AchatEditField
@@ -1016,7 +1084,241 @@ export default function EditCommandePage() {
           )}
         </Section>
 
-        {/* SECTION 6: AVERTISSEMENTS */}
+        {/* SECTION 6: ACHATS PAR PHASE */}
+        <Section icon={<ShoppingCart />} title="Achats par phase" isOpen={activeSection === "achatsPhase"} onToggle={() => setActiveSection(activeSection === "achatsPhase" ? null : "achatsPhase")}>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium">Liste des achats par phase</h4>
+              <button type="button" onClick={addAchatPhase} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
+                <Plus size={16} /> Ajouter un achat
+              </button>
+            </div>
+
+            {achatsPhase.map((achat, index) => {
+              const phase = balcons.find(b => b.numeroPhase === achat.phaseNumero);
+              return (
+                <div key={index} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-medium">Achat #{index + 1}</span>
+                    <button type="button" onClick={() => removeAchatPhase(index)} className="p-2 text-red-600"><Trash2 size={16} /></button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Phase */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Phase</label>
+                      <select
+                        value={achat.phaseNumero}
+                        onChange={(e) => updateAchatPhase(index, "phaseNumero", parseInt(e.target.value))}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      >
+                        {balcons.map(b => (
+                          <option key={b.numeroPhase} value={b.numeroPhase}>
+                            {b.nom}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Type d'achat */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Type d'achat</label>
+                      <select
+                        value={achat.typeAchat}
+                        onChange={(e) => updateAchatPhase(index, "typeAchat", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      >
+                        {TYPE_ACHAT_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Statut */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Statut</label>
+                      <select
+                        value={achat.statut}
+                        onChange={(e) => updateAchatPhase(index, "statut", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      >
+                        {STATUT_ACHAT_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.symbol} {opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Champs communs */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Quantité</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={achat.quantite || 0}
+                        onChange={(e) => updateAchatPhase(index, "quantite", parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Prix unitaire ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={achat.prixUnitaire || 0}
+                        onChange={(e) => updateAchatPhase(index, "prixUnitaire", parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date d'envoi</label>
+                      <input
+                        type="date"
+                        value={achat.dateEnvoie || ""}
+                        onChange={(e) => updateAchatPhase(index, "dateEnvoie", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
+                      <input
+                        type="date"
+                        value={achat.dateReception || ""}
+                        onChange={(e) => updateAchatPhase(index, "dateReception", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Quantité non reçue</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={achat.quantiteNonRecue || 0}
+                        onChange={(e) => updateAchatPhase(index, "quantiteNonRecue", parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+
+                    {/* Champs spécifiques EuroForgings */}
+                    {achat.typeAchat === "EUROFORGINGS" && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Code produit</label>
+                          <input
+                            type="text"
+                            value={achat.codeProduit || ""}
+                            onChange={(e) => updateAchatPhase(index, "codeProduit", e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Description</label>
+                          <input
+                            type="text"
+                            value={achat.description || ""}
+                            onChange={(e) => updateAchatPhase(index, "description", e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Champs spécifiques Peinture DJ */}
+                    {achat.typeAchat === "PEINTURE_DJ" && (
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Couleur</label>
+                        <select
+                          value={achat.couleur || ""}
+                          onChange={(e) => updateAchatPhase(index, "couleur", e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                        >
+                          <option value="">— Sélectionner —</option>
+                          <option value="NOIR">Noir</option>
+                          <option value="BLANC">Blanc</option>
+                          <option value="CHARBON">Charbon</option>
+                          <option value="BRUN_COM">Brun commerciale</option>
+                          <option value="ARGILE">Argile</option>
+                          <option value="GRIS_MET">Gris métallique</option>
+                          <option value="AUTRE">Autre</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Champs spécifiques Verre Lepage */}
+                    {achat.typeAchat === "VERRE_LEPAGE" && (
+                      <>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Épaisseur (mm)</label>
+                          <select
+                            value={achat.epaisseur || ""}
+                            onChange={(e) => updateAchatPhase(index, "epaisseur", e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          >
+                            <option value="">— Sélectionner —</option>
+                            <option value="5">5 mm</option>
+                            <option value="6">6 mm</option>
+                            <option value="10">10 mm</option>
+                            <option value="12">12 mm</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Type de verre</label>
+                          <select
+                            value={achat.typeVerre || ""}
+                            onChange={(e) => updateAchatPhase(index, "typeVerre", e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          >
+                            <option value="">— Sélectionner —</option>
+                            <option value="clair">Clair</option>
+                            <option value="gris">Gris</option>
+                            <option value="bronze">Bronze</option>
+                            <option value="acide">Acide Etch</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Longueur (mm)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={achat.longueur || 0}
+                            onChange={(e) => updateAchatPhase(index, "longueur", parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Hauteur (mm)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={achat.hauteur || 0}
+                            onChange={(e) => updateAchatPhase(index, "hauteur", parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="col-span-3">
+                      <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                      <textarea
+                        value={achat.notes || ""}
+                        onChange={(e) => updateAchatPhase(index, "notes", e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+
+        {/* SECTION 7: AVERTISSEMENTS */}
         <Section icon={<AlertTriangle />} title="Avertissements" isOpen={activeSection === "avertissements"} onToggle={() => setActiveSection(activeSection === "avertissements" ? null : "avertissements")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <SymbolSelect label="Avertissement client" value={formData.avertissementClient} onChange={(v) => setFormData({ ...formData, avertissementClient: v })} options={AVERTISSEMENT_CLIENT_OPTIONS} />
@@ -1034,7 +1336,7 @@ export default function EditCommandePage() {
         </div>
       </form>
 
-      {/* MODAL D'AVIS DE CHANGEMENT DE DATE */}
+      {/* MODAL D'AVIS DE CHANGEMENT DE DATE (inchangé) */}
       {showDateChangeModal && pendingFormData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -1125,7 +1427,6 @@ export default function EditCommandePage() {
                     <span className="text-sm">📧 Représentant : {representants.find(r => r.id === pendingFormData.representantId)?.email}</span>
                   </label>
                 )}
-                {/* Emails supplémentaires */}
                 {additionalEmails.map((email, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <span className="text-sm">📧 {email}</span>
@@ -1167,7 +1468,7 @@ export default function EditCommandePage() {
   );
 }
 
-// Composants auxiliaires (Section, SymbolSelect, AchatEditField) – identiques à ceux de la page de création
+// Composants auxiliaires (Section, SymbolSelect, AchatEditField)
 function Section({ icon, title, isOpen, onToggle, children }: { icon: React.ReactNode; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">

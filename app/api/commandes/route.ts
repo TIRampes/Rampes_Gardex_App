@@ -247,6 +247,7 @@ export async function POST(request: NextRequest) {
         dateAvertissement: data.dateAvertissement ? new Date(data.dateAvertissement) : null,
         dateAvertissementPriseMesure: data.dateAvertissementPriseMesure ? new Date(data.dateAvertissementPriseMesure) : null,
         
+        
         // Créer les balcons si nécessaire
         balcons: balcons && balcons.length > 0 ? {
           create: balcons.map((b, index) => ({
@@ -279,6 +280,7 @@ export async function POST(request: NextRequest) {
         representant: { select: { id: true, nom: true } },
         balcons: true,
         structuresAchat: true,
+      
       },
     });
 
