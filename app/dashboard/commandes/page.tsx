@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
@@ -148,6 +148,7 @@ export default function CommandesPage() {
   const [clients, setClients] = useState<{ id: string; nom: string }[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [showClientMenu, setShowClientMenu] = useState(false);
+  const clientContainerRef = useRef<HTMLDivElement>(null);
 
   // États pour le modal de mot de passe
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -191,15 +192,26 @@ export default function CommandesPage() {
     fetchClients();
   }, [search, filters]);
 
-  // POUR LE FILTRAGE CLIENT DANS LE MODAL
+  // Mettre à jour le champ de recherche client quand le filtre change (par exemple après reset)
   useEffect(() => {
-  if (filters.clientId) {
-    const client = clients.find(c => c.id === filters.clientId);
-    if (client) setClientSearch(client.nom);
-  } else {
-    setClientSearch("");
-  }
-}, [filters.clientId, clients]);
+    if (filters.clientId) {
+      const client = clients.find(c => c.id === filters.clientId);
+      if (client) setClientSearch(client.nom);
+    } else {
+      setClientSearch("");
+    }
+  }, [filters.clientId, clients]);
+
+  // Fermer le menu client en cliquant à l'extérieur
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showClientMenu && clientContainerRef.current && !clientContainerRef.current.contains(event.target as Node)) {
+        setShowClientMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showClientMenu]);
 
   const fetchCommandes = async () => {
     try {
@@ -428,16 +440,57 @@ export default function CommandesPage() {
                 <option key={r.id} value={r.id}>{r.nom}</option>
               ))}
             </select>
-            <select
-              value={filters.clientId}
-              onChange={(e) => setFilters({ ...filters, clientId: e.target.value })}
-              className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
-            >
-              <option value="">Tous les clients</option>
-              {clients.map(c => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
+
+            {/* Filtre client avec recherche par saisie */}
+            <div className="relative" ref={clientContainerRef}>
+              <input
+                type="text"
+                value={clientSearch}
+                onChange={(e) => {
+                  setClientSearch(e.target.value);
+                  if (e.target.value === "") {
+                    // Si on efface, on retire le filtre client
+                    setFilters({ ...filters, clientId: "" });
+                  }
+                }}
+                onFocus={() => setShowClientMenu(true)}
+                placeholder="Rechercher un client..."
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white"
+              />
+              {showClientMenu && (
+                <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-60 overflow-auto">
+                  {clients
+                    .filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase()))
+                    .map(c => (
+                      <div
+                        key={c.id}
+                        onClick={() => {
+                          setFilters({ ...filters, clientId: c.id });
+                          setClientSearch(c.nom);
+                          setShowClientMenu(false);
+                        }}
+                        className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm"
+                      >
+                        {c.nom}
+                      </div>
+                    ))}
+                  {clients.filter(c => c.nom.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                    <div className="px-4 py-2 text-gray-500 text-sm">Aucun client trouvé</div>
+                  )}
+                </div>
+              )}
+              {filters.clientId && (
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, clientId: "" });
+                    setClientSearch("");
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -478,9 +531,9 @@ export default function CommandesPage() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prévue</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Statut</th>
+                {/* Colonne Statut supprimée, remplacée par Référence */}
+                <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Référence</th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Actions</th>
-   
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -558,11 +611,9 @@ export default function CommandesPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateProduction)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.datePriseMesure)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium ${STATUT_CONFIG[c.statut].bgColor} ${STATUT_CONFIG[c.statut].color}`}>
-                        {STATUT_CONFIG[c.statut].icon}
-                        <span className="hidden sm:inline">{STATUT_CONFIG[c.statut].label}</span>
-                      </span>
+                    {/* Nouvelle cellule pour la référence */}
+                    <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-white">
+                      {c.reference || "—"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="relative">
