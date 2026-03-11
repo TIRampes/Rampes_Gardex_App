@@ -452,35 +452,34 @@ export default function NouvelleCommandePage() {
     if (!formData.clientId) { setError("Le client est obligatoire"); setLoading(false); return; }
     if (!formData.adresse.trim()) { setError("L'adresse est obligatoire"); setLoading(false); return; }
 
-    try {
-      const dataToSend = {
-        ...formData,
-        prixTotal: formData.prixTotal,
-        piedsLineairesRampes: piedsLineairesTotaux,
-        balcons: balcons.length > 0 ? balcons : undefined,
-        structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
-        achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined,
-        representantId: formData.representantId || null,
-        couleur: formData.couleur || null,
-        couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
-        mesure: formData.mesure || null,
-        plan: formData.plan || null,
-        planApprobationEnvoyeLe: formData.planApprobationEnvoyeLe || null,
-        envoyeProduction: formData.envoyeProduction || null,
-        productionTerminee: formData.productionTerminee || null,
-        termine: formData.termine || null,
-        installation: formData.installation || null,
-        achatFibre: formData.achatFibre || null,
-        achatLimons: formData.achatLimons || null,
-        achatVerres: formData.achatVerres || null,
-        achatColonnes: formData.achatColonnes || null,
-        achatPeinture: formData.achatPeinture || null,
-        achatAttaches: formData.achatAttaches || null,
-        achatPlancherAluminium: formData.achatPlancherAluminium || null,
-        avertissementClient: formData.avertissementClient || null,
-        avertissementPriseMesure: formData.avertissementPriseMesure || null,
-      };
+    // Fonction de nettoyage récursive : remplace les chaînes vides par null
+    const cleanData = (obj: any): any => {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) {
+        return obj.map(item => cleanData(item));
+      }
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === "") {
+          cleaned[key] = null;
+        } else if (typeof value === 'object' && value !== null) {
+          cleaned[key] = cleanData(value);
+        } else {
+          cleaned[key] = value;
+        }
+      }
+      return cleaned;
+    };
 
+    const dataToSend = cleanData({
+      ...formData,
+      balcons: balcons.length > 0 ? balcons : undefined,
+      structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
+      achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined,
+    });
+
+    try {
       const res = await fetch("/api/commandes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -494,8 +493,9 @@ export default function NouvelleCommandePage() {
         setTimeout(() => router.push("/dashboard/commandes"), 1500);
       } else {
         setError(data.error || "Erreur lors de la création");
+        console.error("Détails de l'erreur:", data.details);
       }
-    } catch {
+    } catch (err) {
       setError("Erreur lors de la création");
     } finally {
       setLoading(false);

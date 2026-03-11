@@ -11,7 +11,7 @@ import {
   History, Wrench, Truck, MessageCircle, Paintbrush, Hash, RefreshCw
 } from "lucide-react";
 
-// Types complets
+// Types complets (alignés avec la création)
 interface Client {
   id: string; nom: string; type: string; adresse: string; telephone: string;
   cellulaire?: string; personne_Contact: string; emails: string[];
@@ -129,7 +129,7 @@ const CODE_SYMBOLS: Record<string, { symbol: string; label: string; color: strin
   ATTENTE_CAROL_MESURE: { symbol: "C-RM", label: "Attente Carol mesure", color: "text-pink-700", bgColor: "bg-pink-100" },
   BACK_ORDER: { symbol: "B/O", label: "Back order", color: "text-red-700", bgColor: "bg-red-100" },
   ATTENTE_REPRESENTANT: { symbol: "At.Rep", label: "Attente rep.", color: "text-indigo-700", bgColor: "bg-indigo-100" },
-  APPROBATION_PLAN: { symbol: "AP", label: "Approbation plan", color: "text-purple-700", bgColor: "bg-purple-100" }, // Nouveau
+  APPROBATION_PLAN: { symbol: "AP", label: "Approbation plan", color: "text-purple-700", bgColor: "bg-purple-100" },
 };
 
 const ACHAT_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bgColor: string }> = {

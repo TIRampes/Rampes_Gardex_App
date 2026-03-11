@@ -163,7 +163,7 @@ interface Commande {
   achatsPhase?: AchatPhase[]; // Nouveau
 }
 
-// Options de commentaires prédéfinis (inchangé)
+// Options de commentaires prédéfinis
 const PREDEFINED_COMMENTS = [
   "Un bris de production nous oblige à repousser votre commande. Nous faisons tout notre possible pour que votre commande soit prête le plus rapidement possible.",
   "Dû aux mauvaises conditions météo des derniers jours, nos installations ont été retardées. Nous sommes donc contraints de retarder votre installation.",
@@ -175,7 +175,7 @@ const PREDEFINED_COMMENTS = [
   "Autre"
 ];
 
-// Mappings (copiés depuis la création)
+// Mappings
 const CODE_PRODUCTION_OPTIONS = [
   { value: "", label: "— Sélectionner —", symbol: "", color: "" },
   { value: "COMPLETE", label: "Complété", symbol: "✓", color: "text-green-600" },
@@ -188,7 +188,7 @@ const CODE_PRODUCTION_OPTIONS = [
   { value: "ATTENTE_CAROL_MESURE", label: "Attente Carol mesure", symbol: "C-RM", color: "text-pink-600" },
   { value: "BACK_ORDER", label: "Back order", symbol: "B/O", color: "text-red-600" },
   { value: "ATTENTE_REPRESENTANT", label: "Attente représentant", symbol: "At.Rep", color: "text-indigo-600" },
-  { value: "APPROBATION_PLAN", label: "Approbation plan", symbol: "AP", color: "text-purple-600" }, // Nouveau
+  { value: "APPROBATION_PLAN", label: "Approbation plan", symbol: "AP", color: "text-purple-600" },
 ];
 
 const STATUT_ACHAT_OPTIONS = [
@@ -261,7 +261,6 @@ const PIEDS_LINEAIRES_FACTEURS = [
   { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
 ];
 
-// Nouveau: types d'achats pour phase
 const TYPE_ACHAT_OPTIONS = [
   { value: "FIBRE", label: "Fibre" },
   { value: "LIMONS", label: "Limons" },
@@ -351,7 +350,7 @@ export default function EditCommandePage() {
     mesure: "",
     mesureDonneeLe: "",
     plan: "",
-    planApprobationEnvoyeLe: "", // Nouveau
+    planApprobationEnvoyeLe: "",
     envoyeProduction: "",
     productionTerminee: "",
     termine: "",
@@ -393,7 +392,7 @@ export default function EditCommandePage() {
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
   const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
-  const [achatsPhase, setAchatsPhase] = useState<AchatPhase[]>([]); // Nouveau
+  const [achatsPhase, setAchatsPhase] = useState<AchatPhase[]>([]);
 
   // Charger clients, représentants et commande
   useEffect(() => {
@@ -460,7 +459,7 @@ export default function EditCommandePage() {
             mesure: c.mesure || "",
             mesureDonneeLe: formatDateForInput(c.mesureDonneeLe),
             plan: c.plan || "",
-            planApprobationEnvoyeLe: formatDateForInput(c.planApprobationEnvoyeLe), // Nouveau
+            planApprobationEnvoyeLe: formatDateForInput(c.planApprobationEnvoyeLe),
             envoyeProduction: c.envoyeProduction || "",
             productionTerminee: c.productionTerminee || "",
             termine: c.termine || "",
@@ -501,7 +500,7 @@ export default function EditCommandePage() {
           });
           if (c.balcons) setBalcons(c.balcons);
           if (c.structuresAchat) setStructuresAchat(c.structuresAchat);
-          if (c.achatsPhase) setAchatsPhase(c.achatsPhase); // Nouveau
+          if (c.achatsPhase) setAchatsPhase(c.achatsPhase);
         }
       } catch (err) {
         console.error("Erreur:", err);
@@ -514,7 +513,7 @@ export default function EditCommandePage() {
     if (params.id) fetchData();
   }, [params.id]);
 
-  // Calculs (inchangés)
+  // Calculs
   const prixTotal = useMemo(() => (formData.prixTotal || 0), [formData.prixTotal]);
 
   const piedsLineairesTotaux = useMemo(() => {
@@ -574,7 +573,7 @@ export default function EditCommandePage() {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
   };
 
-  // Fonctions pour structures (inchangées)
+  // Fonctions pour structures
   const addStructure = () => {
     setStructuresAchat(prev => [
       ...prev,
@@ -619,7 +618,7 @@ export default function EditCommandePage() {
     setAchatsPhase(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Modal et soumission (inchangé, mais on inclut achatsPhase dans pendingFormData)
+  // Modal et soumission
   const handleAddEmail = () => {
     if (newEmail && /^\S+@\S+\.\S+$/.test(newEmail)) {
       setAdditionalEmails([...additionalEmails, newEmail]);
@@ -663,7 +662,7 @@ export default function EditCommandePage() {
         piedsLineairesRampes: piedsLineairesTotaux,
         balcons: balcons.length > 0 ? balcons : undefined,
         structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
-        achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined, // Nouveau
+        achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined,
         representantId: dataToSend.representantId || null,
         couleur: dataToSend.couleur || null,
         couleurPersonnalisee: dataToSend.couleur === "AUTRE" ? dataToSend.couleurPersonnalisee : null,
@@ -1336,7 +1335,7 @@ export default function EditCommandePage() {
         </div>
       </form>
 
-      {/* MODAL D'AVIS DE CHANGEMENT DE DATE (inchangé) */}
+      {/* MODAL D'AVIS DE CHANGEMENT DE DATE */}
       {showDateChangeModal && pendingFormData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -1468,7 +1467,7 @@ export default function EditCommandePage() {
   );
 }
 
-// Composants auxiliaires (Section, SymbolSelect, AchatEditField)
+// Composants auxiliaires
 function Section({ icon, title, isOpen, onToggle, children }: { icon: React.ReactNode; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">

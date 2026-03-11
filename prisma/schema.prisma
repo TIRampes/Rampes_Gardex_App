@@ -560,6 +560,7 @@ model Commande {
   prixTotal                         Decimal              @default(0) @db.Decimal(10, 2)
   tempsInstallationAuto             Decimal              @default(0) @db.Decimal(10, 2)
   utiliserCalculAuto                Boolean              @default(false)
+
   piedsLineairesBarrotin            Int                  @default(0)
   piedsLineairesVerre               Int                  @default(0)
   piedsLineairesMur                 Int                  @default(0)
