@@ -151,7 +151,7 @@ export default function AchatsPage() {
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-[0.8125rem]">
-          <thead className="bg-slate-800 text-white">
+          <thead className="bg-slate-800 text-black">
             <tr>
               <th className="px-[0.75rem] py-[0.75rem] text-left"># Projet</th>
               <th className="px-[0.75rem] py-[0.75rem] text-left">Client<br/><span className="font-normal text-[0.6875rem] text-slate-300">Service / Ville</span></th>
@@ -250,7 +250,7 @@ export default function AchatsPage() {
               <h3 className="font-bold text-slate-800 mb-[0.75rem] text-[1.0625rem]">Détail des achats par type</h3>
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <table className="w-full text-[0.8125rem]">
-                  <thead className="bg-slate-100">
+                  <thead className="bg-slate-100 text-slate-800">
                     <tr>
                       <th className="px-[1rem] py-[0.75rem] text-left font-semibold">Type d&apos;achat</th>
                       <th className="px-[1rem] py-[0.75rem] text-center font-semibold">Statut</th>
@@ -547,7 +547,7 @@ export default function AchatsPage() {
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-[0.8125rem]">
-                <thead className="bg-slate-800 text-white">
+                <thead className="bg-slate-800 text-black">
                   <tr>
                     <th className="px-[1rem] py-[0.75rem] text-left">Fournisseur</th>
                     <th className="px-[1rem] py-[0.75rem] text-left hidden md:table-cell">Adresse</th>
