@@ -96,6 +96,10 @@ export const config = {
     '/clients/:path*',
     '/achats/:path*',
     '/reprises/:path*',
+    '/responsables/:path*',
+    '/types/:path*',
+    '/departements/:path*',
+    '/non-conformites/:path*',
     '/login/:path*',
     '/'
   ]

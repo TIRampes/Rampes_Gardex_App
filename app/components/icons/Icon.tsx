@@ -1,21 +1,36 @@
 'use client';
 
-import * as Icons from 'lucide-react';
+import { Edit, X, List, Users, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type IconName = keyof typeof Icons;
-
 interface IconProps {
-  name: IconName;
+  name: 'edit' | 'x' | 'list' | 'users' | 'plus';
   size?: number;
   className?: string;
 }
 
 export const Icon = ({ name, size = 20, className }: IconProps) => {
-  const LucideIcon = Icons[name] as React.ElementType;
-  if (!LucideIcon) {
-    console.warn(`Icone "${name}" non trouvée`);
-    return null;
+  let Component;
+  switch (name) {
+    case 'edit':
+      Component = Edit;
+      break;
+    case 'x':
+      Component = X;
+      break;
+    case 'list':
+      Component = List;
+      break;
+    case 'users':
+      Component = Users;
+      break;
+    case 'plus':
+      Component = Plus;
+      break;
+    default:
+      console.warn(`Icône "${name}" non trouvée`);
+      return null;
   }
-  return <LucideIcon size={size} className={cn('shrink-0', className)} />;
+
+  return <Component size={size} className={cn('shrink-0', className)} />;
 };
