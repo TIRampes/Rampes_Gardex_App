@@ -505,11 +505,11 @@ export default function AchatsPage() {
       {/* ===== ACHATS ACTIFS ===== */}
       {onglet === 'achats' && (<>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-[0.75rem]">
-          <div className="bg-white p-[0.75rem] rounded-xl border border-amber-200"><p className="text-[0.6875rem] text-slate-500">À faire</p><p className="text-[1.25rem] font-bold text-amber-600">{stats?.aFaire || 0}</p></div>
-          <div className="bg-white p-[0.75rem] rounded-xl border border-purple-200"><p className="text-[0.6875rem] text-slate-500">Fait</p><p className="text-[1.25rem] font-bold text-purple-600">{stats?.fait || 0}</p></div>
+          <div className="bg-white p-[0.75rem] rounded-xl border border-amber-200"><p className="text-[0.6875rem] text-slate-500">À commander</p><p className="text-[1.25rem] font-bold text-amber-600">{stats?.aFaire || 0}</p></div>
+          <div className="bg-white p-[0.75rem] rounded-xl border border-purple-200"><p className="text-[0.6875rem] text-slate-500">Achat Fait</p><p className="text-[1.25rem] font-bold text-purple-600">{stats?.fait || 0}</p></div>
           <div className="bg-white p-[0.75rem] rounded-xl border border-blue-200"><p className="text-[0.6875rem] text-slate-500">Prêt à ramasser</p><p className="text-[1.25rem] font-bold text-blue-600">{stats?.enTransit || 0}</p></div>
           <div className="bg-white p-[0.75rem] rounded-xl border border-red-200"><p className="text-[0.6875rem] text-slate-500">Back order</p><p className="text-[1.25rem] font-bold text-red-600">{stats?.backOrder || 0}</p></div>
-          <div className="bg-white p-[0.75rem] rounded-xl border border-emerald-200"><p className="text-[0.6875rem] text-slate-500">Historique livrés</p><p className="text-[1.25rem] font-bold text-emerald-600">{stats?.historiqueLivres || 0}</p></div>
+          <div className="bg-white p-[0.75rem] rounded-xl border border-emerald-200"><p className="text-[0.6875rem] text-slate-500">Historique Achat</p><p className="text-[1.25rem] font-bold text-emerald-600">{stats?.historiqueLivres || 0}</p></div>
         </div>
         <div className="bg-white rounded-xl p-[1rem] border border-slate-200 flex flex-wrap items-end gap-[0.75rem]">
           <div className="flex-1 min-w-[11.25rem]"><label className="block text-[0.6875rem] text-slate-500 mb-[0.25rem]">Rechercher</label><input type="text" value={recherche} onChange={(e) => setRecherche(e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border border-slate-300 rounded-lg text-[0.8125rem]" placeholder="# commande, client..."/></div>
