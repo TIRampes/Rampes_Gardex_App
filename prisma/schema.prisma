@@ -531,35 +531,35 @@ model FournisseurProduit {
 // 07. COMMANDE (inchangé)
 // ============================================
 model Commande {
-  id                                String               @id @default(cuid())
-  numero                            String               @unique @db.VarChar(50)
-  clientId                          String
-  client                            Client               @relation(fields: [clientId], references: [id])
-  representantId                    String?
-  representant                      Representant?        @relation(fields: [representantId], references: [id])
-  reference                         String?              @db.VarChar(100)
-  typeCommande                      TypeCommande         @default(STANDARD)
-  service                           ServiceCommande      @default(INSTALLATION)
-  statut                            StatutCommande       @default(ACTIVE)
-  adresse                           String               @db.Text
-  commentaireAdresse                String?              @db.Text
-  couleur                           Couleur?
-  couleurPersonnalisee              String?              @db.VarChar(50)
-  reprise                           Boolean              @default(false)
-  ancienneCommandeNumero            String?              @db.VarChar(50)
-  dateEntree                        DateTime             @default(now())
-  datePrevue                        DateTime?
-  dateProduction                    DateTime?
-  datePriseMesure                   DateTime?
-  dateLivraison                     DateTime?
-  dateCompletion                    DateTime?
-  dateAnnulation                    DateTime?
-  semainePrevue                     String?              @db.VarChar(10)
-  prixVenteMateriaux                Decimal              @default(0) @db.Decimal(10, 2)
-  prixVenteInstallation             Decimal              @default(0) @db.Decimal(10, 2)
-  prixTotal                         Decimal              @default(0) @db.Decimal(10, 2)
-  tempsInstallationAuto             Decimal              @default(0) @db.Decimal(10, 2)
-  utiliserCalculAuto                Boolean              @default(false)
+  id                     String          @id @default(cuid())
+  numero                 String          @unique @db.VarChar(50)
+  clientId               String
+  client                 Client          @relation(fields: [clientId], references: [id])
+  representantId         String?
+  representant           Representant?   @relation(fields: [representantId], references: [id])
+  reference              String?         @db.VarChar(100)
+  typeCommande           TypeCommande    @default(STANDARD)
+  service                ServiceCommande @default(INSTALLATION)
+  statut                 StatutCommande  @default(ACTIVE)
+  adresse                String          @db.Text
+  commentaireAdresse     String?         @db.Text
+  couleur                Couleur?
+  couleurPersonnalisee   String?         @db.VarChar(50)
+  reprise                Boolean         @default(false)
+  ancienneCommandeNumero String?         @db.VarChar(50)
+  dateEntree             DateTime        @default(now())
+  datePrevue             DateTime?
+  dateProduction         DateTime?
+  datePriseMesure        DateTime?
+  dateLivraison          DateTime?
+  dateCompletion         DateTime?
+  dateAnnulation         DateTime?
+  semainePrevue          String?         @db.VarChar(10)
+  prixVenteMateriaux     Decimal         @default(0) @db.Decimal(10, 2)
+  prixVenteInstallation  Decimal         @default(0) @db.Decimal(10, 2)
+  prixTotal              Decimal         @default(0) @db.Decimal(10, 2)
+  tempsInstallationAuto  Decimal         @default(0) @db.Decimal(10, 2)
+  utiliserCalculAuto     Boolean         @default(false)
 
   piedsLineairesBarrotin            Int                  @default(0)
   piedsLineairesVerre               Int                  @default(0)
@@ -632,7 +632,7 @@ model Commande {
   updatedAt                         DateTime             @updatedAt
   attenteEnvoyee                    Boolean?             @default(false) // true si la dernière attente a été envoyée
   dateDernierEnvoiAttente           DateTime? // date du dernier envoi d'attente
-  planApprobationEnvoyeLe DateTime? // date d'envoi pour approbation du plan
+  planApprobationEnvoyeLe           DateTime? // date d'envoi pour approbation du plan
 
   balcons           Balcon[]
   structuresAchat   StructureAchat[]
@@ -976,27 +976,49 @@ model Reprise {
 }
 
 // ============================================
-// 16. NON_CONFORMITE (inchangé)
+// 16. NON_CONFORMITE (modifié)
 // ============================================
 model NonConformite {
-  id               String              @id @default(cuid())
-  commandeId       String
-  commande         Commande            @relation(fields: [commandeId], references: [id])
+  id         String    @id @default(cuid())
+  commandeId String? // optionnel
+  commande   Commande? @relation(fields: [commandeId], references: [id])
+  noProjet   String?   @db.VarChar(50) // numéro de projet libre
+
+  departementId String?
+  departement   DepartementNC? @relation(fields: [departementId], references: [id])
+  typeId        String?
+  type          TypeNC?        @relation(fields: [typeId], references: [id])
+  responsableId String?
+  responsable   ResponsableNC? @relation(fields: [responsableId], references: [id])
+
   description      String              @db.Text
-  departement      String              @db.VarChar(100)
   dateDetection    DateTime            @default(now())
   dateResolution   DateTime?
   statut           StatutNonConformite @default(OUVERT)
   gravite          GraviteNC           @default(MINEURE)
   actionCorrective String?             @db.Text
-  responsable      String?             @db.VarChar(255)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+
+  // Nouveaux champs provenant du CSV
+  envoiMail        Boolean   @default(false)
+  mesureCorrective String?   @db.Text // AjoutMesureCorrective
+  correction       String?   @db.Text // Correction
+  dateCorrection   DateTime? // DateCorrection
+  confirmation     Boolean? // Confirmation (Oui/Non)
+
+  // Champs texte de secours (pour compatibilité, à déprécier progressivement)
+  departementTexte String? @db.VarChar(100)
+  responsableTexte String? @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([commandeId])
+  @@index([noProjet])
+  @@index([departementId])
+  @@index([typeId])
+  @@index([responsableId])
   @@index([statut])
   @@index([gravite])
-  @@index([departement])
   @@index([dateDetection])
   @@map("non_conformites")
 }
@@ -1373,4 +1395,44 @@ model AchatPhase {
 
   @@index([commandeId])
   @@map("achats_phase")
+}
+
+// ============================================
+// 33. DEPARTEMENT_NC (nouveau)
+// ============================================
+model DepartementNC {
+  id        String   @id @default(cuid())
+  nom       String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  types          TypeNC[]
+  nonConformites NonConformite[]
+}
+
+// ============================================
+// 34. TYPE_NC (nouveau)
+// ============================================
+model TypeNC {
+  id            String        @id @default(cuid())
+  departementId String
+  departement   DepartementNC @relation(fields: [departementId], references: [id], onDelete: Cascade)
+  nom           String        @db.VarChar(255) // le type de non-conformité
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  nonConformites NonConformite[]
+}
+
+// ============================================
+// 35. RESPONSABLE_NC (nouveau)
+// ============================================
+model ResponsableNC {
+  id        String   @id @default(cuid())
+  nom       String   @db.VarChar(255)
+  email     String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nonConformites NonConformite[]
 }
