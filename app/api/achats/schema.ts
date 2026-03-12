@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // ╔══════════════════════════════════════════════════════╗
-// ║        SCHEMAS ZOD — MODULE ACHATS                    ║
+// ║        SCHEMAS ZOD — MODULE ACHATS & DÉLAIS           ║
 // ╚══════════════════════════════════════════════════════╝
 
 // === ENUMS PRISMA ===
@@ -50,7 +50,7 @@ export interface AchatTypeView {
   dateEnvoie: string | null;
   dateReception: string | null;
   quantiteNonRecue: number | null;
-  actif: boolean; // true si statut != null
+  actif: boolean;
 }
 
 // === VUE ENRICHIE D'UNE COMMANDE AVEC SES ACHATS ===
@@ -66,7 +66,7 @@ export interface AchatCommandeView {
   commentaire: string | null;
   statutLivraison: string;
   achats: AchatTypeView[];
-  statutGlobal: string; // calculé: EN_ATTENTE, COMMANDEE, EN_TRANSIT, LIVREE
+  statutGlobal: string;
   nbAchatsActifs: number;
   nbAchatsRecus: number;
 }
@@ -76,34 +76,13 @@ const StatutAchatZod = z.enum(STATUT_ACHAT_ENUM).nullable().optional();
 const DateZod = z.string().nullable().optional();
 
 export const UpdateAchatsCommandeSchema = z.object({
-  achatFibre: StatutAchatZod,
-  dateEnvoieFibre: DateZod,
-  dateReceptionFibre: DateZod,
-  quantiteNonRecueFibre: z.number().int().nullable().optional(),
-  achatLimons: StatutAchatZod,
-  dateEnvoieLimons: DateZod,
-  dateReceptionLimons: DateZod,
-  quantiteNonRecueLimons: z.number().int().nullable().optional(),
-  achatVerres: StatutAchatZod,
-  dateEnvoieVerres: DateZod,
-  dateReceptionVerre: DateZod,
-  quantiteNonRecueVerres: z.number().int().nullable().optional(),
-  achatColonnes: StatutAchatZod,
-  dateEnvoieColonnes: DateZod,
-  dateReceptionColonnes: DateZod,
-  quantiteNonRecueColonnes: z.number().int().nullable().optional(),
-  achatPeinture: StatutAchatZod,
-  dateEnvoiePeinture: DateZod,
-  dateReceptionPeinture: DateZod,
-  quantiteNonRecuePeinture: z.number().int().nullable().optional(),
-  achatAttaches: StatutAchatZod,
-  dateEnvoieAttaches: DateZod,
-  dateReceptionAttaches: DateZod,
-  quantiteNonRecueAttaches: z.number().int().nullable().optional(),
-  achatPlancherAluminium: StatutAchatZod,
-  dateEnvoiePlancherAluminium: DateZod,
-  dateReceptionPlancherAluminium: DateZod,
-  quantiteNonRecuePlancherAluminium: z.number().int().nullable().optional(),
+  achatFibre: StatutAchatZod, dateEnvoieFibre: DateZod, dateReceptionFibre: DateZod, quantiteNonRecueFibre: z.number().int().nullable().optional(),
+  achatLimons: StatutAchatZod, dateEnvoieLimons: DateZod, dateReceptionLimons: DateZod, quantiteNonRecueLimons: z.number().int().nullable().optional(),
+  achatVerres: StatutAchatZod, dateEnvoieVerres: DateZod, dateReceptionVerre: DateZod, quantiteNonRecueVerres: z.number().int().nullable().optional(),
+  achatColonnes: StatutAchatZod, dateEnvoieColonnes: DateZod, dateReceptionColonnes: DateZod, quantiteNonRecueColonnes: z.number().int().nullable().optional(),
+  achatPeinture: StatutAchatZod, dateEnvoiePeinture: DateZod, dateReceptionPeinture: DateZod, quantiteNonRecuePeinture: z.number().int().nullable().optional(),
+  achatAttaches: StatutAchatZod, dateEnvoieAttaches: DateZod, dateReceptionAttaches: DateZod, quantiteNonRecueAttaches: z.number().int().nullable().optional(),
+  achatPlancherAluminium: StatutAchatZod, dateEnvoiePlancherAluminium: DateZod, dateReceptionPlancherAluminium: DateZod, quantiteNonRecuePlancherAluminium: z.number().int().nullable().optional(),
   commentaire: z.string().nullable().optional(),
 });
 export type UpdateAchatsCommande = z.input<typeof UpdateAchatsCommandeSchema>;
@@ -118,9 +97,49 @@ export const FournisseurCreateSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 export type FournisseurCreate = z.input<typeof FournisseurCreateSchema>;
-
 export const FournisseurUpdateSchema = FournisseurCreateSchema.partial();
 export type FournisseurUpdate = z.input<typeof FournisseurUpdateSchema>;
+
+// ╔══════════════════════════════════════════════════════╗
+// ║        DÉLAIS DE LIVRAISON & RUPTURES                 ║
+// ╚══════════════════════════════════════════════════════╝
+
+export const DelaiLivraisonSchema = z.object({
+  id: z.string(),
+  secteur: z.string().min(1),
+  delaiSemaines: z.number().int().min(0),
+});
+export type DelaiLivraison = z.infer<typeof DelaiLivraisonSchema>;
+
+export const RuptureStockSchema = z.object({
+  id: z.string(),
+  piece: z.string().min(1, 'Pièce requise'),
+  couleur: z.string().optional().default(''),
+  dateReception: z.string().optional().default(''),
+});
+export type RuptureStock = z.infer<typeof RuptureStockSchema>;
+
+export const DelaisConfigSchema = z.object({
+  delais: z.array(DelaiLivraisonSchema),
+  ruptures: z.array(RuptureStockSchema),
+  debutConstruction: z.string().optional().default(''),
+});
+export type DelaisConfig = z.infer<typeof DelaisConfigSchema>;
+
+// Défauts
+export const DELAIS_DEFAUT: DelaiLivraison[] = [
+  { id: 'd1', secteur: "PRODUCTION D'ALUMINIUM", delaiSemaines: 2 },
+  { id: 'd2', secteur: 'PRODUCTION DU VERRE 5-6mm', delaiSemaines: 3 },
+  { id: 'd3', secteur: 'PRODUCTION DU VERRE 10-12mm', delaiSemaines: 4 },
+  { id: 'd4', secteur: 'PRODUCTION DU FIBRE', delaiSemaines: 3 },
+  { id: 'd5', secteur: 'PRODUCTION DE MARCHES DE FIBRE', delaiSemaines: 3 },
+  { id: 'd6', secteur: 'PRODUCTION DES LIMONS', delaiSemaines: 4 },
+  { id: 'd7', secteur: 'PRODUCTION DES COLONNES', delaiSemaines: 4 },
+  { id: 'd8', secteur: 'INSTALLATION (Barrotins)', delaiSemaines: 3 },
+  { id: 'd9', secteur: 'INSTALLATION (Verres 5-6 mm)', delaiSemaines: 3 },
+  { id: 'd10', secteur: "Projet d'INSTALLATION de 6h et plus", delaiSemaines: 6 },
+  { id: 'd11', secteur: 'INSTALLATION (Verres 10-12 mm)', delaiSemaines: 4 },
+];
 
 // === STATS ===
 export interface StatsAchats {
@@ -138,34 +157,30 @@ export function getStatutAchatInfo(statut: string | null) {
   if (!statut) return null;
   return STATUT_ACHAT_MAP[statut] || { symbol: '?', label: statut, couleur: 'bg-slate-200 text-slate-700' };
 }
-
 export function getStatutGlobalInfo(statut: string) {
   return STATUT_GLOBAL_MAP[statut] || { label: statut, couleur: 'bg-slate-100 text-slate-700' };
 }
-
 export function getServiceCouleur(service: string) {
   return SERVICE_COULEUR_MAP[service] || 'bg-slate-400 text-white';
 }
-
 export function formaterDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
 }
-
 export function formaterDateCourte(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-CA');
 }
-
-/** Calcule le statut global d'une commande basé sur ses achats inline */
 export function calculerStatutGlobal(achats: AchatTypeView[]): string {
   const actifs = achats.filter((a) => a.actif);
   if (actifs.length === 0) return 'EN_ATTENTE';
-  const tousRecus = actifs.every((a) => a.statut === 'RECEPTIONNE');
-  if (tousRecus) return 'LIVREE';
-  const auMoinsFait = actifs.some((a) => a.statut === 'FAIT' || a.statut === 'PRET_A_RAMASSER');
-  if (auMoinsFait) return 'EN_TRANSIT';
-  const auMoinsCommande = actifs.some((a) => a.statut !== 'A_FAIRE');
-  if (auMoinsCommande) return 'COMMANDEE';
+  if (actifs.every((a) => a.statut === 'RECEPTIONNE')) return 'LIVREE';
+  if (actifs.some((a) => a.statut === 'FAIT' || a.statut === 'PRET_A_RAMASSER')) return 'EN_TRANSIT';
+  if (actifs.some((a) => a.statut !== 'A_FAIRE' && a.statut !== null)) return 'COMMANDEE';
   return 'EN_ATTENTE';
+}
+export function calculerDateLivraison(semaines: number, debutConstruction?: string): string {
+  const base = debutConstruction ? new Date(debutConstruction) : new Date();
+  base.setDate(base.getDate() + semaines * 7);
+  return base.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
 }
