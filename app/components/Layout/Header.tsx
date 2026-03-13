@@ -32,18 +32,15 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
-  // ✅ UTILISE UNIQUEMENT CES VALEURS DU HOOK - PAS D'ÉTATS LOCAUX EN DOUBLON!
   const { theme, palette, toggleTheme, selectPalette, colorPalettes, isDark } = useTheme(); 
   
   const { data: session } = useSession();
   
-  // États UI seulement
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileServices, setShowMobileServices] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   
-  // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
@@ -54,7 +51,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
     initials: session?.user?.name?.charAt(0).toUpperCase() || "U",
   };
 
-  // Charger notifications
   const fetchNotifications = async () => {
     setLoadingNotifications(true);
     try {
@@ -91,20 +87,21 @@ export default function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
-  // ✅ Sélectionner une palette
   const handlePaletteSelect = (p: typeof palette) => {
     selectPalette(p);
     setShowThemeMenu(false);
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 lg:left-64 h-16 bg-gradient-to-b from-[#1a2332] to-[#0f1419] border-b border-gray-700 z-30 shadow-sm">
+   
+    <header className="fixed top-0 left-0 right-0 h-16 bg-gradient-to-b from-[#1a2332] to-[#0f1419] border-b border-gray-700 z-30 shadow-sm">
       <div className="flex items-center justify-between h-full px-4 lg:px-6">
         {/* Gauche */}
         <div className="flex items-center gap-3">
+          {/* Bouton hamburger - suppression de lg:hidden pour qu'il soit visible sur tous les écrans */}
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-xl hover:bg-white/10 transition-colors text-white"
+            className="p-2 rounded-xl hover:bg-white/10 transition-colors text-white"
           >
             <Menu size={24} />
           </button>
@@ -121,11 +118,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </div>
         </div>
 
-        {/* Droite */}
+        {/* Droite (le reste du code est inchangé) */}
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Contrôles thème - Desktop */}
           <div className="hidden lg:flex items-center gap-2">
-            {/* ✅ Bouton Dark/Light - utilise isDark du hook */}
             <button
               onClick={toggleTheme}
               className="p-2.5 rounded-xl hover:bg-white/10 transition-colors text-white relative group"
@@ -158,7 +154,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       <p className="text-xs text-gray-500">Choisissez votre thème</p>
                     </div>
                     
-                    {/* Mode Dark/Light - ✅ utilise isDark du hook */}
                     <div className="px-4 py-3 border-b border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700">Thème</span>
@@ -190,7 +185,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       </div>
                     </div>
 
-                    {/* Palettes - ✅ utilise palette du hook */}
                     <div className="p-4">
                       <h4 className="text-sm font-medium text-gray-700 mb-3">Palette de couleurs</h4>
                       <div className="grid grid-cols-5 gap-2">
@@ -220,7 +214,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       </div>
                     </div>
 
-                    {/* Prévisualisation - ✅ utilise palette du hook */}
                     <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Actuel :</span>

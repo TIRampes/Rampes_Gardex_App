@@ -27,8 +27,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Header */}
       <Header onMenuClick={handleOpenSidebar} />
 
-      {/* Main Content */}
-      <main className="pt-16 lg:ml-64 min-h-screen">
+      {/* Main Content - Suppression de lg:ml-64 pour occuper toute la largeur */}
+      <main className="pt-16 min-h-screen">
         <div className="p-4 sm:p-6">{children}</div>
       </main>
     </div>

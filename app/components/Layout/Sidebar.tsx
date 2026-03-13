@@ -1,8 +1,9 @@
 "use client";
+
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { X } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
@@ -26,7 +27,7 @@ import {
   Settings,
   LogOut,
 } from "lucide-react";
-// Ajoutez d'autres icônes nécessaires
+
 const menuItems = [
   { name: "Tableau de bord", href: "/dashboard/dashboard", icon: LayoutDashboard },
   { name: "Clients", href: "/dashboard/clients", icon: Users },
@@ -37,11 +38,11 @@ const menuItems = [
   { name: "Inventaire", href: "/dashboard/inventaire", icon: Package },
   { name: "Achats", href: "/dashboard/achats", icon: ShoppingCart },
   { name: "Rentabilité", href: "/dashboard/rentabilite", icon: TrendingUp },
-  {name: "Cueillettes/Transport", href: "/dashboard/cueille_trans_livraison", icon: Truck },
+  { name: "Cueillettes/Transport", href: "/dashboard/cueille_trans_livraison", icon: Truck },
   { name: "Attentes", href: "/dashboard/attentes", icon: Clock },
   { name: "Non-conformités", href: "/dashboard/non_conformite", icon: AlertTriangle },
   { name: "Multi-logements", href: "/dashboard/multi_logements", icon: Building2 },
-  {name:"Commissions", href: "/dashboard/commissions", icon: ClipboardList },
+  { name: "Commissions", href: "/dashboard/commissions", icon: ClipboardList },
   { name: "Reprises", href: "/dashboard/reprises", icon: RotateCcw },
   { name: "Rapports", href: "/dashboard/rapports", icon: FileBarChart },
   { name: "Paramètres", href: "/dashboard/parametres", icon: Settings },
@@ -53,7 +54,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
-    const { theme, toggleTheme, selectPalette } = useTheme();
+  const { theme, toggleTheme, selectPalette } = useTheme();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -77,25 +78,25 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Overlay mobile */}
+      {/* Overlay - visible sur tous les écrans quand le sidebar est ouvert */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - supprimé lg:translate-x-0 pour qu'il soit caché par défaut sur tous les écrans */}
       <aside
         className={`
           fixed left-0 top-0 h-full w-64 z-50 flex flex-col
           bg-gradient-to-b from-[#1a2332] to-[#0f1419]
           transform transition-transform duration-300 ease-in-out
-          lg:translate-x-0 shadow-2xl
+          shadow-2xl
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
-        {/* Header avec Logo */}
+        {/* Header avec Logo - bouton de fermeture visible sur tous les écrans */}
         <div className="h-20 flex items-center justify-between px-4 border-b border-white/10">
           <Link href="/dashboard/dashboard" className="flex items-center">
             <Image
@@ -109,7 +110,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </Link>
           <button
             onClick={onClose}
-            className="lg:hidden p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white"
           >
             <X size={20} />
           </button>
