@@ -1,3 +1,5 @@
+// app/api/planification/non-planifiees/route.ts
+
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { CommandeNonPlanifiee } from "@/app/api/planification/schema";
@@ -7,8 +9,7 @@ export async function GET() {
     const commandes = await prisma.commande.findMany({
       where: {
         statut: 'ACTIVE',
-        service: { in: ['INSTALLATION'] },
-        productionTerminee: 'COMPLETE',
+        // On prend toutes les commandes actives sans planification non annulée
         planifications: { none: { statut: { notIn: ['ANNULEE'] } } },
       },
       include: { client: { select: { nom: true, ville: true } } },
@@ -23,9 +24,10 @@ export async function GET() {
       adresse: c.adresse,
       typeCommande: c.typeCommande,
       service: c.service,
-      tempsEstimeInstallation: c.tempsEstimeInstallation,
-      piedsLineaires: c.piedsLineairesRampes,
+      tempsEstimeInstallation: c.tempsEstimeInstallation || 0,
+      piedsLineaires: c.piedsLineairesRampes || 0,
       couleur: c.couleurPersonnalisee || c.couleur || null,
+      datePrevue: c.datePrevue, // AJOUTÉ
     }));
 
     return NextResponse.json({ commandes: result });

@@ -18,7 +18,12 @@ export const STATUT_PLANIF_MAP: Record<string, { label: string; couleur: string 
   REPORTEE: { label: 'Reportée', couleur: 'bg-orange-100 text-orange-800' },
   ANNULEE: { label: 'Annulée', couleur: 'bg-red-100 text-red-800' },
 };
-
+export const SERVICE_COULEUR: Record<string, string> = {
+  INSTALLATION: 'bg-red-600',
+  CUEILLETTE: 'bg-yellow-500',
+  LIVRAISON: 'bg-blue-600',
+  TRANSPORT: 'bg-green-600',
+};
 export const TYPE_COMMANDE_COULEUR: Record<string, string> = {
   STANDARD: 'bg-slate-100 text-slate-700',
   COMMERCIAL: 'bg-purple-100 text-purple-700',
@@ -99,6 +104,7 @@ export interface CommandeNonPlanifiee {
   tempsEstimeInstallation: number;
   piedsLineaires: number;
   couleur: string | null;
+  datePrevue: Date | null;
 }
 
 export interface EquipeView {
@@ -187,4 +193,14 @@ export function getDaysInMonth(date: Date): Array<{ day: number; currentMonth: b
   const rem = 42 - days.length;
   for (let i = 1; i <= rem; i++) days.push({ day: i, currentMonth: false, date: new Date(y, m + 1, i) });
   return days;
+}
+
+export function getWeekNumber(date: Date): { year: number; week: number } {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // On décale pour que le jeudi soit dans la semaine
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNumber = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: d.getFullYear(), week: weekNumber };
 }
