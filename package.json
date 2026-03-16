@@ -2,7 +2,6 @@
   "name": "rampes-gardex-app",
   "version": "0.1.0",
   "private": true,
- 
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
@@ -20,9 +19,9 @@
     "migrate:transactions": "ts-node scripts/migrate-transactions.ts",
     "migrate:all": "ts-node scripts/migrateAll.ts",
     "postinstall": "prisma generate"
-    
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1009.0",
     "@azure/identity": "^4.13.0",
     "@eslint-community/eslint-utils": "^4.9.1",
     "@microsoft/microsoft-graph-client": "^3.0.7",
