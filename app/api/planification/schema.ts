@@ -1,182 +1,190 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-// ╔══════════════════════════════════════════════════════════════╗
-// ║   SCHEMAS ZOD — MODULE PLANIFICATION (Rampes Gardex)        ║
-// ╚══════════════════════════════════════════════════════════════╝
+// ╔══════════════════════════════════════════════════════╗
+// ║      SCHEMAS ZOD — MODULE PLANIFICATION                ║
+// ╚══════════════════════════════════════════════════════╝
 
-// ──── Enums ────
-export const StatutPlanificationEnum = z.enum([
-  "PLANIFIEE",
-  "CONFIRMEE",
-  "EN_COURS",
-  "COMPLETEE",
-  "REPORTEE",
-  "ANNULEE",
-]);
-
-export const ServiceCommandeEnum = z.enum([
-  "INSTALLATION",
-  "LIVRAISON",
-  "CUEILLETTE",
-  "TRANSPORT",
-]);
-
-export const TypeCommandeEnum = z.enum([
-  "STANDARD",
-  "COMMERCIAL",
-  "MULTI_PHASE",
-  "MULTIPLAN",
-]);
-
-// ──── Constantes visuelles ────
-
+export const STATUT_PLANIF_ENUM = ['PLANIFIEE', 'CONFIRMEE', 'EN_COURS', 'COMPLETEE', 'REPORTEE', 'ANNULEE'] as const;
 export const HEURES_PAR_JOUR = 8;
-export const HEURES_MAX_JOURNEE = 12;
+export const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+export const DAY_NAMES_SHORT = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
+export const HEURES_MAX_JOURNEE = 12; // 12h max pour les interventions
 
-export const COULEURS_EQUIPES = [
-  "bg-blue-500",
-  "bg-green-500",
-  "bg-purple-500",
-  "bg-orange-500",
-  "bg-pink-500",
-  "bg-teal-500",
-  "bg-red-500",
-  "bg-cyan-500",
-  "bg-indigo-500",
-  "bg-amber-500",
-] as const;
-
-export const TYPE_COMMANDE_COLORS: Record<string, { bg: string; text: string }> = {
-  STANDARD:    { bg: "bg-slate-100",  text: "text-slate-700" },
-  COMMERCIAL:  { bg: "bg-purple-100", text: "text-purple-700" },
-  MULTIPLAN:   { bg: "bg-blue-100",   text: "text-blue-700" },
-  MULTI_PHASE: { bg: "bg-orange-100", text: "text-orange-700" },
+export const STATUT_PLANIF_MAP: Record<string, { label: string; couleur: string }> = {
+  PLANIFIEE: { label: 'Planifiée', couleur: 'bg-purple-100 text-purple-800' },
+  CONFIRMEE: { label: 'Confirmée', couleur: 'bg-blue-100 text-blue-800' },
+  EN_COURS: { label: 'En cours', couleur: 'bg-amber-100 text-amber-800' },
+  COMPLETEE: { label: 'Complétée', couleur: 'bg-emerald-100 text-emerald-800' },
+  REPORTEE: { label: 'Reportée', couleur: 'bg-orange-100 text-orange-800' },
+  ANNULEE: { label: 'Annulée', couleur: 'bg-red-100 text-red-800' },
 };
 
-export const STATUT_PLANIF_MAP: Record<string, { label: string; bg: string; text: string }> = {
-  PLANIFIEE: { label: "Planifiée",  bg: "bg-blue-100",   text: "text-blue-700" },
-  CONFIRMEE: { label: "Confirmée",  bg: "bg-green-100",  text: "text-green-700" },
-  EN_COURS:  { label: "En cours",   bg: "bg-amber-100",  text: "text-amber-700" },
-  COMPLETEE: { label: "Complétée",  bg: "bg-emerald-500", text: "text-white" },
-  REPORTEE:  { label: "Reportée",   bg: "bg-orange-100", text: "text-orange-700" },
-  ANNULEE:   { label: "Annulée",    bg: "bg-red-100",    text: "text-red-700" },
+export const TYPE_COMMANDE_COULEUR: Record<string, string> = {
+  STANDARD: 'bg-slate-100 text-slate-700',
+  COMMERCIAL: 'bg-purple-100 text-purple-700',
+  MULTIPLAN: 'bg-blue-100 text-blue-700',
+  MULTI_PHASE: 'bg-orange-100 text-orange-700',
 };
 
-export const MOIS_NOMS = [
-  "janvier", "février", "mars", "avril", "mai", "juin",
-  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
-] as const;
+export const STATUS_PROD_COULEUR: Record<string, string> = {
+  COMPLETE: 'bg-green-500 text-white',
+  ATTENTE_CLIENT: 'bg-orange-400 text-white',
+  NON_APPLICABLE: 'bg-slate-300 text-slate-600',
+  PARTIEL: 'bg-blue-400 text-white',
+  BACK_ORDER: 'bg-red-500 text-white',
+};
 
-export const JOURS_COURTS = ["dim", "lun", "mar", "mer", "jeu", "ven", "sam"] as const;
-export const JOURS_LONGS = [
-  "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi",
-] as const;
+export const STATUT_ACHAT_COULEUR: Record<string, string> = {
+  A_FAIRE: 'bg-slate-200 text-slate-600',
+  FAIT: 'bg-green-500 text-white',
+  RECEPTIONNE: 'bg-emerald-500 text-white',
+  PRET_A_RAMASSER: 'bg-blue-500 text-white',
+  BACK_ORDER: 'bg-red-500 text-white',
+};
 
-// ──── Schemas de requêtes API ────
+// === VUE PLANIFICATION ENRICHIE ===
+export interface PlanificationView {
+  id: string;
+  commandeId: string;
+  commandeNumero: string;
+  clientNom: string;
+  clientVille: string | null;
+  clientTelephone: string | null;
+  adresse: string;
+  reference: string | null;
+  typeCommande: string;
+  service: string;
+  couleur: string | null;
+  reprise: boolean;
+  commentaire: string | null;
+  dateEntree: string;
+  datePlanifiee: string;
+  heureDebut: string | null;
+  heureFin: string | null;
+  statut: string;
+  equipeId: string;
+  equipeNom: string;
+  equipeCouleur: string;
+  clientPresent: boolean;
+  representantPresent: boolean;
+  envoyerAvis: boolean;
+  avisEnvoye: boolean;
+  notes: string | null;
+  // Données commande
+  tempsEstimeInstallation: number;
+  piedsLineaires: number;
+  mesure: string | null;
+  plan: string | null;
+  envoyeProduction: string | null;
+  productionTerminee: string | null;
+  // Achats inline
+  achatVerres: string | null;
+  achatLimons: string | null;
+  achatPeinture: string | null;
+  achatColonnes: string | null;
+  achatFibre: string | null;
+  achatAttaches: string | null;
+  achatPlancherAluminium: string | null;
+}
 
-/** GET /api/planification — filtres */
-export const PlanificationQuerySchema = z.object({
-  type: z.enum(["tous", "installation", "mesure"]).optional().default("tous"),
-  typeCommande: z.enum(["tous", "standard", "commercial", "multiplan", "multiphase"]).optional().default("tous"),
-  equipeId: z.string().optional(),
-  statut: z.string().optional(),
-  recherche: z.string().optional(),
-  nonPlanifiees: z.string().transform((v) => v === "true").optional(),
-  page: z.string().transform((v) => parseInt(v, 10)).pipe(z.number().int().positive()).optional().default(1),
-  limite: z.string().transform((v) => parseInt(v, 10)).pipe(z.number().int().min(1).max(200)).optional().default(500),
-});
+// Commande non planifiée (prod terminée mais pas de planif)
+export interface CommandeNonPlanifiee {
+  id: string;
+  numero: string;
+  clientNom: string;
+  clientVille: string | null;
+  adresse: string;
+  typeCommande: string;
+  service: string;
+  tempsEstimeInstallation: number;
+  piedsLineaires: number;
+  couleur: string | null;
+}
 
-/** GET /api/planification/calendrier */
-export const CalendrierPlanifQuerySchema = z.object({
-  mois: z.string().transform((v) => parseInt(v, 10)).pipe(z.number().int().min(0).max(11)),
-  annee: z.string().transform((v) => parseInt(v, 10)).pipe(z.number().int().min(2020).max(2100)),
-  equipeId: z.string().optional(),
-});
+export interface EquipeView {
+  id: string;
+  nom: string;
+  couleur: string;
+  actif: boolean;
+  membres: Array<{ id: string; nom: string; prenom: string }>;
+  nbPlanifications: number;
+  heuresTotal: number;
+}
 
-// ──── Schemas de mutations ────
+export interface StatsPlanification {
+  nbPlanifiees: number;
+  heuresTotal: number;
+  piedsTotal: number;
+  nbNonPlanifiees: number;
+}
 
-/** POST /api/planification — créer une planification */
-export const CreerPlanificationSchema = z.object({
-  commandeId: z.string().cuid(),
-  equipeId: z.string().cuid(),
- datePlanifiee: z
-  .coerce.date()
-  .refine((date) => !isNaN(date.getTime()), {
-    message: "Date requise",
-  }),
-  heureDebut: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  heureFin: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+// === ZOD SCHEMAS ===
+export const PlanificationCreateSchema = z.object({
+  commandeId: z.string().min(1),
+  equipeId: z.string().min(1),
+  datePlanifiee: z.string().min(1, 'Date requise'),
+  heureDebut: z.string().nullable().optional(),
+  heureFin: z.string().nullable().optional(),
   clientPresent: z.boolean().default(false),
   representantPresent: z.boolean().default(false),
   envoyerAvis: z.boolean().default(false),
-  notes: z.string().max(2000).optional(),
+  notes: z.string().nullable().optional(),
 });
+export type PlanificationCreate = z.input<typeof PlanificationCreateSchema>;
 
-/** PATCH /api/planification — mettre à jour */
-export const UpdatePlanificationSchema = z.object({
-  planificationId: z.string().cuid(),
-  equipeId: z.string().cuid().optional(),
-  datePlanifiee: z
-    .coerce.date()
-    .refine((date) => !isNaN(date.getTime()), {
-      message: "Date requise",
-    })
-    .optional(),
-  heureDebut: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
-  heureFin: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
-  clientPresent: z.boolean().optional(),
-  representantPresent: z.boolean().optional(),
-  envoyerAvis: z.boolean().optional(),
+export const PlanificationUpdateSchema = PlanificationCreateSchema.partial().extend({
+  statut: z.enum(STATUT_PLANIF_ENUM).optional(),
   avisEnvoye: z.boolean().optional(),
-  statut: StatutPlanificationEnum.optional(),
-  notes: z.string().max(2000).nullable().optional(),
 });
+export type PlanificationUpdate = z.input<typeof PlanificationUpdateSchema>;
 
-/** PUT — modifier la commande directement (date, équipe, temps) */
-export const EditInstallationSchema = z.object({
-  commandeId: z.string().cuid(),
-  datePrevue: z.coerce.date().nullable().optional(),
-  equipeId: z.string().cuid().nullable().optional(),
-  tempsEstimeInstallation: z.number().int().min(0).max(500).optional(),
-  heureDebut: z.string().nullable().optional(),
-  heureFin: z.string().nullable().optional(),
-  notes: z.string().max(2000).nullable().optional(),
+export const EquipeCreateSchema = z.object({
+  nom: z.string().min(1, 'Nom requis'),
+  couleur: z.string().default('bg-blue-500'),
 });
+export type EquipeCreate = z.input<typeof EquipeCreateSchema>;
 
-/** POST — terminer une installation */
-export const TerminerInstallationSchema = z.object({
-  commandeId: z.string().cuid(),
-  planificationId: z.string().cuid().optional(),
-});
+// === HELPERS ===
+export function formatDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
 
-/** POST — reporter une installation */
-export const ReporterInstallationSchema = z.object({
-  planificationId: z.string().cuid(),
-  nouvelleDatePlanifiee: z.coerce.date(),
-  raison: z.string().max(500).optional(),
-});
+export function calculerJoursNecessaires(heures: number): number {
+  if (!heures || heures <= 0) return 1;
+  if (heures <= 12) return 1;
+  return Math.ceil(heures / HEURES_PAR_JOUR);
+}
 
-// ──── Schemas équipes ────
+export function depasseJournee(heures: number): boolean {
+  return heures > HEURES_PAR_JOUR && heures <= 12;
+}
 
-export const CreerEquipeSchema = z.object({
-  nom: z.string().min(1, "Nom requis").max(100),
-  couleur: z.string().min(1),
-  membreIds: z.array(z.string().cuid()).optional(),
-});
+export function getProdStatusColor(val: string | null): string {
+  return val ? (STATUS_PROD_COULEUR[val] || 'bg-slate-200 text-slate-600') : 'bg-slate-100 text-slate-400';
+}
 
-export const UpdateEquipeSchema = z.object({
-  equipeId: z.string().cuid(),
-  nom: z.string().min(1).max(100).optional(),
-  couleur: z.string().optional(),
-  actif: z.boolean().optional(),
-  membreIds: z.array(z.string().cuid()).optional(),
-});
+export function getAchatStatusColor(val: string | null): string {
+  return val ? (STATUT_ACHAT_COULEUR[val] || 'bg-slate-200 text-slate-600') : 'bg-slate-100 text-slate-400';
+}
 
-// ──── Types dérivés ────
-export type PlanificationQuery = z.infer<typeof PlanificationQuerySchema>;
-export type CalendrierPlanifQuery = z.infer<typeof CalendrierPlanifQuerySchema>;
-export type CreerPlanification = z.infer<typeof CreerPlanificationSchema>;
-export type UpdatePlanification = z.infer<typeof UpdatePlanificationSchema>;
-export type EditInstallation = z.infer<typeof EditInstallationSchema>;
-export type CreerEquipe = z.infer<typeof CreerEquipeSchema>;
-export type UpdateEquipe = z.infer<typeof UpdateEquipeSchema>;
+export function getSymbol(val: string | null): string {
+  if (!val) return '—';
+  const map: Record<string, string> = {
+    COMPLETE: '√', ATTENTE_CLIENT: 'At.C', NON_APPLICABLE: 'N/A', PARTIEL: 'P',
+    BACK_ORDER: 'B/O', A_FAIRE: '①', FAIT: '✓', RECEPTIONNE: 'R', PRET_A_RAMASSER: 'P',
+  };
+  return map[val] || val;
+}
+
+export function getDaysInMonth(date: Date): Array<{ day: number; currentMonth: boolean; date: Date }> {
+  const y = date.getFullYear(), m = date.getMonth();
+  const firstDay = new Date(y, m, 1);
+  const lastDay = new Date(y, m + 1, 0);
+  const days: Array<{ day: number; currentMonth: boolean; date: Date }> = [];
+  const prevLast = new Date(y, m, 0).getDate();
+  for (let i = firstDay.getDay() - 1; i >= 0; i--) days.push({ day: prevLast - i, currentMonth: false, date: new Date(y, m - 1, prevLast - i) });
+  for (let i = 1; i <= lastDay.getDate(); i++) days.push({ day: i, currentMonth: true, date: new Date(y, m, i) });
+  const rem = 42 - days.length;
+  for (let i = 1; i <= rem; i++) days.push({ day: i, currentMonth: false, date: new Date(y, m + 1, i) });
+  return days;
+}

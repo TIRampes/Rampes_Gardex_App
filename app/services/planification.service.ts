@@ -2,7 +2,7 @@
 // ║   SERVICE — Logique métier Planification                    ║
 // ╚══════════════════════════════════════════════════════════════╝
 
-import { HEURES_PAR_JOUR, HEURES_MAX_JOURNEE, MOIS_NOMS } from "@/app/api/planification/schema";
+import { HEURES_PAR_JOUR, HEURES_MAX_JOURNEE, MONTH_NAMES } from "@/app/api/planification/schema";
 import type {
   CommandePlanification,
   DayInfo,
@@ -91,7 +91,7 @@ export function getSemainesDuMois(date: Date): SemaineDuMois[] {
 
     semaines.push({
       num: weekNum,
-      label: `Sem. ${weekNum} (${weekStart.getDate()}-${weekEnd.getDate()} ${MOIS_NOMS[month]})`,
+      label: `Sem. ${weekNum} (${weekStart.getDate()}-${weekEnd.getDate()} ${MONTH_NAMES[month]})`,
       startDate: formatDateKey(weekStart),
       endDate: formatDateKey(weekEnd),
     });

@@ -1,239 +1,81 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import type {
-  CommandePlanification,
-  Equipe,
-  FiltresPlanification,
-  PlanificationFormData,
-  EditInstallationFormData,
-} from "@/app/types/planification";
-import { FILTRES_DEFAUT } from "@/app/types/planification";
-import {
-  separerPlanifications,
-  filtrerCommandes,
-  grouperParDate,
-  calculerStatsHebdo,
-  calculerChargeEquipe,
-  detecterConflits,
-  getDaysInMonth,
-  getSemainesDuMois,
-} from "@/app/services/planification.service";
+'use client';
 
-// ╔══════════════════════════════════════════════════════════════╗
-// ║   HOOK — usePlanification                                   ║
-// ╚══════════════════════════════════════════════════════════════╝
+import { useState, useCallback } from 'react';
+import type { PlanificationView, CommandeNonPlanifiee, EquipeView, StatsPlanification, PlanificationCreate, PlanificationUpdate, EquipeCreate } from '@/app/api/planification/schema';
+
+async function api<T>(url: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  if (!res.ok) { const e = await res.json().catch(() => ({ error: 'Erreur réseau' })); throw new Error(e.error || `Erreur ${res.status}`); }
+  return res.json();
+}
 
 export function usePlanification() {
-  const [commandes, setCommandes] = useState<CommandePlanification[]>([]);
-  const [equipes, setEquipes] = useState<Equipe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(() => new Date());
-  const [filtres, setFiltres] = useState<FiltresPlanification>(FILTRES_DEFAUT);
+  const [planifications, setPlanifications] = useState<PlanificationView[]>([]);
+  const [stats, setStats] = useState<StatsPlanification | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // ── Fetch commandes ──
-  const fetchCommandes = useCallback(async () => {
+  const charger = useCallback(async (filtres?: Record<string, string>) => {
     setLoading(true);
-    setError(null);
     try {
-      const res = await fetch("/api/planification?limite=200");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setCommandes(json.data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur chargement");
-    } finally {
-      setLoading(false);
-    }
+      const q = filtres ? new URLSearchParams(filtres).toString() : '';
+      const data = await api<{ planifications: PlanificationView[]; stats: StatsPlanification }>(`/api/planification${q ? `?${q}` : ''}`);
+      setPlanifications(data.planifications || []);
+      setStats(data.stats || null);
+    } catch (e) { console.error('Erreur chargement planifications:', e); }
+    setLoading(false);
   }, []);
 
-  // ── Fetch équipes ──
-  const fetchEquipes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/planification/equipes");
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setEquipes(json.data);
-    } catch (err) {
-      console.error("[useEquipes]", err);
-    }
+  const creer = useCallback(async (data: PlanificationCreate) => {
+    await api('/api/planification', { method: 'POST', body: JSON.stringify(data) });
   }, []);
 
-  useEffect(() => {
-    fetchCommandes();
-    fetchEquipes();
-  }, [fetchCommandes, fetchEquipes]);
-
-  // ── Computed ──
-  const { planifiees, nonPlanifiees } = useMemo(
-    () => separerPlanifications(commandes),
-    [commandes]
-  );
-
-  const planifiesFiltrees = useMemo(
-    () => filtrerCommandes(planifiees, filtres),
-    [planifiees, filtres]
-  );
-
-  const parDate = useMemo(() => grouperParDate(planifiesFiltrees), [planifiesFiltrees]);
-
-  const statsHebdo = useMemo(() => calculerStatsHebdo(planifiees), [planifiees]);
-
-  const chargesEquipes = useMemo(
-    () => equipes.map((eq) => calculerChargeEquipe(eq, planifiees)),
-    [equipes, planifiees]
-  );
-
-  const conflits = useMemo(
-    () => detecterConflits(planifiees, equipes),
-    [planifiees, equipes]
-  );
-
-  const days = useMemo(() => getDaysInMonth(currentMonth), [currentMonth]);
-  const semaines = useMemo(() => getSemainesDuMois(currentMonth), [currentMonth]);
-
-  // ── Navigation mois ──
-  const goToPrevMonth = useCallback(
-    () => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1)),
-    []
-  );
-  const goToNextMonth = useCallback(
-    () => setCurrentMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1)),
-    []
-  );
-  const goToToday = useCallback(() => setCurrentMonth(new Date()), []);
-
-  // ── Mutations ──
-  const planifierInstallation = useCallback(
-    async (data: PlanificationFormData) => {
-      try {
-        const res = await fetch("/api/planification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "creer", ...data }),
-        });
-        if (!res.ok) throw new Error("Erreur");
-        await fetchCommandes();
-        return true;
-      } catch (err) {
-        console.error("[planifier]", err);
-        return false;
-      }
-    },
-    [fetchCommandes]
-  );
-
-  const editInstallation = useCallback(
-    async (commandeId: string, data: Partial<EditInstallationFormData>) => {
-      try {
-        const res = await fetch("/api/planification", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ commandeId, ...data }),
-        });
-        if (!res.ok) throw new Error("Erreur");
-        // Optimistic update
-        setCommandes((prev) =>
-          prev.map((c) => (c.id === commandeId ? { ...c, ...data } : c))
-        );
-        return true;
-      } catch (err) {
-        console.error("[edit]", err);
-        return false;
-      }
-    },
-    []
-  );
-
-  const terminerInstallation = useCallback(
-    async (commandeId: string, planificationId?: string) => {
-      try {
-        await fetch("/api/planification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "terminer", commandeId, planificationId }),
-        });
-        setCommandes((prev) =>
-          prev.map((c) =>
-            c.id === commandeId ? { ...c, statut: "COMPLETEE" } : c
-          )
-        );
-        return true;
-      } catch (err) {
-        console.error("[terminer]", err);
-        return false;
-      }
-    },
-    []
-  );
-
-  const reporterInstallation = useCallback(
-    async (planificationId: string, nouvelleDatePlanifiee: string, raison?: string) => {
-      try {
-        await fetch("/api/planification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "reporter",
-            planificationId,
-            nouvelleDatePlanifiee,
-            raison,
-          }),
-        });
-        await fetchCommandes();
-        return true;
-      } catch (err) {
-        console.error("[reporter]", err);
-        return false;
-      }
-    },
-    [fetchCommandes]
-  );
-
-  // ── Équipes ──
-  const ajouterEquipe = useCallback(
-    async (nom: string, couleur: string) => {
-      try {
-        const res = await fetch("/api/planification/equipes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nom, couleur }),
-        });
-        if (!res.ok) throw new Error("Erreur");
-        const json = await res.json();
-        setEquipes((prev) => [...prev, json.data]);
-        return true;
-      } catch (err) {
-        console.error("[ajouterEquipe]", err);
-        return false;
-      }
-    },
-    []
-  );
-
-  const supprimerEquipe = useCallback(async (equipeId: string) => {
-    try {
-      await fetch(`/api/planification/equipes?id=${equipeId}`, { method: "DELETE" });
-      setEquipes((prev) => prev.filter((e) => e.id !== equipeId));
-      return true;
-    } catch (err) {
-      console.error("[supprimerEquipe]", err);
-      return false;
-    }
+  const modifier = useCallback(async (id: string, data: PlanificationUpdate) => {
+    await api(`/api/planification/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }, []);
 
-  return {
-    // State
-    commandes, equipes, loading, error,
-    currentMonth, filtres, days, semaines,
-    // Computed
-    planifiees, planifiesFiltrees, nonPlanifiees, parDate,
-    statsHebdo, chargesEquipes, conflits,
-    // Navigation
-    goToPrevMonth, goToNextMonth, goToToday,
-    setFiltres, setCurrentMonth,
-    // Mutations
-    planifierInstallation, editInstallation, terminerInstallation,
-    reporterInstallation, ajouterEquipe, supprimerEquipe,
-    fetchCommandes, fetchEquipes,
-  };
+  const supprimer = useCallback(async (id: string) => {
+    await api(`/api/planification/${id}`, { method: 'DELETE' });
+  }, []);
+
+  return { planifications, stats, loading, charger, creer, modifier, supprimer };
+}
+
+export function useNonPlanifiees() {
+  const [commandes, setCommandes] = useState<CommandeNonPlanifiee[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const charger = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api<{ commandes: CommandeNonPlanifiee[] }>('/api/planification/non-planifiees');
+      setCommandes(data.commandes || []);
+    } catch (e) { console.error('Erreur chargement non-planifiées:', e); }
+    setLoading(false);
+  }, []);
+
+  return { commandes, loading, charger };
+}
+
+export function useEquipes() {
+  const [equipes, setEquipes] = useState<EquipeView[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const charger = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api<{ equipes: EquipeView[] }>('/api/planification/equipes');
+      setEquipes(data.equipes || []);
+    } catch (e) { console.error('Erreur chargement équipes:', e); }
+    setLoading(false);
+  }, []);
+
+  const creer = useCallback(async (data: EquipeCreate) => {
+    await api('/api/planification/equipes', { method: 'POST', body: JSON.stringify(data) });
+  }, []);
+
+  const supprimer = useCallback(async (id: string) => {
+    await api(`/api/planification/equipes/${id}`, { method: 'DELETE' });
+  }, []);
+
+  return { equipes, loading, charger, creer, supprimer };
 }

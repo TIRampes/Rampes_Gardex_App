@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
-import { MOIS_NOMS, JOURS_COURTS } from "@/app/api/planification/schema";
+import { MONTH_NAMES, DAY_NAMES_SHORT} from "@/app/api/planification/schema";
 import {
   formatDateKey,
   getInstallationsForDate,
@@ -49,7 +49,7 @@ export default function PlanificationCalendrier({
         </button>
         <div className="text-center">
           <h2 className="text-[1.125rem] sm:text-[1.5rem] font-bold capitalize">
-            {MOIS_NOMS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </h2>
           <button
             onClick={onGoToday}
@@ -68,7 +68,7 @@ export default function PlanificationCalendrier({
 
       {/* En-têtes jours */}
       <div className="grid grid-cols-7 bg-slate-700 text-white">
-        {JOURS_COURTS.map((jour) => (
+        {DAY_NAMES_SHORT.map((jour) => (
           <div
             key={jour}
             className="p-[0.375rem] sm:p-[0.75rem] text-center border-r border-slate-600 last:border-r-0"

@@ -1,113 +1,50 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { CreerEquipeSchema, UpdateEquipeSchema } from "@/app/api/planification/schema";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { EquipeCreateSchema } from "@/app/api/planification/schema";
+import type { EquipeView } from "@/app/api/planification/schema";
 
-// GET /api/planification/equipes
 export async function GET() {
   try {
     const equipes = await prisma.equipe.findMany({
       where: { actif: true },
       include: {
-        membres: { select: { id: true, nom: true, prenom: true, role: true }, where: { actif: true } },
+        membres: { where: { actif: true }, select: { id: true, nom: true, prenom: true } },
         planifications: {
-          where: { statut: { in: ["PLANIFIEE", "CONFIRMEE", "EN_COURS"] } },
-          select: { id: true, datePlanifiee: true, commande: { select: { tempsEstimeInstallation: true } } },
+          where: { statut: { notIn: ['ANNULEE', 'COMPLETEE'] } },
+          select: { id: true, commande: { select: { tempsEstimeInstallation: true } } },
         },
       },
-      orderBy: { nom: "asc" },
+      orderBy: { nom: 'asc' },
     });
 
-    const data = equipes.map((eq) => ({
-      id: eq.id,
-      nom: eq.nom,
-      couleur: eq.couleur,
-      actif: eq.actif,
-      membres: eq.membres.map((m) => ({
-        id: m.id,
-        nom: m.nom,
-        prenom: m.prenom,
-        role: m.role,
-      })),
-      nbInstallations: eq.planifications.length,
-      heuresPlanifiees: eq.planifications.reduce(
-        (acc, p) => acc + (p.commande?.tempsEstimeInstallation ?? 0), 0
-      ),
+    const result: EquipeView[] = equipes.map((e) => ({
+      id: e.id,
+      nom: e.nom,
+      couleur: e.couleur,
+      actif: e.actif,
+      membres: e.membres,
+      nbPlanifications: e.planifications.length,
+      heuresTotal: e.planifications.reduce((a, p) => a + ((p.commande as any)?.tempsEstimeInstallation || 0), 0),
     }));
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ equipes: result });
   } catch (error) {
-    console.error("[API/equipes GET]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    console.error('GET equipes erreur:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
 
-// POST /api/planification/equipes
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const data = CreerEquipeSchema.parse(body);
+    const parsed = EquipeCreateSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: 'Données invalides', details: parsed.error.flatten() }, { status: 400 });
 
-    const equipe = await prisma.equipe.create({
-      data: {
-        nom: data.nom,
-        couleur: data.couleur,
-        ...(data.membreIds?.length
-          ? { membres: { connect: data.membreIds.map((id) => ({ id })) } }
-          : {}),
-      },
-      include: { membres: { select: { id: true, nom: true, prenom: true, role: true } } },
-    });
-
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: equipe.id,
-        nom: equipe.nom,
-        couleur: equipe.couleur,
-        actif: equipe.actif,
-        membres: equipe.membres,
-        nbInstallations: 0,
-        heuresPlanifiees: 0,
-      },
-    });
-  } catch (error) {
-    console.error("[API/equipes POST]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
-}
-
-// PATCH /api/planification/equipes
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const data = UpdateEquipeSchema.parse(body);
-    const { equipeId, membreIds, ...fields } = data;
-
-    await prisma.equipe.update({
-      where: { id: equipeId },
-      data: {
-        ...fields,
-        ...(membreIds ? { membres: { set: membreIds.map((id) => ({ id })) } } : {}),
-      },
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[API/equipes PATCH]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
-  }
-}
-
-// DELETE /api/planification/equipes?id=xxx
-export async function DELETE(request: NextRequest) {
-  try {
-    const id = new URL(request.url).searchParams.get("id");
-    if (!id) return NextResponse.json({ error: "ID requis" }, { status: 400 });
-
-    await prisma.equipe.update({ where: { id }, data: { actif: false } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("[API/equipes DELETE]", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    const equipe = await prisma.equipe.create({ data: { nom: parsed.data.nom, couleur: parsed.data.couleur } });
+    return NextResponse.json(equipe, { status: 201 });
+  } catch (error: any) {
+    if (error?.code === 'P2002') return NextResponse.json({ error: 'Ce nom d\'équipe existe déjà' }, { status: 400 });
+    console.error('POST equipe erreur:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
