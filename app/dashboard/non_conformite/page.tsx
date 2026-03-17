@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import NonConformiteList from '@/app/components/NonConformiteList';
-import NonConformiteModal from '@/app/components/NonConformiteModal';
-import NonConformiteDetailModal from '@/app/components/NonConformiteDetailModal';
-import DepartementModal from '@/app/components/DepartementModal';
-import TypeModal from '@/app/components/TypeModal';
-import ResponsableModal from '@/app/components/ResponsableModal';
+import NonConformiteList from '@/app/components/nonconformite/NonConformiteList';
+import NonConformiteModal from '@/app/components/nonconformite/NonConformiteModal';
+import NonConformiteDetailModal from '@/app/components/nonconformite/NonConformiteDetailModal';
+import DepartementModal from '@/app/components/nonconformite/DepartementModal';
+import TypeModal from '@/app/components/nonconformite/TypeModal';
+import ResponsableModal from '@/app/components/nonconformite/ResponsableModal';
 import { List, Users, Plus } from 'lucide-react';
 
 export default function NonConformitesPage() {

@@ -38,14 +38,12 @@ const menuItems = [
   { name: "Inventaire", href: "/dashboard/inventaire", icon: Package },
   { name: "Achats", href: "/dashboard/achats", icon: ShoppingCart },
   { name: "Rentabilité", href: "/dashboard/rentabilite", icon: TrendingUp },
-  { name: "Cueillettes/Transport", href: "/dashboard/cueille_trans_livraison", icon: Truck },
   { name: "Attentes", href: "/dashboard/attentes", icon: Clock },
   { name: "Non-conformités", href: "/dashboard/non_conformite", icon: AlertTriangle },
   { name: "Multi-logements", href: "/dashboard/multi_logements", icon: Building2 },
   { name: "Commissions", href: "/dashboard/commissions", icon: ClipboardList },
   { name: "Reprises", href: "/dashboard/reprises", icon: RotateCcw },
-  { name: "Rapports", href: "/dashboard/rapports", icon: FileBarChart },
-  { name: "Paramètres", href: "/dashboard/parametres", icon: Settings },
+ 
 ];
 
 interface SidebarProps {

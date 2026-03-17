@@ -16,18 +16,18 @@ export async function GET() {
       orderBy: { dateEntree: 'asc' },
     });
 
-    const result: CommandeNonPlanifiee[] = commandes.map((c) => ({
+    const result: CommandeNonPlanifiee[] = commandes.map((c) => ({                                           
       id: c.id,
       numero: c.numero,
       clientNom: c.client?.nom || '—',
       clientVille: c.client?.ville || null,
-      adresse: c.adresse,
+      adresse: c.adresse,                       
       typeCommande: c.typeCommande,
       service: c.service,
       tempsEstimeInstallation: c.tempsEstimeInstallation || 0,
       piedsLineaires: c.piedsLineairesRampes || 0,
       couleur: c.couleurPersonnalisee || c.couleur || null,
-      datePrevue: c.datePrevue, // AJOUTÉ
+      datePrevue: c.datePrevue, // AJOUTÉ                                               
     }));
 
     return NextResponse.json({ commandes: result });
