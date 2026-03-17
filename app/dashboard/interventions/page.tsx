@@ -24,14 +24,6 @@ export default function InterventionsPage() {
   const [showMap, setShowMap] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 
-  const TYPE_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
-  STANDARD: { label: "Standard", color: "text-blue-700", bgColor: "bg-blue-100" },
-  COMMERCIAL: { label: "Commercial", color: "text-purple-700", bgColor: "bg-purple-100" },
-  MULTI_PHASE: { label: "Multi-Phase", color: "text-orange-700", bgColor: "bg-orange-100" },
-  MULTIPLAN: { label: "Multiplan", color: "text-emerald-700", bgColor: "bg-emerald-100" },
-};
-
-
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); } }, [toast]);
@@ -116,8 +108,6 @@ export default function InterventionsPage() {
     const addr = encodeURIComponent(inter.adresse);
     return `https://www.google.com/maps/search/?api=1&query=${addr}`;
   };
-
-  
 
   // === CHECKBOX GROUP ===
   const CB = ({ label, value, onChange, options = ['fait', 'na', 'oui', 'non'] }: { label: string; value: string | null; onChange: (v: string) => void; options?: string[] }) => (
@@ -397,11 +387,11 @@ export default function InterventionsPage() {
           ))}
         </div>
         <div className="flex items-center gap-[0.5rem] flex-wrap">
-          {[{ id: '', label: 'Tous', cls: 'bg-slate-800 text-white' }, ...Object.entries(TYPE_CONFIG).map(([id, c]) => ({ id, label: c.label, cls: c.bgColor}))].map((t) => (
-            <button key={t.id} onClick={() => setFiltreType(t.id)} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium ${filtreType === t.id ? t.cls : 'bg-white border border-slate-200'}`}>
-              {t.label}
-            </button>
-          ))}
+          <button onClick={() => setFiltreType('')} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium ${filtreType === '' ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200'}`}>Tous</button>
+          <button onClick={() => setFiltreType('INSTALLATION')} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium flex items-center gap-[0.25rem] ${filtreType === 'INSTALLATION' ? 'bg-red-500 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>🔧 Installation</button>
+          <button onClick={() => setFiltreType('LIVRAISON')} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium flex items-center gap-[0.25rem] ${filtreType === 'LIVRAISON' ? 'bg-blue-500 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>🚚 Livraison</button>
+          <button onClick={() => setFiltreType('CUEILLETTE')} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium flex items-center gap-[0.25rem] ${filtreType === 'CUEILLETTE' ? 'bg-yellow-500 text-yellow-900' : 'bg-white border border-slate-200 text-slate-700'}`}>📦 Cueillette</button>
+          <button onClick={() => setFiltreType('TRANSPORT')} className={`px-[0.75rem] py-[0.375rem] rounded-lg text-[0.8125rem] font-medium flex items-center gap-[0.25rem] ${filtreType === 'TRANSPORT' ? 'bg-green-500 text-white' : 'bg-white border border-slate-200 text-slate-700'}`}>🚛 Transport</button>
         </div>
         <input type="text" value={recherche} onChange={(e) => setRecherche(e.target.value)} className="px-[0.75rem] py-[0.5rem] border border-slate-300 rounded-lg text-[0.8125rem] w-full md:w-auto md:min-w-[12rem]" placeholder="Rechercher..."/>
       </div>
