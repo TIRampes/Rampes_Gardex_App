@@ -3,24 +3,33 @@ import { prisma } from '@/lib/prisma';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const updateData: Record<string, unknown> = {};
+    if (body.nom !== undefined) updateData.nom = body.nom;
+    if (body.responsable !== undefined) updateData.responsable = body.responsable || null;
+    if (body.nbHeuresJour !== undefined) updateData.nbHeuresJour = body.nbHeuresJour;
+    if (body.couleur !== undefined) updateData.couleur = body.couleur;
+
+    const equipe = await prisma.equipe.update({ where: { id }, data: updateData });
+    return NextResponse.json(equipe);
+  } catch (error) { console.error('PUT equipe:', error); return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 }); }
+}
+
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const existing = await prisma.equipe.findUnique({
-      where: { id },
-      include: { _count: { select: { planifications: true, interventions: true } } },
+      where: { id }, include: { _count: { select: { planifications: true, interventions: true } } },
     });
-    if (!existing) return NextResponse.json({ error: 'Équipe non trouvée' }, { status: 404 });
-
+    if (!existing) return NextResponse.json({ error: 'Non trouvée' }, { status: 404 });
     if (existing._count.planifications > 0 || existing._count.interventions > 0) {
       await prisma.equipe.update({ where: { id }, data: { actif: false } });
-      return NextResponse.json({ message: 'Équipe désactivée (planifications/interventions liées)' });
+      return NextResponse.json({ message: 'Désactivée' });
     }
-
     await prisma.equipe.delete({ where: { id } });
-    return NextResponse.json({ message: 'Équipe supprimée' });
-  } catch (error) {
-    console.error('DELETE equipe erreur:', error);
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
-  }
+    return NextResponse.json({ message: 'Supprimée' });
+  } catch (error) { console.error('DELETE equipe:', error); return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 }); }
 }

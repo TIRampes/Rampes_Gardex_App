@@ -17,7 +17,9 @@
     "migrate:unites": "ts-node scripts/migrate-unites.ts",
     "migrate:pieces": "ts-node scripts/migrate-pieces.ts",
     "migrate:transactions": "ts-node scripts/migrate-transactions.ts",
+    "migrate:equipes": "ts-node scripts/migrate-equipes.ts",
     "migrate:all": "ts-node scripts/migrateAll.ts",
+    
     "postinstall": "prisma generate"
   },
   "dependencies": {

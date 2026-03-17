@@ -1,22 +1,7 @@
 // ╔══════════════════════════════════════════════════════╗
 // ║   CLIENT MICROSOFT GRAPH - OAuth2 Client Credentials ║
 // ╚══════════════════════════════════════════════════════╝
-//
-// Variables d'environnement requises dans .env :
-//
-//   AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-//   AZURE_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-//   AZURE_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-//   AZURE_MAIL_FROM=attentes@rampesgardex.com
-//
-// Permissions Azure AD (Application) requises :
-//   - Mail.Send
-//
-// Configuration Azure AD :
-//   1. Azure Portal > App registrations > New registration
-//   2. API Permissions > Microsoft Graph > Application > Mail.Send
-//   3. Grant admin consent
-//   4. Certificates & secrets > New client secret
+// Ce module gère l'authentification OAuth2 pour Microsoft Graph et l'envoi d'emails via l'API Graph.
 
 interface GraphTokenResponse {
   access_token: string;

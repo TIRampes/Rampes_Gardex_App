@@ -38,6 +38,7 @@ enum TypeCommande {
   COMMERCIAL
   MULTI_PHASE
   MULTIPLAN
+  MESURE
 }
 
 enum ServiceCommande {
@@ -45,6 +46,7 @@ enum ServiceCommande {
   LIVRAISON
   CUEILLETTE
   TRANSPORT
+  MESURE
 }
 
 enum StatutCommande {
@@ -378,21 +380,40 @@ model Representant {
 // 03. EQUIPE
 // ============================================
 model Equipe {
-  id        String   @id @default(cuid())
-  nom       String   @unique @db.VarChar(100)
-  couleur   String   @default("bg-blue-500") @db.VarChar(50)
-  actif     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  nom          String   @unique @db.VarChar(100)
+  responsable  String?  @db.VarChar(255) // ← AJOUTER
+  nbHeuresJour Int?     @default(8) // ← AJOUTER
+  couleur      String   @default("bg-blue-500") @db.VarChar(50)
+  actif        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   membres        User[]
   planifications Planification[]
   interventions  Intervention[]
   reprises       Reprise[]
+  heuresSemaines EquipeHeureSemaine[] // ← AJOUTER
 
   @@index([nom])
   @@index([actif])
   @@map("equipes")
+}
+
+model EquipeHeureSemaine {
+  id         String   @id @default(cuid())
+  equipeId   String
+  equipe     Equipe   @relation(fields: [equipeId], references: [id], onDelete: Cascade)
+  semaineDu  DateTime
+  semaineFin DateTime
+  jours      Int      @default(5)
+  heures     Int      @default(40)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([equipeId])
+  @@index([semaineDu])
+  @@map("equipe_heure_semaines")
 }
 
 // ============================================
@@ -708,8 +729,12 @@ model Planification {
   id                  String              @id @default(cuid())
   commandeId          String
   commande            Commande            @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-  equipeId            String
-  equipe              Equipe              @relation(fields: [equipeId], references: [id])
+  equipeId            String? // ← RENDRE NULLABLE
+  equipe              Equipe?             @relation(fields: [equipeId], references: [id]) // ← Equipe?
+  chauffeurId         String? // ← AJOUTER
+  chauffeur           Chauffeur?          @relation(fields: [chauffeurId], references: [id]) // ← AJOUTER
+  vehiculeId          String? // ← AJOUTER
+  vehicule            Vehicule?           @relation(fields: [vehiculeId], references: [id]) // ← AJOUTER
   datePlanifiee       DateTime
   heureDebut          String?             @db.VarChar(10)
   heureFin            String?             @db.VarChar(10)
@@ -717,6 +742,8 @@ model Planification {
   representantPresent Boolean             @default(false)
   envoyerAvis         Boolean             @default(false)
   avisEnvoye          Boolean             @default(false)
+  avisClientEnvoye    Boolean             @default(false) // ← AJOUTER
+  avisClientDate      DateTime? // ← AJOUTER
   statut              StatutPlanification @default(PLANIFIEE)
   notes               String?             @db.Text
   createdAt           DateTime            @default(now())
@@ -724,6 +751,8 @@ model Planification {
 
   @@index([commandeId])
   @@index([equipeId])
+  @@index([chauffeurId]) // ← AJOUTER
+  @@index([vehiculeId]) // ← AJOUTER
   @@index([datePlanifiee])
   @@index([statut])
   @@map("planifications")
@@ -1108,14 +1137,15 @@ model Batiment {
 // 20. VEHICULE (inchangé)
 // ============================================
 model Vehicule {
-  id        String         @id @default(cuid())
-  nom       String         @db.VarChar(100)
-  type      String         @db.VarChar(100)
-  plaque    String         @db.VarChar(20)
-  statut    StatutVehicule @default(DISPONIBLE)
-  actif     Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id             String          @id @default(cuid())
+  nom            String          @db.VarChar(100)
+  type           String          @db.VarChar(100)
+  plaque         String          @db.VarChar(20)
+  statut         StatutVehicule  @default(DISPONIBLE)
+  actif          Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  planifications Planification[]
 
   @@index([nom])
   @@index([statut])
@@ -1135,6 +1165,8 @@ model Chauffeur {
   actif     Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
+
+  planifications Planification[]
 
   @@index([nom])
   @@index([statut])
