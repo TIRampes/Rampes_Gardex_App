@@ -16,7 +16,7 @@ export const SERVICE_COULEUR: Record<string, string> = {
   LIVRAISON: 'bg-blue-500',
   CUEILLETTE: 'bg-yellow-500',
   TRANSPORT: 'bg-green-500',
-  MESURE: 'bg-pink-500',
+  MESURE: 'bg-violet-500',
 };
 export const SERVICE_TEXT: Record<string, string> = {
   INSTALLATION: 'text-white',
@@ -239,5 +239,6 @@ export function getDaysInMonth(date: Date): Array<{ day: number; currentMonth: b
   for (let i = 1; i <= rem; i++) days.push({ day: i, currentMonth: false, date: new Date(y, m + 1, i) });
   return days;
 }
-export function needsEquipe(service: string): boolean { return service === 'INSTALLATION' || service === 'MESURE'; }
+export function needsEquipe(service: string): boolean { return service === 'INSTALLATION'; }
 export function needsChauffeur(service: string): boolean { return service === 'LIVRAISON' || service === 'TRANSPORT'; }
+export function needsMesureur(service: string): boolean { return service === 'MESURE'; }

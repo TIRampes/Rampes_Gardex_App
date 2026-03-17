@@ -7,7 +7,7 @@ import {
   MONTH_NAMES, DAY_NAMES_SHORT, SERVICE_COULEUR, SERVICE_TEXT, TYPE_COMMANDE_COULEUR,
   formatDateKey, getDaysInMonth, calculerJoursNecessaires, depasseJournee,
   getProdStatusColor, getAchatStatusColor, getSymbol, getServiceBg, getServiceLabel,
-  getWeekNumber, needsEquipe, needsChauffeur,
+  getWeekNumber, needsEquipe, needsChauffeur, needsMesureur,
 } from '@/app/api/planification/schema';
 
 export default function PlanificationPage() {
@@ -233,11 +233,13 @@ export default function PlanificationPage() {
     const jours = calculerJoursNecessaires(cmdAPlanifier.tempsEstimeInstallation);
     const isInstall = needsEquipe(cmdAPlanifier.service);
     const isTransport = needsChauffeur(cmdAPlanifier.service);
+    const isMesure = needsMesureur(cmdAPlanifier.service);
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-[1rem]">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[28rem]">
           <div className={`p-[1rem] border-b ${getServiceBg(cmdAPlanifier.service)} ${SERVICE_TEXT[cmdAPlanifier.service] || 'text-white'}`}><h2 className="text-[1rem] font-bold">Planifier — {getServiceLabel(cmdAPlanifier.service)}</h2><p className="text-[0.8125rem] opacity-90">{cmdAPlanifier.numero} — {cmdAPlanifier.clientNom}</p></div>
           <div className="p-[1.25rem] space-y-[0.75rem]">
+            {isMesure && <div className="bg-violet-50 p-[0.625rem] rounded-xl text-[0.8125rem] text-violet-700 border border-violet-200">📐 Prise de mesures — Sélectionnez la date et l&apos;heure du rendez-vous</div>}
             <div className="bg-blue-50 p-[0.625rem] rounded-xl text-[0.8125rem] text-blue-600">Temps: <strong>{cmdAPlanifier.tempsEstimeInstallation}h</strong>{jours > 1 && <span className="text-amber-600 ml-[0.5rem]">⚠️ {jours} jours</span>}</div>
             <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Date *</label><input type="date" value={planifForm.date} onChange={(e) => setPlanifForm({ ...planifForm, date: e.target.value })} className="w-full px-[0.75rem] py-[0.5rem] border rounded-xl text-[0.8125rem]"/></div>
             {isInstall && <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Équipe *</label><select value={planifForm.equipeId} onChange={(e) => setPlanifForm({ ...planifForm, equipeId: e.target.value })} className="w-full px-[0.75rem] py-[0.5rem] border rounded-xl bg-white text-[0.8125rem]"><option value="">Choisir...</option>{equipes.map((eq) => <option key={eq.id} value={eq.id}>{eq.nom}</option>)}</select></div>}
@@ -290,7 +292,7 @@ export default function PlanificationPage() {
             <input type="text" placeholder="Rechercher # commande ou client..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[12rem] px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/>
             <select value={filtreSvc} onChange={(e) => setFiltreSvc(e.target.value)} className="px-[0.5rem] py-[0.5rem] border rounded-lg text-[0.8125rem]">
               <option value="">Tous services</option>
-              {['installation', 'livraison', 'cueillette', 'transport'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+              {['installation', 'livraison', 'cueillette', 'transport', 'mesure'].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
             <select value={filtreSemaine} onChange={(e) => setFiltreSemaine(e.target.value)} className="px-[0.5rem] py-[0.5rem] border rounded-lg text-[0.8125rem]">
               <option value="">Toutes les semaines</option>
@@ -421,7 +423,7 @@ export default function PlanificationPage() {
 
       {/* Filtres */}
       <div className="bg-white rounded-xl border border-slate-200 p-[0.625rem] flex flex-wrap items-center gap-[0.625rem]">
-        <div className="flex items-center gap-[0.25rem]"><span className="text-[0.75rem] text-slate-600">Type:</span><select value={filtreType} onChange={(e) => setFiltreType(e.target.value)} className="px-[0.375rem] py-[0.25rem] border rounded text-[0.8125rem]"><option value="">Tous</option><option value="installation">Installation</option><option value="livraison">Livraison</option><option value="cueillette">Cueillette</option><option value="transport">Transport</option></select></div>
+        <div className="flex items-center gap-[0.25rem]"><span className="text-[0.75rem] text-slate-600">Type:</span><select value={filtreType} onChange={(e) => setFiltreType(e.target.value)} className="px-[0.375rem] py-[0.25rem] border rounded text-[0.8125rem]"><option value="">Tous</option><option value="installation">Installation</option><option value="livraison">Livraison</option><option value="cueillette">Cueillette</option><option value="transport">Transport</option><option value="mesure">Mesure</option></select></div>
         <div className="flex items-center gap-[0.25rem]"><span className="text-[0.75rem] text-slate-600">Équipe:</span><select value={filtreEquipe} onChange={(e) => setFiltreEquipe(e.target.value)} className="px-[0.375rem] py-[0.25rem] border rounded text-[0.8125rem]"><option value="">Toutes</option>{equipes.map((eq) => <option key={eq.id} value={eq.id}>{eq.nom}</option>)}</select></div>
         <span className="ml-auto px-[0.5rem] py-[0.25rem] bg-green-500 text-white text-[0.75rem] font-semibold rounded">{stats?.nbNonPlanifiees || nonPlanifiees.length} prêtes</span>
       </div>
