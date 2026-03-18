@@ -1,50 +1,41 @@
-// /lib/auth.ts
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FICHIER: lib/auth.ts                                     ║
+// ║  REMPLACE ton lib/auth.ts existant                        ║
+// ╚══════════════════════════════════════════════════════════╝
+
 import NextAuth from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
-import Credentials from "next-auth/providers/credentials";
+import { prisma } from "@/lib/prisma";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    // Microsoft Entra ID (anciennement Azure AD)
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
       issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER,
     }),
-    // Authentification par email/mot de passe (pour les comptes locaux)
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Mot de passe", type: "password" },
-      },
-      async authorize(credentials) {
-        // TODO: Vérifier les credentials dans la base de données avec Prisma
-        // const user = await prisma.user.findUnique({ where: { email: credentials.email } });
-        // if (user && bcrypt.compareSync(credentials.password, user.password)) {
-        //   return user;
-        // }
-        
-        if (credentials?.email && credentials?.password) {
-          // Simulation pour test - À remplacer par la vraie vérification
-          return {
-            id: "1",
-            name: "Utilisateur Test",
-            email: credentials.email as string,
-            role: "ADMIN",
-          };
-        }
-        return null;
-      },
-    }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as any).role || "EMPLOYE";
-      }
-      if (account) {
+    async jwt({ token, account }) {
+      // Login Microsoft — chercher le rôle dans la BD par email
+      if (account?.provider === "microsoft-entra-id" && token.email) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email },
+            include: { equipe: { select: { id: true, nom: true } } },
+          });
+          if (dbUser) {
+            token.id = dbUser.id;
+            token.role = dbUser.role;
+            token.equipeId = dbUser.equipeId;
+            token.equipeNom = dbUser.equipe?.nom || null;
+          } else {
+            // Email pas dans la table users → EMPLOYE par défaut
+            token.role = "EMPLOYE";
+          }
+        } catch {
+          token.role = "EMPLOYE";
+        }
         token.accessToken = account.access_token;
       }
       return token;
@@ -52,7 +43,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).id = token.id;
-        (session.user as any).role = token.role;
+        (session.user as any).role = token.role || "EMPLOYE";
+        (session.user as any).equipeId = token.equipeId || null;
+        (session.user as any).equipeNom = token.equipeNom || null;
         (session.user as any).accessToken = token.accessToken;
       }
       return session;
