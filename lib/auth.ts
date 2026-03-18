@@ -1,6 +1,7 @@
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FICHIER: lib/auth.ts                                     ║
 // ║  REMPLACE ton lib/auth.ts existant                        ║
+// ║  Microsoft only + MFA flag dans le token                  ║
 // ╚══════════════════════════════════════════════════════════╝
 
 import NextAuth from "next-auth";
@@ -17,7 +18,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, account }) {
-      // Login Microsoft — chercher le rôle dans la BD par email
       if (account?.provider === "microsoft-entra-id" && token.email) {
         try {
           const dbUser = await prisma.user.findUnique({
@@ -29,12 +29,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.role = dbUser.role;
             token.equipeId = dbUser.equipeId;
             token.equipeNom = dbUser.equipe?.nom || null;
+            // MFA: distinguer "configuré" vs "à configurer"
+            const mfaEnabled = (dbUser as any).mfaEnabled === true;
+            const mfaSecret = (dbUser as any).mfaSecret;
+            token.mfaRequired = mfaEnabled && !!mfaSecret;      // a un secret → demander le code
+            token.mfaSetupNeeded = mfaEnabled && !mfaSecret;     // pas de secret → doit scanner QR
           } else {
-            // Email pas dans la table users → EMPLOYE par défaut
             token.role = "EMPLOYE";
+            token.mfaRequired = false;
+            token.mfaSetupNeeded = false;
           }
         } catch {
           token.role = "EMPLOYE";
+          token.mfaRequired = false;
+          token.mfaSetupNeeded = false;
         }
         token.accessToken = account.access_token;
       }
@@ -47,6 +55,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         (session.user as any).equipeId = token.equipeId || null;
         (session.user as any).equipeNom = token.equipeNom || null;
         (session.user as any).accessToken = token.accessToken;
+        (session.user as any).mfaRequired = token.mfaRequired || false;
+        (session.user as any).mfaSetupNeeded = token.mfaSetupNeeded || false;
       }
       return session;
     },

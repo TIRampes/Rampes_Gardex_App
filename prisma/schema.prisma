@@ -428,6 +428,8 @@ model User {
   role      UserRole @default(EMPLOYE)
   telephone String?  @db.VarChar(20)
   equipeId  String?
+  mfaSecret   String?  @db.VarChar(255)
+  mfaEnabled  Boolean  @default(false)
   equipe    Equipe?  @relation(fields: [equipeId], references: [id])
   actif     Boolean  @default(true)
   createdAt DateTime @default(now())

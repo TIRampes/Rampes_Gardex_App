@@ -1,6 +1,7 @@
 // ╔══════════════════════════════════════════════════════════╗
-// ║  FICHIER: proxy.ts (ou middleware.ts selon ton setup)      ║
+// ║  FICHIER: proxy.ts                                        ║
 // ║  REMPLACE ton proxy.ts existant                           ║
+// ║  Ajout: vérification MFA après login Microsoft            ║
 // ╚══════════════════════════════════════════════════════════╝
 
 import { NextResponse } from 'next/server';
@@ -8,13 +9,13 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { routeAutorisee } from '@/lib/auth-config';
 
-const PUBLIC_ROUTES = ['/api/auth', '/_next', '/favicon.ico', '/login'];
+const PUBLIC_ROUTES = ['/api/auth', '/_next', '/favicon.ico', '/login', '/mfa'];
 const CRON_ROUTES = ['/api/attentes/cron', '/api/production/cron'];
 
 export default auth((req) => {
   const pathname = req.nextUrl.pathname;
 
-  // 1️⃣ Routes publiques
+  // 1️⃣ Routes publiques + MFA page
   if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
     return NextResponse.next();
   }
@@ -24,7 +25,7 @@ export default auth((req) => {
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Non autorisé — secret CRON invalide' }, { status: 401 });
+      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
     }
     return NextResponse.next();
   }
@@ -43,19 +44,32 @@ export default auth((req) => {
   const user = (req as any).auth?.user;
 
   if (!user) {
-    // Pas connecté → login
     if (pathname !== '/login' && pathname !== '/') {
       return NextResponse.redirect(new URL('/login', req.url));
     }
     return NextResponse.next();
   }
 
-  // 5️⃣ NOUVEAU: Vérification rôle pour les routes dashboard
+  // 5️⃣ Vérification MFA
+  const mfaRequired = (user as any).mfaRequired === true;       // a un secret → code requis
+  const mfaSetupNeeded = (user as any).mfaSetupNeeded === true; // pas de secret → scanner QR
+  const mfaVerified = req.cookies.get('mfa-verified')?.value === 'true';
+
+  if (pathname.startsWith('/dashboard')) {
+    // Doit scanner le QR d'abord
+    if (mfaSetupNeeded && !mfaVerified) {
+      return NextResponse.redirect(new URL('/mfa/setup', req.url));
+    }
+    // A un secret mais pas encore vérifié → page code
+    if (mfaRequired && !mfaVerified) {
+      return NextResponse.redirect(new URL('/mfa', req.url));
+    }
+  }
+
+  // 6️⃣ Vérification rôle pour les routes dashboard
   if (pathname.startsWith('/dashboard/')) {
     const role = (user as any).role || 'EMPLOYE';
-
     if (!routeAutorisee(role, pathname)) {
-      // Pas le droit → retour au dashboard avec message
       const url = new URL('/dashboard/dashboard', req.url);
       url.searchParams.set('unauthorized', '1');
       return NextResponse.redirect(url);
@@ -70,6 +84,7 @@ export const config = {
     '/api/:path*',
     '/dashboard/:path*',
     '/login',
+    '/mfa',
     '/',
   ],
 };

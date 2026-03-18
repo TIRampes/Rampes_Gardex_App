@@ -19,7 +19,6 @@
     "migrate:transactions": "ts-node scripts/migrate-transactions.ts",
     "migrate:equipes": "ts-node scripts/migrate-equipes.ts",
     "migrate:all": "ts-node scripts/migrateAll.ts",
-    
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -39,6 +38,8 @@
     "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
+    "otpauth": "^9.5.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.71.2",
@@ -53,6 +54,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^20.19.37",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^10.0.0",
