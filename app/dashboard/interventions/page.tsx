@@ -105,9 +105,9 @@ export default function InterventionsPage() {
 
   // === MAP URL ===
   const getMapUrl = (inter: InterventionView) => {
-    const addr = encodeURIComponent(inter.adresse);
-    return `https://www.google.com/maps/search/?api=1&query=${addr}`;
-  };
+  const fullAddress = `${inter.adresse}${inter.clientVille ? ', ' + inter.clientVille : ''}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+};
 
   // === CHECKBOX GROUP ===
   const CB = ({ label, value, onChange, options = ['fait', 'na', 'oui', 'non'] }: { label: string; value: string | null; onChange: (v: string) => void; options?: string[] }) => (
