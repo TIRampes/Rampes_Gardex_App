@@ -168,14 +168,14 @@ export default function ReprisesPage() {
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-[0.8125rem]">
-          <thead className="bg-slate-800 text-white">
+          <thead className="bg-slate-800 text-black/50">
             <tr>
               <th className="px-[0.75rem] py-[0.75rem] text-left"># Commande</th>
               <th className="px-[0.75rem] py-[0.75rem] text-left">Client / Ville</th>
               <th className="px-[0.75rem] py-[0.75rem] text-center">Type</th>
-              <th className="px-[0.75rem] py-[0.75rem] text-center">Nb</th>
+              <th className="px-[0.75rem] py-[0.75rem] text-center">Nombre</th>
               <th className="px-[0.75rem] py-[0.75rem] text-center">Priorité</th>
-              <th className="px-[0.75rem] py-[0.75rem] text-center hidden md:table-cell">Date</th>
+              <th className="px-[0.75rem] py-[0.75rem] text-center hidden md:table-cell">Date prévue</th>
               <th className="px-[0.75rem] py-[0.75rem] text-center hidden lg:table-cell">Note</th>
               {!isHistorique && <th className="px-[0.75rem] py-[0.75rem] text-center w-[3rem]"></th>}
               {isHistorique && <th className="px-[0.75rem] py-[0.75rem] text-center">Complétée le</th>}

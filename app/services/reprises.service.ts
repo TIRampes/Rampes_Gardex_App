@@ -6,6 +6,46 @@ import { TYPE_REPRISE_MAP } from '@/app/api/reprises/schema';
 // ║        SERVICE REPRISES (SERVEUR)         ║
 // ╚══════════════════════════════════════════╝
 
+/**
+ * Fonction interne pour créer les records manquants dans la table Reprise
+ * à partir des commandes marquées comme "reprise"
+ */
+async function synchroniserCommandesReprises() {
+  // On cherche les commandes marquées reprise qui n'ont AUCUNE entrée dans la table Reprise
+  const commandesSansDossier = await prisma.commande.findMany({
+    where: {
+      reprise: true,
+      reprises: { none: {} } 
+    },
+    select: {
+      id: true,
+      clientId: true,
+      updatedAt: true
+    }
+  });
+
+  if (commandesSansDossier.length > 0) {
+    // Création des dossiers de reprise manquants
+    await Promise.all(
+      commandesSansDossier.map((cmd) =>
+        prisma.reprise.create({
+          data: {
+            commandeId: cmd.id,
+            clientId: cmd.clientId,
+            typeReprise: 'AUTRE',
+            raison: 'Automatique : Commande marquée comme reprise',
+            dateReprise: new Date(),
+            statut: 'PLANIFIEE',
+            priorite: 'MOYENNE',
+            nombreReprises: 1,
+            completee: false,
+          },
+        })
+      )
+    );
+  }
+}
+
 function mapReprise(r: any): RepriseView {
   return {
     id: r.id,
@@ -52,6 +92,10 @@ export async function getReprisesActives(filtres?: {
   priorite?: string;
   periode?: string;
 }): Promise<RepriseView[]> {
+  
+  // Sincroniser avant de récupérer les données
+  await synchroniserCommandesReprises();
+
   const where: any = { completee: false };
 
   if (filtres?.typeReprise) where.typeReprise = filtres.typeReprise;
@@ -72,7 +116,6 @@ export async function getReprisesActives(filtres?: {
 
   let result = data.map(mapReprise);
 
-  // Filtrage période côté serveur
   if (filtres?.periode) {
     const now = new Date();
     result = result.filter((r) => {
@@ -124,6 +167,10 @@ export async function getStatsReprises(filtresPeriode?: {
   periode?: string;
   annee?: number;
 }): Promise<StatsReprises> {
+  
+  // Sincroniser pour que les stats incluent les nouvelles commandes cochées
+  await synchroniserCommandesReprises();
+
   const toutes = await prisma.reprise.findMany({
     select: { typeReprise: true, completee: true, nombreReprises: true, dateReprise: true, commande: { select: { numero: true } } },
   });
@@ -134,7 +181,6 @@ export async function getStatsReprises(filtresPeriode?: {
   const totalToutes = toutes.length;
   const commandesMultiReprises = toutes.filter((r) => r.nombreReprises > 1).length;
 
-  // Filtrer pour stats par type selon période
   let dataFiltree = toutes;
   if (filtresPeriode?.periode) {
     dataFiltree = toutes.filter((r) => {
@@ -169,7 +215,6 @@ export async function getStatsReprises(filtresPeriode?: {
     }))
     .sort((a, b) => b.count - a.count);
 
-  // Par période (toujours sur toutes)
   const isDay = (d: Date) => d.toDateString() === now.toDateString();
   const isWeek = (d: Date) => {
     const debut = new Date(now);
