@@ -291,7 +291,6 @@ export default function InterventionsPage() {
           <div className="p-[1rem] border-t border-slate-200 bg-slate-50 flex items-center justify-between">
             <button onClick={() => setShowForm(false)} className="px-[1rem] py-[0.5rem] text-slate-600 hover:bg-slate-100 rounded-lg text-[0.875rem]">Annuler</button>
             <div className="flex gap-[0.5rem]">
-              <button onClick={() => handleSauvegarder(false)} className="px-[1rem] py-[0.5rem] border border-slate-300 rounded-lg flex items-center gap-[0.375rem] text-[0.875rem]">💾 Brouillon</button>
               <button onClick={() => handleSauvegarder(true)} className={`px-[1.5rem] py-[0.5rem] ${tc.headerBg} hover:opacity-90 text-white font-medium rounded-lg flex items-center gap-[0.375rem] text-[0.875rem]`}>✓ Terminer</button>
             </div>
           </div>
