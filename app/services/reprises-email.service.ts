@@ -1,198 +1,165 @@
+// app/services/reprises-email.service.ts
+
 import { sendMailViaGraph } from '@/lib/microsoft-graph';
 import { prisma } from '@/lib/prisma';
 import { TYPE_REPRISE_MAP } from '@/app/api/reprises/schema';
 
-// ╔══════════════════════════════════════════════════════════╗
-// ║   EMAIL CONSEILS & PRÉVENTION — Microsoft Graph          ║
-// ╚══════════════════════════════════════════════════════════╝
-
 /**
- * Envoie un email de conseils & prévention à tous les employés
- * Appelé par le CRON tous les 3 jours
+ * Service pour envoyer les conseils de prévention basés sur les données réelles des reprises
  */
 export async function envoyerConseilsPrevention(): Promise<{
   envoyes: number;
   erreurs: string[];
 }> {
-  // 1. Récupérer les stats de reprises récentes (30 derniers jours)
+  // 1. Récupérer les données des 30 derniers jours pour l'analyse
   const depuis = new Date();
   depuis.setDate(depuis.getDate() - 30);
 
   const reprises = await prisma.reprise.findMany({
     where: { dateReprise: { gte: depuis } },
-    select: { typeReprise: true, raison: true, nombreReprises: true },
+    select: { typeReprise: true, raison: true }
   });
 
   if (reprises.length === 0) {
-    return { envoyes: 0, erreurs: ['Aucune reprise dans les 30 derniers jours'] };
+    return { envoyes: 0, erreurs: ['Aucune reprise enregistrée sur les 30 derniers jours. Analyse impossible.'] };
   }
 
-  // 2. Calculer les stats par type
-  const typeMap = new Map<string, { count: number; raisons: string[] }>();
-  for (const r of reprises) {
-    const existing = typeMap.get(r.typeReprise);
-    if (existing) {
-      existing.count++;
-      if (r.raison && existing.raisons.length < 3) existing.raisons.push(r.raison);
-    } else {
-      typeMap.set(r.typeReprise, { count: 1, raisons: r.raison ? [r.raison] : [] });
-    }
-  }
+  // 2. Calcul des statistiques par type
+  const typeMap = new Map<string, { count: number }>();
+  reprises.forEach(r => {
+    typeMap.set(r.typeReprise, { count: (typeMap.get(r.typeReprise)?.count || 0) + 1 });
+  });
 
   const statsParType = Array.from(typeMap.entries())
     .map(([type, data]) => ({
       type,
       label: TYPE_REPRISE_MAP[type]?.label || type,
       icone: TYPE_REPRISE_MAP[type]?.icone || '📋',
-      ...data,
+      count: data.count,
       pourcentage: Math.round((data.count / reprises.length) * 100),
     }))
     .sort((a, b) => b.count - a.count);
 
-  // 3. Récupérer tous les utilisateurs actifs
+  // 3. Récupérer tous les utilisateurs actifs pour l'envoi
   const users = await prisma.user.findMany({
     where: { actif: true },
-    select: { email: true, nom: true, prenom: true },
+    select: { email: true, nom: true, prenom: true }
   });
 
   if (users.length === 0) {
-    return { envoyes: 0, erreurs: ['Aucun utilisateur actif trouvé'] };
+    return { envoyes: 0, erreurs: ['Aucun employé actif trouvé dans la base de données.'] };
   }
 
-  // 4. Générer le HTML
-  const html = genererEmailConseils(reprises.length, statsParType);
+  // 4. Générer le contenu de l'email
+  const html = genererEmailHTMLConseils(reprises.length, statsParType);
+  let envoyesCount = 0;
+  const erreursList: string[] = [];
 
-  // 5. Envoyer à chaque utilisateur
-  let envoyes = 0;
-  const erreurs: string[] = [];
-
+  // 5. Boucle d'envoi individuelle avec validation d'email
   for (const user of users) {
+    const emailAUtiliser = user.email ? user.email.trim() : "";
+
+    // VALIDATION : Si l'email ne contient pas d'arobase ou est un nom, on ignore pour éviter l'erreur 400
+    if (!emailAUtiliser || !emailAUtiliser.includes('@')) {
+      const msg = `Format d'email invalide ignoré pour ${user.prenom} ${user.nom}: "${emailAUtiliser}"`;
+      console.error(`⚠️ ${msg}`);
+      erreursList.push(msg);
+      continue; 
+    }
+
     try {
       const result = await sendMailViaGraph({
-        to: user.email,
+        to: emailAUtiliser,
         toName: `${user.prenom} ${user.nom}`,
-        subject: `🛡️ Conseils & Prévention — ${reprises.length} reprise(s) ce mois | Rampes Gardex`,
+        subject: `🛡️ Prévention : Rapport mensuel sur les ${reprises.length} reprises | Rampes Gardex`,
         htmlBody: html,
-        importance: reprises.length > 10 ? 'high' : 'normal',
+        importance: reprises.length > 5 ? 'high' : 'normal'
       });
-      if (result.success) envoyes++;
-      else erreurs.push(`${user.email}: ${result.error}`);
+
+      if (result.success) {
+        envoyesCount++;
+      } else {
+        erreursList.push(`${emailAUtiliser}: ${result.error}`);
+      }
     } catch (e: any) {
-      erreurs.push(`${user.email}: ${e.message}`);
+      erreursList.push(`${emailAUtiliser}: ${e.message}`);
     }
   }
 
-  return { envoyes, erreurs };
+  console.log(`✅ Fin de l'envoi de prévention: ${envoyesCount} réussis, ${erreursList.length} erreurs.`);
+  return { envoyes: envoyesCount, erreurs: erreursList };
 }
 
-function genererEmailConseils(
-  totalReprises: number,
-  statsParType: Array<{ type: string; label: string; icone: string; count: number; pourcentage: number; raisons: string[] }>
-): string {
-  const date = new Date().toLocaleDateString('fr-CA', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+/**
+ * Générateur de Template HTML Professionnel
+ */
+function genererEmailHTMLConseils(total: number, stats: any[]): string {
+  const dateStr = new Date().toLocaleDateString('fr-CA', { 
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
   });
+  
+  const top3 = stats.slice(0, 3);
 
-  const top3 = statsParType.slice(0, 3);
-
-  const conseilsParType: Record<string, string[]> = {
-    ERREURS_MESURE: [
-      'Double vérification obligatoire par un second mesureur',
-      'Photos systématiques de chaque point de mesure',
-      'Formulaire standardisé avec checklist des points critiques',
-    ],
-    ERREURS_PRODUCTION: [
-      'Validation croisée bon de coupe vs commande',
-      'Contrôle dimensionnel post-coupe systématique',
-      'Calibration quotidienne des machines',
-    ],
-    MAUVAISE_COULEUR: [
-      'Code couleur standardisé au lieu de descriptions textuelles',
-      'Confirmation client avec échantillon physique',
-      'Étiquetage couleur + code sur chaque lot',
-    ],
-    PIECES_GRAFIGNEES: [
-      'Emballage renforcé coins et surfaces',
-      'Formation manipulation des pièces finies',
-      'Inspection visuelle avant expédition',
-    ],
-    QUINCAILLERIE_MANQUANTE: [
-      'Checklist de quincaillerie par type de commande',
-      'Zone de préparation dédiée avec bacs identifiés',
-      'Vérification en binôme avant emballage',
-    ],
-  };
-
-  const lignesTypes = top3.map((t) => {
-    const conseils = conseilsParType[t.type] || [
-      'Analyser les causes racines de ce type de reprise',
-      'Mettre en place une procédure de vérification',
-      'Former les équipes sur les bonnes pratiques',
-    ];
-    return `
-      <tr>
-        <td style="padding: 20px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
-          <div style="display: flex; align-items: flex-start; gap: 12px;">
-            <span style="font-size: 28px;">${t.icone}</span>
-            <div style="flex: 1;">
-              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <strong style="font-size: 15px; color: #1e293b;">${t.label}</strong>
-                <span style="background: #fee2e2; color: #991b1b; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;">${t.count} cas (${t.pourcentage}%)</span>
-              </div>
-              <p style="font-size: 13px; color: #475569; margin: 0 0 10px 0; font-weight: 600;">Mesures préventives recommandées :</p>
-              <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #334155; line-height: 1.8;">
-                ${conseils.map((c) => `<li>${c}</li>`).join('')}
-              </ul>
-            </div>
-          </div>
-        </td>
-      </tr>`;
-  }).join('');
-
-  return `<!DOCTYPE html>
-<html lang="fr">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:Calibri,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
-  <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-      <tr><td style="background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:16px 16px 0 0;padding:32px 36px;text-align:center;">
-        <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;"><tr>
-          <td style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#1e293b;font-weight:900;font-size:20px;padding:10px 24px;border-radius:12px;letter-spacing:1.5px;">RAMPES GARDEX</td>
-        </tr></table>
-        <h1 style="color:white;font-size:22px;margin:20px 0 4px;font-weight:700;">🛡️ Conseils & Prévention</h1>
-        <p style="color:#94a3b8;font-size:13px;margin:0;">${date} — Rapport automatique</p>
-      </td></tr>
-    </table>
-
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-      <tr><td style="background:white;padding:32px 36px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
-        <p style="font-size:15px;color:#334155;margin:0 0 6px;">Bonjour à toute l'équipe,</p>
-        <p style="font-size:14px;color:#64748b;margin:0 0 24px;line-height:1.7;">
-          Au cours des 30 derniers jours, <strong style="color:#dc2626;font-size:16px;">${totalReprises}</strong> reprise(s) ont été enregistrées.
-          Voici les types les plus fréquents et les mesures préventives recommandées.
+  const lignesTypes = top3.map(t => `
+    <tr>
+      <td style="padding: 20px; border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+          <span style="font-size: 24px;">${t.icone}</span>
+          <strong style="font-size: 16px; color: #1e293b;">${t.label}</strong>
+          <span style="margin-left: auto; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold;">
+            ${t.count} cas (${t.pourcentage}%)
+          </span>
+        </div>
+        <p style="margin: 5px 0 0 0; color: #475569; font-size: 14px; line-height: 1.5;">
+          <strong>Mesure recommandée :</strong> Sensibilisation de l'équipe sur ce point et vérification systématique avant l'étape suivante.
         </p>
+      </td>
+    </tr>
+  `).join('');
 
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;border-collapse:separate;border-spacing:0;">
-          <tr><td style="background:#fef2f2;padding:14px 20px;border-bottom:2px solid #fecaca;">
-            <strong style="font-size:14px;color:#991b1b;text-transform:uppercase;letter-spacing:0.5px;">Top ${top3.length} — Types de reprises les plus fréquents</strong>
-          </td></tr>
-          ${lignesTypes}
-        </table>
+  return `
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head><meta charset="UTF-8"></head>
+    <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Segoe UI', Arial, sans-serif;">
+      <div style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: #ffffff; padding: 40px 30px; text-align: center;">
+          <div style="background: #fbbf24; color: #1e293b; display: inline-block; padding: 8px 20px; border-radius: 8px; font-weight: 900; font-size: 14px; letter-spacing: 1px; margin-bottom: 15px;">
+            RAMPES GARDEX
+          </div>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 700;">🛡️ CONSEILS & PRÉVENTION</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.8; font-size: 14px;">${dateStr}</p>
+        </div>
 
-        <table role="presentation" cellspacing="0" cellpadding="0" style="margin:28px auto 0;">
-          <tr><td style="background:linear-gradient(135deg,#0d9488,#0f766e);border-radius:10px;padding:14px 32px;text-align:center;">
-            <span style="color:white;font-size:14px;font-weight:700;">Ensemble, réduisons les reprises — Merci pour votre vigilance !</span>
-          </td></tr>
-        </table>
-      </td></tr>
-    </table>
+        <!-- Body -->
+        <div style="padding: 30px;">
+          <p style="font-size: 16px; color: #334155;">Bonjour à toute l'équipe,</p>
+          <p style="font-size: 14px; color: #475569; line-height: 1.6;">
+            Dans notre démarche d'amélioration continue, nous avons analysé les <strong>${total} reprises</strong> de ce mois-ci. 
+            Voici les 3 domaines nécessitant une vigilance accrue pour réduire les erreurs :
+          </p>
 
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-      <tr><td style="background:#1e293b;border-radius:0 0 16px 16px;padding:24px 36px;text-align:center;">
-        <p style="color:#94a3b8;font-size:12px;margin:0 0 4px;">Ce message a été envoyé automatiquement (tous les 3 jours) par le système Rampes Gardex via Microsoft 365.</p>
-        <p style="color:#475569;font-size:11px;margin:0;">© ${new Date().getFullYear()} Rampes Gardex inc. — Tous droits réservés</p>
-      </td></tr>
-    </table>
-  </div>
-</body></html>`;
+          <table width="100%" cellspacing="0" cellpadding="0" style="margin-top: 20px; border: 1px solid #e2e8f0; border-radius: 8px; border-collapse: separate; overflow: hidden;">
+            ${lignesTypes}
+          </table>
+
+          <div style="margin-top: 30px; padding: 20px; background-color: #f0fdf4; border-radius: 12px; text-align: center; border: 1px solid #bbf7d0;">
+            <strong style="color: #166534; font-size: 14px;">"La qualité, c'est de bien faire les choses même quand personne ne regarde."</strong>
+            <p style="margin: 5px 0 0 0; color: #15803d; font-size: 13px;">Travaillons ensemble pour viser le zéro erreur.</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
+            Ce rapport automatisé est envoyé tous les 3 jours par le système ERP Rampes Gardex.<br>
+            © ${new Date().getFullYear()} Rampes Gardex inc. — Tous droits réservés.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
