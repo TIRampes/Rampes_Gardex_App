@@ -19,6 +19,7 @@ export default function NonConformitesPage() {
   const [editingNc, setEditingNc] = useState(null);
   const [selectedNc, setSelectedNc] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [stats, setStats] = useState([]);
 
   const fetchNonConformites = async () => {
     setLoading(true);
@@ -71,6 +72,17 @@ export default function NonConformitesPage() {
     fetchNonConformites();
   };
 
+  const fetchStats = async () => {
+  const res = await fetch('/api/non-conformites/stats');
+  const data = await res.json();
+  setStats(data);
+};
+
+useEffect(() => {
+  fetchNonConformites();
+  fetchStats(); // Chargez aussi les stats
+}, []);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -109,6 +121,7 @@ export default function NonConformitesPage() {
           >
             <Plus size={20} /> Nouvelle non-conformité
           </button>
+          
         </div>
       </div>
 
