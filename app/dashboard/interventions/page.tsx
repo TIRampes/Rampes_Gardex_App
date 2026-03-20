@@ -320,7 +320,7 @@ export default function InterventionsPage() {
               <div className="bg-slate-50 rounded-xl p-[0.75rem]"><p className="text-[0.6875rem] text-slate-500">Équipe</p><p className="font-semibold text-[0.875rem]">{selected.equipeNom || '—'}</p></div>
               <div className="bg-slate-50 rounded-xl p-[0.75rem]"><p className="text-[0.6875rem] text-slate-500">Formulaire</p><p className="font-semibold text-[0.875rem]">{selected.formulaireComplete ? '✓ Complété' : '— Non'}</p></div>
             </div>
-            <div className="bg-slate-50 rounded-xl p-[0.75rem]"><p className="text-[0.6875rem] text-slate-500">Adresse</p><p className="font-medium">{selected.adresse}</p></div>
+            <div className="bg-slate-50 rounded-xl p-[0.75rem]"><p className="text-[0.6875rem] text-slate-500">Adresse</p><p className="font-medium">  {selected.adresse  || "Adresse non spécifiée"}</p></div>
             {/* Photos */}
             {selected.photos.length > 0 && (
               <div><h3 className="font-bold text-slate-800 mb-[0.5rem] text-[0.9375rem]">📷 Photos ({selected.photos.length})</h3>
