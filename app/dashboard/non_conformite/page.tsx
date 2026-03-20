@@ -222,9 +222,9 @@ export default function NonConformitesPage() {
 
           <button
             onClick={() => { setEditingNc(null); setActiveModal('nc'); }}
-            className="bg-slate-900 text-white font-black px-6 py-3 rounded-2xl flex items-center gap-3 shadow-xl hover:bg-slate-800 transition-all active:scale-95"
+            className="bg-slate-900 text-white font-black px-6 py-3 rounded-2xl uppercase flex items-center gap-3 shadow-xl hover:bg-slate-800 transition-all active:scale-95"
           >
-            <Plus size={22} /> NOUVELLE NON-CONFORMITE
+            <Plus size={22} /> nouvelle non-conformité
           </button>
         </div>
       </div>
