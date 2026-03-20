@@ -1,198 +1,101 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Icon } from '@/app/components/icons/Icon';
-
-interface Departement {
-  id: string;
-  nom: string;
-}
-
-interface Type {
-  id: string;
-  nom: string;
-  departementId: string;
-  departement?: Departement;
-}
+import { X, Tag, List, Plus, Edit3, Trash2 } from 'lucide-react';
 
 export default function TypeModal({ isOpen, onClose }) {
-  const [types, setTypes] = useState<Type[]>([]);
-  const [departements, setDepartements] = useState<Departement[]>([]);
+  const [types, setTypes] = useState([]);
+  const [departements, setDepartements] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState<Type | null>(null);
+  const [editing, setEditing] = useState(null);
   const [formNom, setFormNom] = useState('');
   const [formDepartementId, setFormDepartementId] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
-  const fetchTypes = async () => {
+  const fetchAll = async () => {
     setLoading(true);
-    const res = await fetch('/api/types');
-    const data = await res.json();
-    setTypes(data);
+    try {
+      const [tRes, dRes] = await Promise.all([fetch('/api/types'), fetch('/api/departements')]);
+      setTypes(await tRes.json());
+      setDepartements(await dRes.json());
+    } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  const fetchDepartements = async () => {
-    const res = await fetch('/api/departements');
-    const data = await res.json();
-    setDepartements(data);
-  };
+  useEffect(() => { if (isOpen) fetchAll(); }, [isOpen]);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchTypes();
-      fetchDepartements();
-    }
-  }, [isOpen]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formNom.trim() || !formDepartementId) return;
 
-    if (editing) {
-      await fetch(`/api/types/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nom: formNom, departementId: formDepartementId }),
-      });
-    } else {
-      await fetch('/api/types', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nom: formNom, departementId: formDepartementId }),
-      });
-    }
+    const url = editing ? `/api/types/${editing.id}` : '/api/types';
+    await fetch(url, {
+      method: editing ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nom: formNom, departementId: formDepartementId }),
+    });
+
     setFormNom('');
     setFormDepartementId('');
     setEditing(null);
-    fetchTypes();
-  };
-
-  const handleEdit = (type: Type) => {
-    setEditing(type);
-    setFormNom(type.nom);
-    setFormDepartementId(type.departementId);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce type ?')) return;
-    await fetch(`/api/types/${id}`, { method: 'DELETE' });
-    fetchTypes();
-  };
-
-  const handleCancel = () => {
-    setEditing(null);
-    setFormNom('');
-    setFormDepartementId('');
+    fetchAll();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-800 text-white flex items-center justify-between">
-          <h2 className="text-xl font-bold">Gestion des types de non-conformité</h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-lg">
-            <Icon name="x" size={24} />
-          </button>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[250] p-4">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95">
+        <div className="p-6 bg-slate-900 text-white flex items-center justify-between rounded-t-[2.5rem]">
+          <div className="flex items-center gap-3">
+            <Tag className="text-amber-500" size={24}/>
+            <h2 className="text-xl font-black uppercase">Types de Non-Conformité</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X/></button>
         </div>
 
-        {/* Liste */}
         <div className="flex-1 overflow-y-auto p-6">
-          {loading ? (
-            <div className="text-center py-8">Chargement...</div>
-          ) : (
-            <div className="space-y-4">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-semibold text-slate-700">Type</th>
-                    <th className="px-4 py-2 text-left font-semibold text-slate-700">Département</th>
-                    <th className="px-4 py-2 text-center w-32">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {types.map((type) => (
-                    <tr key={type.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-3">{type.nom}</td>
-                      <td className="px-4 py-3">{type.departement?.nom || '-'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() => handleEdit(type)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                            title="Modifier"
-                          >
-                            <Icon name="edit" size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(type.id)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                            title="Supprimer"
-                          >
-                            <Icon name="x" size={18} />
-                          </button>
+          <div className="border border-slate-100 rounded-3xl overflow-hidden">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-6 py-4 italic">Type de défaut</th>
+                  <th className="px-6 py-4">Secteur / Dépt</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {types.map((type) => (
+                  <tr key={type.id} className={`hover:bg-slate-50 ${deletingId === type.id ? 'bg-red-50' : ''}`}>
+                    <td className="px-6 py-4 font-bold text-slate-700 uppercase tracking-tight">{type.nom}</td>
+                    <td className="px-6 py-4"><span className="bg-slate-100 px-2 py-1 rounded text-[10px] font-bold uppercase">{type.departement?.nom || '-'}</span></td>
+                    <td className="px-6 py-4 text-right">
+                      {deletingId === type.id ? (
+                        <button onClick={async () => { await fetch(`/api/types/${type.id}`, {method: 'DELETE'}); setDeletingId(null); fetchAll(); }} className="text-red-500 font-black text-[10px] uppercase">Confirmer</button>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => {setEditing(type); setFormNom(type.nom); setFormDepartementId(type.departementId);}} className="text-slate-400 hover:text-amber-500"><Edit3 size={16}/></button>
+                          <button onClick={() => setDeletingId(type.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {types.length === 0 && (
-                <p className="text-center text-slate-500 py-4">Aucun type</p>
-              )}
-            </div>
-          )}
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Formulaire d'ajout/édition */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
-          <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                {editing ? 'Modifier le type' : 'Nouveau type'}
-              </label>
-              <input
-                type="text"
-                value={formNom}
-                onChange={(e) => setFormNom(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-400"
-                placeholder="Nom du type"
-                required
-              />
-            </div>
-            <div className="w-64">
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Département</label>
-              <select
-                value={formDepartementId}
-                onChange={(e) => setFormDepartementId(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg bg-white"
-                required
-              >
-                <option value="">Sélectionner</option>
-                {departements.map(d => (
-                  <option key={d.id} value={d.id}>{d.nom}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              {editing && (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100"
-                >
-                  Annuler
-                </button>
-              )}
-              <button
-                type="submit"
-                className="px-6 py-2 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 font-semibold rounded-lg hover:shadow-md"
-              >
-                {editing ? 'Modifier' : 'Ajouter'}
-              </button>
-            </div>
+        <div className="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem]">
+          <form onSubmit={handleSubmit} className="flex gap-3">
+            <input type="text" value={formNom} onChange={(e) => setFormNom(e.target.value)} className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-bold" placeholder="Nom du type..." required />
+            <select value={formDepartementId} onChange={(e) => setFormDepartementId(e.target.value)} className="w-48 px-4 py-3 border border-slate-200 rounded-xl text-xs font-bold uppercase bg-white cursor-pointer" required>
+              <option value="">Secteur</option>
+              {departements.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}
+            </select>
+            <button type="submit" className="bg-[#f59e0b] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-amber-100">
+               {editing ? 'Update' : 'Ajouter'}
+            </button>
           </form>
         </div>
       </div>
