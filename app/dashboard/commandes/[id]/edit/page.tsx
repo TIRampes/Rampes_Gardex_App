@@ -10,6 +10,10 @@ import {
   Truck, Wrench, Clock, MessageCircle, RefreshCw, Hash, Send, X
 } from "lucide-react";
 import { useConfig } from "@/app/context/ConfigContext";
+import AddressAutocomplete from "@/app/components/commandes/Addressautocomplete"
+import FormulaireAchatModal from "@/app/components/commandes/FormulaireAchatModal";
+import { TYPES_ACHAT, getTypeAchat, getTypeAchatOptions } from "@/lib/fournisseurs-config";
+import type { TypeAchatConfig } from "@/lib/fournisseurs-config";
 
 // Types
 interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; cellulaire?: string; emails: string[]; }
@@ -285,6 +289,7 @@ export default function EditCommandePage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [representants, setRepresentants] = useState<Representant[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([]);
   const [success, setSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>("general");
   const [originalDatePrevue, setOriginalDatePrevue] = useState<string | null>(null);
@@ -393,6 +398,9 @@ export default function EditCommandePage() {
   const [balcons, setBalcons] = useState<Balcon[]>([]);
   const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
   const [achatsPhase, setAchatsPhase] = useState<AchatPhase[]>([]);
+
+  // État pour le modal formulaire fournisseur
+  const [formulaireModal, setFormulaireModal] = useState<{ isOpen: boolean; config: TypeAchatConfig | null; phaseName?: string }>({ isOpen: false, config: null });
 
   // Charger clients, représentants et commande
   useEffect(() => {
@@ -525,7 +533,7 @@ export default function EditCommandePage() {
     total += (formData.piedsLineairesGardexVision || 0) * 1;
     total += (formData.piedsLineairesGardexUrbaine || 0) * 2;
     total += (formData.piedsLineairesGardexOptimum || 0) * 0.75;
-    return Math.round(total * 100) / 100;
+    return Math.round(total);
   }, [
     formData.piedsLineairesBarrotin,
     formData.piedsLineairesVerre,
@@ -640,6 +648,7 @@ export default function EditCommandePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors([]);
 
     if (!formData.numero.trim()) { setError("Le numéro est obligatoire"); return; }
     if (!formData.clientId) { setError("Le client est obligatoire"); return; }
@@ -696,9 +705,13 @@ export default function EditCommandePage() {
       } else {
         const data = await res.json();
         setError(data.error || "Erreur lors de la mise à jour");
+        if (data.fieldErrors && Array.isArray(data.fieldErrors)) {
+          setFieldErrors(data.fieldErrors);
+        }
       }
     } catch (err) {
       setError("Erreur lors de la mise à jour");
+      setFieldErrors([]);
     } finally {
       setSaving(false);
     }
@@ -794,9 +807,21 @@ export default function EditCommandePage() {
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
-          <AlertTriangle className="w-5 h-5 text-red-600" />
-          <p className="text-red-700 dark:text-red-400">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+            <p className="text-red-700 dark:text-red-400 font-medium">{error}</p>
+          </div>
+          {fieldErrors.length > 0 && (
+            <ul className="mt-3 ml-8 space-y-1">
+              {fieldErrors.map((fe, i) => (
+                <li key={i} className="text-[0.8125rem] text-red-600 dark:text-red-400 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
+                  <span>{fe.message}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
@@ -875,7 +900,11 @@ export default function EditCommandePage() {
           {/* Adresse et commentaires */}
           <div className="mt-4">
             <label className="block text-sm font-medium mb-2">Adresse</label>
-            <input type="text" value={formData.adresse} onChange={(e) => setFormData({ ...formData, adresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+            <AddressAutocomplete
+              value={formData.adresse}
+              onChange={(addr) => setFormData({ ...formData, adresse: addr })}
+              error={fieldErrors.find(e => e.field === 'adresse')?.message}
+            />
           </div>
           <div className="mt-4">
             <label className="block text-sm font-medium mb-2">Commentaire adresse</label>
@@ -946,119 +975,107 @@ export default function EditCommandePage() {
 
         {/* SECTION 4: PRODUCTION */}
         <Section icon={<Factory />} title="Production" isOpen={activeSection === "production"} onToggle={() => setActiveSection(activeSection === "production" ? null : "production")}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <SymbolSelect label="Mesure" value={formData.mesure} onChange={(v) => setFormData({ ...formData, mesure: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <div><label className="block text-sm font-medium mb-2">Mesure donnée le</label><input type="date" value={formData.mesureDonneeLe} onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <SymbolSelect label="Plan" value={formData.plan} onChange={(v) => setFormData({ ...formData, plan: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <div><label className="block text-sm font-medium mb-2">Date envoi approbation</label><input type="date" value={formData.planApprobationEnvoyeLe} onChange={(e) => setFormData({ ...formData, planApprobationEnvoyeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <SymbolSelect label="Envoyé production" value={formData.envoyeProduction} onChange={(v) => setFormData({ ...formData, envoyeProduction: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <SymbolSelect label="Production terminée" value={formData.productionTerminee} onChange={(v) => setFormData({ ...formData, productionTerminee: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <SymbolSelect label="Terminé" value={formData.termine} onChange={(v) => setFormData({ ...formData, termine: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <SymbolSelect label="Installation" value={formData.installation} onChange={(v) => setFormData({ ...formData, installation: v })} options={CODE_PRODUCTION_OPTIONS} />
-            <div>
-              <label className="block text-sm font-medium mb-2">Statut livraison</label>
-              <select value={formData.statutLivraison} onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
-                {STATUT_LIVRAISON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+          {/* Étape 1: Mesure */}
+          <div className="mb-4">
+            <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">① Prise de mesure</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SymbolSelect label="Mesure" value={formData.mesure} onChange={(v) => setFormData({ ...formData, mesure: v })} options={CODE_PRODUCTION_OPTIONS} />
+              <div><label className="block text-sm font-medium mb-2">Mesure donnée le</label><input type="date" value={formData.mesureDonneeLe} onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            </div>
+          </div>
+
+          {/* Étape 2: Plan */}
+          <div className="mb-4">
+            <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">② Plan &amp; approbation</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <SymbolSelect label="Plan" value={formData.plan} onChange={(v) => setFormData({ ...formData, plan: v })} options={CODE_PRODUCTION_OPTIONS} />
+              <div><label className="block text-sm font-medium mb-2">Date envoi approbation</label><input type="date" value={formData.planApprobationEnvoyeLe} onChange={(e) => setFormData({ ...formData, planApprobationEnvoyeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+            </div>
+          </div>
+
+          {/* Étape 3: Production */}
+          <div className="mb-4">
+            <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">③ Production</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <SymbolSelect label="Envoyé production" value={formData.envoyeProduction} onChange={(v) => setFormData({ ...formData, envoyeProduction: v })} options={CODE_PRODUCTION_OPTIONS} />
+              <SymbolSelect label="Production terminée" value={formData.productionTerminee} onChange={(v) => setFormData({ ...formData, productionTerminee: v })} options={CODE_PRODUCTION_OPTIONS} />
+              <SymbolSelect label="Terminé" value={formData.termine} onChange={(v) => setFormData({ ...formData, termine: v })} options={CODE_PRODUCTION_OPTIONS} />
+            </div>
+          </div>
+
+          {/* Étape 4: Livraison & Installation */}
+          <div>
+            <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">④ Livraison &amp; Installation</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Statut livraison</label>
+                <select value={formData.statutLivraison} onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+                  {STATUT_LIVRAISON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <SymbolSelect label="Installation" value={formData.installation} onChange={(v) => setFormData({ ...formData, installation: v })} options={CODE_PRODUCTION_OPTIONS} />
             </div>
           </div>
         </Section>
 
-        {/* SECTION 5: ACHATS GLOBAUX */}
+        {/* SECTION 5: ACHATS UNIFIÉS */}
         <Section icon={<ShoppingCart />} title="Achats" isOpen={activeSection === "achats"} onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}>
+          {/* Achats globaux avec bouton formulaire */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <AchatEditField
-              label="Fibre"
-              statut={formData.achatFibre}
-              dateEnvoie={formData.dateEnvoieFibre}
-              dateReception={formData.dateReceptionFibre}
-              quantiteNonRecue={formData.quantiteNonRecueFibre}
-              onStatutChange={(v) => setFormData({ ...formData, achatFibre: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieFibre: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionFibre: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueFibre: v })}
-            />
-            <AchatEditField
-              label="Limons"
-              statut={formData.achatLimons}
-              dateEnvoie={formData.dateEnvoieLimons}
-              dateReception={formData.dateReceptionLimons}
-              quantiteNonRecue={formData.quantiteNonRecueLimons}
-              onStatutChange={(v) => setFormData({ ...formData, achatLimons: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieLimons: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionLimons: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueLimons: v })}
-            />
-            <AchatEditField
-              label="Verres"
-              statut={formData.achatVerres}
-              dateEnvoie={formData.dateEnvoieVerres}
-              dateReception={formData.dateReceptionVerre}
-              quantiteNonRecue={formData.quantiteNonRecueVerres}
-              onStatutChange={(v) => setFormData({ ...formData, achatVerres: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieVerres: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionVerre: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueVerres: v })}
-            />
-            <AchatEditField
-              label="Colonnes"
-              statut={formData.achatColonnes}
-              dateEnvoie={formData.dateEnvoieColonnes}
-              dateReception={formData.dateReceptionColonnes}
-              quantiteNonRecue={formData.quantiteNonRecueColonnes}
-              onStatutChange={(v) => setFormData({ ...formData, achatColonnes: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieColonnes: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionColonnes: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueColonnes: v })}
-            />
-            <AchatEditField
-              label="Peinture"
-              statut={formData.achatPeinture}
-              dateEnvoie={formData.dateEnvoiePeinture}
-              dateReception={formData.dateReceptionPeinture}
-              quantiteNonRecue={formData.quantiteNonRecuePeinture}
-              onStatutChange={(v) => setFormData({ ...formData, achatPeinture: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePeinture: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPeinture: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePeinture: v })}
-            />
-            <AchatEditField
-              label="Attaches"
-              statut={formData.achatAttaches}
-              dateEnvoie={formData.dateEnvoieAttaches}
-              dateReception={formData.dateReceptionAttaches}
-              quantiteNonRecue={formData.quantiteNonRecueAttaches}
-              onStatutChange={(v) => setFormData({ ...formData, achatAttaches: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoieAttaches: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionAttaches: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecueAttaches: v })}
-            />
-            <AchatEditField
-              label="Plancher alu."
-              statut={formData.achatPlancherAluminium}
-              dateEnvoie={formData.dateEnvoiePlancherAluminium}
-              dateReception={formData.dateReceptionPlancherAluminium}
-              quantiteNonRecue={formData.quantiteNonRecuePlancherAluminium}
-              onStatutChange={(v) => setFormData({ ...formData, achatPlancherAluminium: v })}
-              onDateEnvoieChange={(v) => setFormData({ ...formData, dateEnvoiePlancherAluminium: v })}
-              onDateReceptionChange={(v) => setFormData({ ...formData, dateReceptionPlancherAluminium: v })}
-              onQuantiteChange={(v) => setFormData({ ...formData, quantiteNonRecuePlancherAluminium: v })}
-            />
-          </div>
-
-          {/* Option structure */}
-          <div className="mt-4">
-            <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-              <input type="checkbox" checked={formData.structure} onChange={(e) => setFormData({ ...formData, structure: e.target.checked })} className="w-5 h-5" />
-              <span className="text-sm font-medium text-purple-700">Ajouter des structures d'achat</span>
-            </label>
+            {[
+              { key: 'Fibre', statut: 'achatFibre', de: 'dateEnvoieFibre', dr: 'dateReceptionFibre', q: 'quantiteNonRecueFibre' },
+              { key: 'Limons', statut: 'achatLimons', de: 'dateEnvoieLimons', dr: 'dateReceptionLimons', q: 'quantiteNonRecueLimons' },
+              { key: 'Verres', statut: 'achatVerres', de: 'dateEnvoieVerres', dr: 'dateReceptionVerre', q: 'quantiteNonRecueVerres' },
+              { key: 'Colonnes', statut: 'achatColonnes', de: 'dateEnvoieColonnes', dr: 'dateReceptionColonnes', q: 'quantiteNonRecueColonnes' },
+              { key: 'Peinture', statut: 'achatPeinture', de: 'dateEnvoiePeinture', dr: 'dateReceptionPeinture', q: 'quantiteNonRecuePeinture' },
+              { key: 'Attaches', statut: 'achatAttaches', de: 'dateEnvoieAttaches', dr: 'dateReceptionAttaches', q: 'quantiteNonRecueAttaches' },
+              { key: 'Plancher alu.', statut: 'achatPlancherAluminium', de: 'dateEnvoiePlancherAluminium', dr: 'dateReceptionPlancherAluminium', q: 'quantiteNonRecuePlancherAluminium' },
+            ].map(item => {
+              const typeId = item.key.toUpperCase().replace(/[. ]/g, '_').replace('ALU_', 'ALUMINIUM');
+              const typeConfig = getTypeAchat(typeId === 'PLANCHER_ALU_' ? 'PLANCHER_ALUMINIUM' : typeId);
+              return (
+                <div key={item.key} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-semibold">{item.key}</label>
+                    {typeConfig && (
+                      <button type="button" onClick={() => setFormulaireModal({ isOpen: true, config: typeConfig })} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[0.6875rem] font-medium hover:bg-blue-200">
+                        📄 Formulaire
+                      </button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <select value={(formData as any)[item.statut] || ''} onChange={(e) => setFormData({ ...formData, [item.statut]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
+                      {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
+                    </select>
+                    <div>
+                      <label className="block text-xs text-gray-500">Date d&apos;envoi</label>
+                      <input type="date" value={(formData as any)[item.de] || ''} onChange={(e) => setFormData({ ...formData, [item.de]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Date de réception</label>
+                      <input type="date" value={(formData as any)[item.dr] || ''} onChange={(e) => setFormData({ ...formData, [item.dr]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Quantité non reçue</label>
+                      <input type="number" min="0" value={(formData as any)[item.q] || 0} onChange={(e) => setFormData({ ...formData, [item.q]: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Structures d'achat */}
+          <div className="mt-4">
+            <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <input type="checkbox" checked={formData.structure} onChange={(e) => setFormData({ ...formData, structure: e.target.checked })} className="w-5 h-5" />
+              <span className="text-sm font-medium text-purple-700">Ajouter des structures d&apos;achat</span>
+            </label>
+          </div>
           {formData.structure && (
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="font-medium">Structures d'achat</h4>
+                <h4 className="font-medium">Structures d&apos;achat</h4>
                 <button type="button" onClick={addStructure} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
                   <Plus size={16} /> Ajouter
                 </button>
@@ -1081,241 +1098,90 @@ export default function EditCommandePage() {
               ))}
             </div>
           )}
-        </Section>
 
-        {/* SECTION 6: ACHATS PAR PHASE */}
-        <Section icon={<ShoppingCart />} title="Achats par phase" isOpen={activeSection === "achatsPhase"} onToggle={() => setActiveSection(activeSection === "achatsPhase" ? null : "achatsPhase")}>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h4 className="font-medium">Liste des achats par phase</h4>
-              <button type="button" onClick={addAchatPhase} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
-                <Plus size={16} /> Ajouter un achat
-              </button>
-            </div>
+          {/* Achats par phase/balcon (pour multi-phase, multiplan, commercial) */}
+          {(formData.typeCommande !== 'STANDARD' && balcons.length > 0) && (
+            <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-semibold text-gray-900 dark:text-white">Achats par {formData.typeCommande === 'MULTI_PHASE' ? 'phase' : formData.typeCommande === 'MULTIPLAN' ? 'plan' : 'balcon'}</h4>
+                <button type="button" onClick={addAchatPhase} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
+                  <Plus size={16} /> Ajouter un achat
+                </button>
+              </div>
 
-            {achatsPhase.map((achat, index) => {
-              const phase = balcons.find(b => b.numeroPhase === achat.phaseNumero);
-              return (
-                <div key={index} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-medium">Achat #{index + 1}</span>
-                    <button type="button" onClick={() => removeAchatPhase(index)} className="p-2 text-red-600"><Trash2 size={16} /></button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Phase */}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Phase</label>
-                      <select
-                        value={achat.phaseNumero}
-                        onChange={(e) => updateAchatPhase(index, "phaseNumero", parseInt(e.target.value))}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      >
-                        {balcons.map(b => (
-                          <option key={b.numeroPhase} value={b.numeroPhase}>
-                            {b.nom}
-                          </option>
-                        ))}
-                      </select>
+              {achatsPhase.map((achat, index) => {
+                const phase = balcons.find(b => b.numeroPhase === achat.phaseNumero);
+                const typeConfig = getTypeAchat(achat.typeAchat);
+                return (
+                  <div key={index} className="p-4 mb-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-medium text-sm">Achat #{index + 1}{phase ? ` — ${phase.nom}` : ''}</span>
+                      <div className="flex items-center gap-2">
+                        {typeConfig && (
+                          <button type="button" onClick={() => setFormulaireModal({ isOpen: true, config: typeConfig, phaseName: phase?.nom })} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[0.6875rem] font-medium hover:bg-blue-200">
+                            📄 Formulaire
+                          </button>
+                        )}
+                        <button type="button" onClick={() => removeAchatPhase(index)} className="p-2 text-red-600"><Trash2 size={16} /></button>
+                      </div>
                     </div>
 
-                    {/* Type d'achat */}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Type d'achat</label>
-                      <select
-                        value={achat.typeAchat}
-                        onChange={(e) => updateAchatPhase(index, "typeAchat", e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      >
-                        {TYPE_ACHAT_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Statut */}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Statut</label>
-                      <select
-                        value={achat.statut}
-                        onChange={(e) => updateAchatPhase(index, "statut", e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      >
-                        {STATUT_ACHAT_OPTIONS.map(opt => (
-                          <option key={opt.value} value={opt.value}>{opt.symbol} {opt.label}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Champs communs */}
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Quantité</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={achat.quantite || 0}
-                        onChange={(e) => updateAchatPhase(index, "quantite", parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Prix unitaire ($)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={achat.prixUnitaire || 0}
-                        onChange={(e) => updateAchatPhase(index, "prixUnitaire", parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Date d'envoi</label>
-                      <input
-                        type="date"
-                        value={achat.dateEnvoie || ""}
-                        onChange={(e) => updateAchatPhase(index, "dateEnvoie", e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
-                      <input
-                        type="date"
-                        value={achat.dateReception || ""}
-                        onChange={(e) => updateAchatPhase(index, "dateReception", e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Quantité non reçue</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={achat.quantiteNonRecue || 0}
-                        onChange={(e) => updateAchatPhase(index, "quantiteNonRecue", parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                      />
-                    </div>
-
-                    {/* Champs spécifiques EuroForgings */}
-                    {achat.typeAchat === "EUROFORGINGS" && (
-                      <>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Code produit</label>
-                          <input
-                            type="text"
-                            value={achat.codeProduit || ""}
-                            onChange={(e) => updateAchatPhase(index, "codeProduit", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Description</label>
-                          <input
-                            type="text"
-                            value={achat.description || ""}
-                            onChange={(e) => updateAchatPhase(index, "description", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {/* Champs spécifiques Peinture DJ */}
-                    {achat.typeAchat === "PEINTURE_DJ" && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">Couleur</label>
-                        <select
-                          value={achat.couleur || ""}
-                          onChange={(e) => updateAchatPhase(index, "couleur", e.target.value)}
-                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                        >
-                          <option value="">— Sélectionner —</option>
-                          <option value="NOIR">Noir</option>
-                          <option value="BLANC">Blanc</option>
-                          <option value="CHARBON">Charbon</option>
-                          <option value="BRUN_COM">Brun commerciale</option>
-                          <option value="ARGILE">Argile</option>
-                          <option value="GRIS_MET">Gris métallique</option>
-                          <option value="AUTRE">Autre</option>
+                        <label className="block text-xs text-gray-500 mb-1">{formData.typeCommande === 'MULTI_PHASE' ? 'Phase' : formData.typeCommande === 'MULTIPLAN' ? 'Plan' : 'Balcon'}</label>
+                        <select value={achat.phaseNumero} onChange={(e) => updateAchatPhase(index, "phaseNumero", parseInt(e.target.value))} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
+                          {balcons.map(b => <option key={b.numeroPhase} value={b.numeroPhase}>{b.nom}</option>)}
                         </select>
                       </div>
-                    )}
-
-                    {/* Champs spécifiques Verre Lepage */}
-                    {achat.typeAchat === "VERRE_LEPAGE" && (
-                      <>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Épaisseur (mm)</label>
-                          <select
-                            value={achat.epaisseur || ""}
-                            onChange={(e) => updateAchatPhase(index, "epaisseur", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          >
-                            <option value="">— Sélectionner —</option>
-                            <option value="5">5 mm</option>
-                            <option value="6">6 mm</option>
-                            <option value="10">10 mm</option>
-                            <option value="12">12 mm</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Type de verre</label>
-                          <select
-                            value={achat.typeVerre || ""}
-                            onChange={(e) => updateAchatPhase(index, "typeVerre", e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          >
-                            <option value="">— Sélectionner —</option>
-                            <option value="clair">Clair</option>
-                            <option value="gris">Gris</option>
-                            <option value="bronze">Bronze</option>
-                            <option value="acide">Acide Etch</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Longueur (mm)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={achat.longueur || 0}
-                            onChange={(e) => updateAchatPhase(index, "longueur", parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">Hauteur (mm)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={achat.hauteur || 0}
-                            onChange={(e) => updateAchatPhase(index, "hauteur", parseInt(e.target.value) || 0)}
-                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="col-span-3">
-                      <label className="block text-xs text-gray-500 mb-1">Notes</label>
-                      <textarea
-                        value={achat.notes || ""}
-                        onChange={(e) => updateAchatPhase(index, "notes", e.target.value)}
-                        rows={2}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm resize-none"
-                      />
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Type d&apos;achat</label>
+                        <select value={achat.typeAchat} onChange={(e) => updateAchatPhase(index, "typeAchat", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
+                          {TYPE_ACHAT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Statut</label>
+                        <select value={achat.statut} onChange={(e) => updateAchatPhase(index, "statut", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
+                          {STATUT_ACHAT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol} {opt.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Date d&apos;envoi</label>
+                        <input type="date" value={achat.dateEnvoie || ""} onChange={(e) => updateAchatPhase(index, "dateEnvoie", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
+                        <input type="date" value={achat.dateReception || ""} onChange={(e) => updateAchatPhase(index, "dateReception", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Qté non reçue</label>
+                        <input type="number" min="0" value={achat.quantiteNonRecue || 0} onChange={(e) => updateAchatPhase(index, "quantiteNonRecue", parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      </div>
                     </div>
+
+                    {achat.notes && (
+                      <div className="mt-2">
+                        <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                        <textarea value={achat.notes || ""} onChange={(e) => updateAchatPhase(index, "notes", e.target.value)} rows={2} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm resize-none" />
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </Section>
+
+        {/* MODAL FORMULAIRE FOURNISSEUR */}
+        {formulaireModal.config && (
+          <FormulaireAchatModal
+            isOpen={formulaireModal.isOpen}
+            onClose={() => setFormulaireModal({ isOpen: false, config: null })}
+            config={formulaireModal.config}
+            commandeNumero={formData.numero}
+            phaseName={formulaireModal.phaseName}
+          />
+        )}
 
         {/* SECTION 7: AVERTISSEMENTS */}
         <Section icon={<AlertTriangle />} title="Avertissements" isOpen={activeSection === "avertissements"} onToggle={() => setActiveSection(activeSection === "avertissements" ? null : "avertissements")}>
@@ -1490,34 +1356,6 @@ function SymbolSelect({ label, value, onChange, options }: { label: string; valu
       <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
         {options.map(o => <option key={o.value} value={o.value}>{o.symbol ? `${o.symbol} - ${o.label}` : o.label}</option>)}
       </select>
-    </div>
-  );
-}
-
-function AchatEditField({ label, statut, dateEnvoie, dateReception, quantiteNonRecue, onStatutChange, onDateEnvoieChange, onDateReceptionChange, onQuantiteChange }: {
-  label: string; statut: string; dateEnvoie: string; dateReception: string; quantiteNonRecue: number;
-  onStatutChange: (v: string) => void; onDateEnvoieChange: (v: string) => void; onDateReceptionChange: (v: string) => void; onQuantiteChange: (v: number) => void;
-}) {
-  return (
-    <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
-      <label className="block text-sm font-semibold mb-3">{label}</label>
-      <div className="space-y-2">
-        <select value={statut} onChange={(e) => onStatutChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-          {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
-        </select>
-        <div>
-          <label className="block text-xs text-gray-500">Date d'envoi</label>
-          <input type="date" value={dateEnvoie} onChange={(e) => onDateEnvoieChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500">Date de réception</label>
-          <input type="date" value={dateReception} onChange={(e) => onDateReceptionChange(e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500">Quantité non reçue</label>
-          <input type="number" min="0" value={quantiteNonRecue || 0} onChange={(e) => onQuantiteChange(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-        </div>
-      </div>
     </div>
   );
 }

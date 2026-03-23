@@ -448,7 +448,7 @@ export function calculatePiedsLineairesTotaux(
       total += valeurs[key] * facteur;
     }
   }
-  return Math.round(total * 100) / 100; // Arrondi à 2 décimales
+  return Math.round(total); // Arrondi à l'unité
 }
 
 // Fonction pour obtenir le numéro de semaine

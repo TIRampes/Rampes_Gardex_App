@@ -1,8 +1,13 @@
+// ╔══════════════════════════════════════════════════════════╗
+// ║  FICHIER: app/api/commandes/[id]/route.ts                 ║
+// ║  REMPLACE ton route.ts existant                           ║
+// ║  CHANGEMENT: erreurs détaillées par champ                 ║
+// ╚══════════════════════════════════════════════════════════╝
+
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { commandeSchema, calculatePiedsLineairesTotaux, calculateTempsInstallationAuto } from "../schema";
 
-// Helper: string | Date | null | undefined → Date | null
 function toDate(val: unknown): Date | null {
   if (!val) return null;
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
@@ -11,6 +16,87 @@ function toDate(val: unknown): Date | null {
     return isNaN(d.getTime()) ? null : d;
   }
   return null;
+}
+
+// Helper: transformer les erreurs Zod en messages clairs par champ
+function formatZodErrors(zodError: any): { field: string; message: string }[] {
+  const errors: { field: string; message: string }[] = [];
+  const fieldLabels: Record<string, string> = {
+    numero: "Numéro de commande",
+    clientId: "Client",
+    adresse: "Adresse",
+    typeCommande: "Type de commande",
+    service: "Service",
+    statut: "Statut",
+    prixVenteMateriaux: "Prix vente matériaux",
+    prixVenteInstallation: "Prix vente installation",
+    prixTotal: "Prix total",
+    couleur: "Couleur",
+    dateEntree: "Date d'entrée",
+    datePrevue: "Date prévue",
+    dateProduction: "Date de production",
+    datePriseMesure: "Date prise de mesure",
+    dateLivraison: "Date de livraison",
+    representantId: "Représentant",
+    commentaireAdresse: "Commentaire adresse",
+    commentaire: "Commentaire",
+    nombreBalcons: "Nombre de balcons",
+    nombrePhases: "Nombre de phases",
+  };
+
+  const flat = zodError.flatten();
+
+  // Erreurs de champs
+  if (flat.fieldErrors) {
+    for (const [field, msgs] of Object.entries(flat.fieldErrors)) {
+      const label = fieldLabels[field] || field;
+      const messages = msgs as string[];
+      if (messages?.length) {
+        errors.push({ field, message: `${label}: ${messages[0]}` });
+      }
+    }
+  }
+
+  // Erreurs globales
+  if (flat.formErrors?.length) {
+    flat.formErrors.forEach((msg: string) => {
+      errors.push({ field: '_global', message: msg });
+    });
+  }
+
+  return errors;
+}
+
+// Helper: transformer les erreurs Prisma en messages clairs
+function formatPrismaError(error: any): { field: string; message: string }[] {
+  const code = error?.code;
+  const meta = error?.meta;
+
+  switch (code) {
+    case 'P2002': {
+      // Violation d'unicité
+      const target = meta?.target;
+      if (Array.isArray(target) && target.includes('numero')) {
+        return [{ field: 'numero', message: 'Ce numéro de commande existe déjà' }];
+      }
+      return [{ field: '_global', message: `Valeur en double: ${target?.join(', ') || 'champ inconnu'}` }];
+    }
+    case 'P2003': {
+      // Violation de clé étrangère
+      const fieldName = meta?.field_name || '';
+      if (fieldName.includes('client')) {
+        return [{ field: 'clientId', message: 'Le client sélectionné n\'existe pas' }];
+      }
+      if (fieldName.includes('representant')) {
+        return [{ field: 'representantId', message: 'Le représentant sélectionné n\'existe pas' }];
+      }
+      return [{ field: '_global', message: `Référence invalide: ${fieldName}` }];
+    }
+    case 'P2025':
+      return [{ field: '_global', message: 'Enregistrement non trouvé' }];
+    default:
+      return [{ field: '_global', message: error?.message || 'Erreur base de données' }];
+  }
 }
 
 // GET - Récupérer une commande par ID
@@ -94,12 +180,21 @@ export async function PUT(
       include: { balcons: true, structuresAchat: true },
     });
     if (!existingCommande) {
-      return NextResponse.json({ error: "Commande non trouvée" }, { status: 404 });
+      return NextResponse.json({
+        error: "Commande non trouvée",
+        fieldErrors: [{ field: '_global', message: 'Cette commande n\'existe plus' }],
+      }, { status: 404 });
     }
 
+    // ═══ VALIDATION ZOD AVEC ERREURS DÉTAILLÉES ═══
     const validation = commandeSchema.partial().safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Données invalides", details: validation.error.flatten() }, { status: 400 });
+      const fieldErrors = formatZodErrors(validation.error);
+      const firstError = fieldErrors[0]?.message || "Données invalides";
+      return NextResponse.json({
+        error: firstError,
+        fieldErrors,
+      }, { status: 400 });
     }
 
     const data = validation.data;
@@ -107,7 +202,12 @@ export async function PUT(
     // Vérifier unicité numéro
     if (data.numero && data.numero !== existingCommande.numero) {
       const dup = await prisma.commande.findUnique({ where: { numero: data.numero } });
-      if (dup) return NextResponse.json({ error: "Ce numéro de commande existe déjà" }, { status: 400 });
+      if (dup) {
+        return NextResponse.json({
+          error: "Ce numéro de commande existe déjà",
+          fieldErrors: [{ field: 'numero', message: 'Ce numéro de commande existe déjà' }],
+        }, { status: 400 });
+      }
     }
 
     // Configurations
@@ -153,14 +253,12 @@ export async function PUT(
     const ancienStatut = existingCommande.statut;
     const nouveauStatut = data.statut || ancienStatut;
 
-    // Extraire les sous-objets non-Prisma
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { balcons, structuresAchat, achatsPhase: _ap, installation: _inst, ...rest } = data;
 
-    // Construire uniquement les champs qui ont été fournis (partial update)
+    // Construire updateData
     const updateData: Record<string, unknown> = {};
 
-    // Scalaires simples — ne set que si fourni
     if (rest.numero !== undefined) updateData.numero = rest.numero;
     if (rest.clientId !== undefined) updateData.clientId = rest.clientId;
     if (rest.representantId !== undefined) updateData.representantId = rest.representantId || null;
@@ -174,7 +272,7 @@ export async function PUT(
     if (rest.reprise !== undefined) updateData.reprise = rest.reprise;
     if (rest.ancienneCommandeNumero !== undefined) updateData.ancienneCommandeNumero = rest.ancienneCommandeNumero || null;
 
-    // Dates — ne set que si fourni
+    // Dates
     if (rest.dateEntree !== undefined) updateData.dateEntree = toDate(rest.dateEntree);
     if (rest.datePrevue !== undefined) updateData.datePrevue = toDate(rest.datePrevue);
     if (rest.dateProduction !== undefined) updateData.dateProduction = toDate(rest.dateProduction);
@@ -278,17 +376,27 @@ export async function PUT(
     if (nouveauStatut === "COMPLETEE" && ancienStatut !== "COMPLETEE") updateData.dateCompletion = new Date();
     if (nouveauStatut === "ANNULEE" && ancienStatut !== "ANNULEE") updateData.dateAnnulation = new Date();
 
-    // Update commande
-    const commande = await prisma.commande.update({
-      where: { id },
-      data: updateData,
-      include: {
-        client: { select: { id: true, nom: true, type: true } },
-        representant: { select: { id: true, nom: true } },
-        balcons: { orderBy: { numeroPhase: "asc" } },
-        structuresAchat: true,
-      },
-    });
+    // ═══ UPDATE AVEC GESTION ERREURS PRISMA DÉTAILLÉES ═══
+    let commande;
+    try {
+      commande = await prisma.commande.update({
+        where: { id },
+        data: updateData,
+        include: {
+          client: { select: { id: true, nom: true, type: true } },
+          representant: { select: { id: true, nom: true } },
+          balcons: { orderBy: { numeroPhase: "asc" } },
+          structuresAchat: true,
+        },
+      });
+    } catch (prismaError: any) {
+      console.error("Erreur Prisma UPDATE:", prismaError);
+      const fieldErrors = formatPrismaError(prismaError);
+      return NextResponse.json({
+        error: fieldErrors[0]?.message || "Erreur base de données",
+        fieldErrors,
+      }, { status: 400 });
+    }
 
     // Historique statut
     if (ancienStatut !== nouveauStatut) {
@@ -297,63 +405,88 @@ export async function PUT(
       });
     }
 
-    // Balcons (SEULEMENT les champs existants dans Prisma Balcon)
+    // Balcons
     if (balcons !== undefined) {
-      await prisma.balcon.deleteMany({ where: { commandeId: id } });
-      if (balcons && balcons.length > 0) {
-        await prisma.balcon.createMany({
-          data: balcons.map((b, i) => ({
-            commandeId: id,
-            nom: b.nom,
-            numeroPhase: b.numeroPhase || i + 1,
-            piedsLineaires: b.piedsLineaires || 0,
-            poteaux: b.poteaux || 0,
-            coutBalcon: b.coutBalcon || 0,
-            prixTotal: b.prixTotal || 0,
-            produit: b.produit || false,
-            installationTerminee: b.installationTerminee || false,
-            reprise: b.reprise || false,
-            notes: b.notes || null,
-          })),
-        });
+      try {
+        await prisma.balcon.deleteMany({ where: { commandeId: id } });
+        if (balcons && balcons.length > 0) {
+          await prisma.balcon.createMany({
+            data: balcons.map((b, i) => ({
+              commandeId: id,
+              nom: b.nom,
+              numeroPhase: b.numeroPhase || i + 1,
+              piedsLineaires: b.piedsLineaires || 0,
+              poteaux: b.poteaux || 0,
+              coutBalcon: b.coutBalcon || 0,
+              prixTotal: b.prixTotal || 0,
+              produit: b.produit || false,
+              installationTerminee: b.installationTerminee || false,
+              reprise: b.reprise || false,
+              notes: b.notes || null,
+            })),
+          });
+        }
+      } catch (balconError: any) {
+        console.error("Erreur balcons:", balconError);
+        return NextResponse.json({
+          error: "Erreur lors de la sauvegarde des balcons/phases",
+          fieldErrors: [{ field: 'balcons', message: `Balcons: ${balconError.message}` }],
+        }, { status: 400 });
       }
     }
 
     // Structures d'achat
     if (structuresAchat !== undefined) {
-      await prisma.structureAchat.deleteMany({ where: { commandeId: id } });
-      if (structuresAchat && structuresAchat.length > 0) {
-        await prisma.structureAchat.createMany({
-          data: structuresAchat.map((s) => ({
-            commandeId: id,
-            nom: s.nom,
-            statutAchat: s.statutAchat || "A_FAIRE",
-            dateEnvoie: toDate(s.dateEnvoie),
-            dateReception: toDate(s.dateReception),
-            quantiteNonRecue: s.quantiteNonRecue || null,
-          })),
-        });
+      try {
+        await prisma.structureAchat.deleteMany({ where: { commandeId: id } });
+        if (structuresAchat && structuresAchat.length > 0) {
+          await prisma.structureAchat.createMany({
+            data: structuresAchat.map((s) => ({
+              commandeId: id,
+              nom: s.nom,
+              statutAchat: s.statutAchat || "A_FAIRE",
+              dateEnvoie: toDate(s.dateEnvoie),
+              dateReception: toDate(s.dateReception),
+              quantiteNonRecue: s.quantiteNonRecue || null,
+            })),
+          });
+        }
+      } catch (structError: any) {
+        console.error("Erreur structures:", structError);
+        return NextResponse.json({
+          error: "Erreur lors de la sauvegarde des structures d'achat",
+          fieldErrors: [{ field: 'structuresAchat', message: `Structures: ${structError.message}` }],
+        }, { status: 400 });
       }
     }
 
     return NextResponse.json(commande);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur PUT commande:", error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour" }, { status: 500 });
+    // Tenter de mapper l'erreur Prisma
+    if (error?.code?.startsWith('P')) {
+      const fieldErrors = formatPrismaError(error);
+      return NextResponse.json({
+        error: fieldErrors[0]?.message || "Erreur base de données",
+        fieldErrors,
+      }, { status: 400 });
+    }
+    return NextResponse.json({
+      error: "Erreur lors de la mise à jour",
+      fieldErrors: [{ field: '_global', message: error?.message || 'Erreur serveur inattendue' }],
+    }, { status: 500 });
   }
 }
 
-// DELETE - Supprimer une commande
+// DELETE
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-
     const existing = await prisma.commande.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Commande non trouvée" }, { status: 404 });
-
     await prisma.commande.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "Commande supprimée" });
   } catch (error) {
