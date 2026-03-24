@@ -17,7 +17,7 @@ export const CodeProduction = z.enum([
   "ATTENTE_CAROL_MESURE",
   "BACK_ORDER",
   "ATTENTE_REPRESENTANT",
-  "APPROBATION_PLAN", // Nouveau
+  "APPROBATION_PLAN", 
 ]);
 
 export const StatutAchat = z.enum([

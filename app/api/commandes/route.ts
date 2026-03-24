@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get("clientId");
     const representantId = searchParams.get("representantId");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, any> = {};
 
     if (search) {
       where.OR = [
@@ -122,7 +122,6 @@ export async function POST(request: NextRequest) {
 
     const validation = commandeSchema.safeParse(body);
     if (!validation.success) {
-      console.error("Validation error:", validation.error.flatten());
       return NextResponse.json({ error: "Données invalides", details: validation.error.flatten() }, { status: 400 });
     }
 
@@ -165,7 +164,6 @@ export async function POST(request: NextRequest) {
       semainePrevue = calc.semainePrevue;
     }
 
-    // Extraire les sous-objets qui ne sont PAS des colonnes Prisma sur Commande
     const { balcons, structuresAchat, achatsPhase, ...rest } = data;
 
     const commande = await prisma.commande.create({
@@ -217,15 +215,18 @@ export async function POST(request: NextRequest) {
         piedsLineairesEstime: rest.piedsLineairesEstime ?? null,
         piedsLineairesReels: rest.piedsLineairesReels ?? null,
         structure: rest.structure,
-        m: rest.mesure || null,
+        
+        // CORRECTION DES NOMS DE COLONNES (Basé sur ton prismasCHEMA.txt)
+        mesure: rest.mesure || null,
         mesureDonneeLe: toDate(rest.mesureDonneeLe),
-        p: rest.plan || null,
+        plan: rest.plan || null,
         planApprobationEnvoyeLe: toDate(rest.planApprobationEnvoyeLe),
-        envoye: rest.envoyeProduction || null,
-        production: rest.productionTerminee || null,
-        termin: rest.termine || null,
+        envoyeProduction: rest.envoyeProduction || null,
+        productionTerminee: rest.productionTerminee || null,
+        termine: rest.termine || null,
         statutLivraison: rest.statutLivraison || "N_A",
-        installatio: rest.installation || null,
+        installation: rest.installation || null,
+
         achatFibre: rest.achatFibre || null,
         dateEnvoieFibre: toDate(rest.dateEnvoieFibre),
         dateReceptionFibre: toDate(rest.dateReceptionFibre),
@@ -263,7 +264,7 @@ export async function POST(request: NextRequest) {
         formulaireComplete: rest.formulaireComplete,
         commentaire: rest.commentaire || null,
 
-        // Balcons (avec tous les nouveaux champs)
+        // CORRECTION DU NOM DE LA RELATION : balcons (au pluriel)
         balcon: balcons && balcons.length > 0 ? {
           create: balcons.map((b, i) => ({
             nom: b.nom,
@@ -276,7 +277,6 @@ export async function POST(request: NextRequest) {
             installationTerminee: b.installationTerminee || false,
             reprise: b.reprise || false,
             notes: b.notes || null,
-            // Nouveaux champs
             datePrevue: toDate(b.datePrevue),
             prixVenteInstallation: b.prixVenteInstallation,
             mesure: b.mesure || null,
@@ -288,7 +288,6 @@ export async function POST(request: NextRequest) {
           })),
         } : undefined,
 
-        // Structures d'achat
         structuresAchat: structuresAchat && structuresAchat.length > 0 ? {
           create: structuresAchat.map((s) => ({
             nom: s.nom,
@@ -299,7 +298,6 @@ export async function POST(request: NextRequest) {
           })),
         } : undefined,
 
-        // Achats par phase
         achatPhases: achatsPhase && achatsPhase.length > 0 ? {
           create: achatsPhase.map((a) => ({
             phaseNumero: a.phaseNumero,

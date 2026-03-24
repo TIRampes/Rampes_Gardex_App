@@ -90,6 +90,7 @@ enum CodeProduction {
   ATTENTE_CAROL_MESURE // C-RM Attente Carol pour retourner prendre des mesures
   BACK_ORDER // B/O Commande d'achat avec des back order
   ATTENTE_REPRESENTANT // At. Rep Attente d'une réponse d'un représentant
+  APPROBATION_PLAN // App.Plan Attente d'approbation du plan par le client
 }
 
 enum TypeIntervention {
@@ -420,20 +421,20 @@ model EquipeHeureSemaine {
 // 04. USER
 // ============================================
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique @db.VarChar(255)
-  password  String   @db.VarChar(255)
-  nom       String   @db.VarChar(100)
-  prenom    String   @db.VarChar(100)
-  role      UserRole @default(EMPLOYE)
-  telephone String?  @db.VarChar(20)
-  equipeId  String?
-  mfaSecret   String?  @db.VarChar(255)
-  mfaEnabled  Boolean  @default(false)
-  equipe    Equipe?  @relation(fields: [equipeId], references: [id])
-  actif     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  email      String   @unique @db.VarChar(255)
+  password   String   @db.VarChar(255)
+  nom        String   @db.VarChar(100)
+  prenom     String   @db.VarChar(100)
+  role       UserRole @default(EMPLOYE)
+  telephone  String?  @db.VarChar(20)
+  equipeId   String?
+  mfaSecret  String?  @db.VarChar(255)
+  mfaEnabled Boolean  @default(false)
+  equipe     Equipe?  @relation(fields: [equipeId], references: [id])
+  actif      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   interventions Intervention[]
   notifications Notification[]
