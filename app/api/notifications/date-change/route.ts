@@ -1,13 +1,67 @@
 import { NextResponse } from "next/server";
 import twilio from "twilio";
-import { Resend } from "resend";
 
-// Initialiser les clients (à configurer dans .env)
+// Initialiser Twilio
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Fonction pour obtenir un token Graph
+async function getGraphToken(): Promise<string> {
+  const tenantId = process.env.AZURE_TENANT_ID;
+  const clientId = process.env.AZURE_CLIENT_ID;
+  const clientSecret = process.env.AZURE_CLIENT_SECRET;
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error('Variables Azure manquantes (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)');
+  }
+
+  const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope: 'https://graph.microsoft.com/.default',
+      grant_type: 'client_credentials',
+    }),
+  });
+
+  if (!res.ok) throw new Error('Échec obtention token Azure');
+  const data = await res.json();
+  return data.access_token;
+}
+
+// Fonction pour envoyer un email via Microsoft Graph
+async function sendEmailViaGraph(to: string, subject: string, htmlBody: string, from?: string) {
+  const token = await getGraphToken();
+  const mailFrom = from || process.env.AZURE_MAIL_FROM;
+  if (!mailFrom) throw new Error('AZURE_MAIL_FROM non configuré');
+
+  const emailPayload = {
+    message: {
+      subject,
+      body: { contentType: 'HTML', content: htmlBody },
+      toRecipients: [{ emailAddress: { address: to } }],
+    },
+    saveToSentItems: true,
+  };
+
+  const graphRes = await fetch(`https://graph.microsoft.com/v1.0/users/${mailFrom}/sendMail`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(emailPayload),
+  });
+
+  if (!graphRes.ok) {
+    const err = await graphRes.text();
+    throw new Error(`Graph sendMail error: ${err}`);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -66,12 +120,12 @@ export async function POST(request: Request) {
     `;
 
     // Envoi des SMS (via Twilio)
-    const smsPromises = toSms.map(async (phone: string) => {
+    const smsPromises = (toSms || []).map(async (phone: string) => {
       // Simplifier le message pour SMS (caractères limités)
       const smsMessage = 
 `Les Rampes Gardex
 
-Changement de date -Commande numero:${commande.numero}
+Changement de date - Commande numero:${commande.numero}
 
 Ancienne semaine : ${ancienneSemaine}
 
@@ -95,15 +149,14 @@ ${commande.representantTelephone ? `Téléphone : ${commande.representantTelepho
       }
     });
 
-    // Envoi des emails
-    const emailPromises = toEmails.map(async (email: string) => {
+    // Envoi des emails via Microsoft Graph
+    const emailPromises = (toEmails || []).map(async (email: string) => {
       try {
-        await resend.emails.send({
-          from:"...",
-          to: email,
-          subject: `Avis de changement de date - Commande ${commande.numero}`,
-          html: emailHtml,
-        });
+        await sendEmailViaGraph(
+          email,
+          `Avis de changement de date - Commande ${commande.numero}`,
+          emailHtml
+        );
       } catch (err) {
         console.error(`Erreur envoi email à ${email}:`, err);
       }

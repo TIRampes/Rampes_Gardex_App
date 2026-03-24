@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 1. Générer le PDF en appelant notre propre API
-    const pdfRes = await fetch(new URL('/api/achats/formulaire', request.url).toString(), {
+    const pdfRes = await fetch(new URL('/api/commandes/achats/formulaire', request.url).toString(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ typeAchat, fournisseur, formValues, lignes, commandeNumero, phaseName }),

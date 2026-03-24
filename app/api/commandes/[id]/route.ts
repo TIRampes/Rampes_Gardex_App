@@ -1,7 +1,6 @@
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FICHIER: app/api/commandes/[id]/route.ts                 ║
-// ║  REMPLACE ton route.ts existant                           ║
-// ║  CHANGEMENT: erreurs détaillées par champ                 ║
+// ║  INCLUT: GET, PUT, DELETE avec gestion détaillée des erreurs ║
 // ╚══════════════════════════════════════════════════════════╝
 
 import { NextResponse, NextRequest } from "next/server";
@@ -124,7 +123,7 @@ export async function GET(
           take: 5,
         },
         interventions: {
-          include: { equipe: true, responsable: true },
+          include: { equipe: true, responsable: true, photos: true }, // <-- AJOUT DE photos: true
           orderBy: { datePrevue: "desc" },
           take: 10,
         },

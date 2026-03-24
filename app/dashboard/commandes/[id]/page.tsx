@@ -8,10 +8,11 @@ import {
   ArrowLeft, Edit, Trash2, Package, User, MapPin, Calendar, DollarSign,
   Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Phone, Mail,
   Clock, CheckCircle2, XCircle, Loader2, Building2, Layers, ExternalLink,
-  History, Wrench, Truck, MessageCircle, Paintbrush, Hash, RefreshCw
+  History, Wrench, Truck, MessageCircle, Paintbrush, Hash, RefreshCw,
+  Camera
 } from "lucide-react";
 
-// Types complets (alignés avec la création)
+// ---------- TYPES ----------
 interface Client {
   id: string; nom: string; type: string; adresse: string; telephone: string;
   cellulaire?: string; personne_Contact: string; emails: string[];
@@ -21,14 +22,8 @@ interface Balcon {
   id: string; nom: string; numeroPhase: number; piedsLineaires: number;
   poteaux: number; produit: boolean; installationTerminee: boolean; reprise: boolean;
   coutBalcon?: number; prixTotal?: number;
-  // Nouveaux champs
-  datePrevue?: string;
-  prixVenteInstallation?: number;
-  mesure?: string;
-  plan?: string;
-  planApprobationEnvoyeLe?: string;
-  envoyeProduction?: string;
-  termine?: string;
+  datePrevue?: string; prixVenteInstallation?: number; mesure?: string; plan?: string;
+  planApprobationEnvoyeLe?: string; envoyeProduction?: string; termine?: string;
   installation?: string;
 }
 interface StructureAchat {
@@ -36,28 +31,19 @@ interface StructureAchat {
   dateEnvoie?: string; dateReception?: string; quantiteNonRecue?: number;
 }
 interface AchatPhase {
-  id: string;
-  phaseNumero: number;
-  typeAchat: string;
-  statut: string;
-  dateEnvoie?: string;
-  dateReception?: string;
-  quantiteNonRecue?: number;
-  codeProduit?: string;
-  description?: string;
-  quantite?: number;
-  prixUnitaire?: number;
-  couleur?: string;
-  epaisseur?: string;
-  typeVerre?: string;
-  longueur?: number;
-  hauteur?: number;
-  notes?: string;
-  details?: any;
+  id: string; phaseNumero: number; typeAchat: string; statut: string;
+  dateEnvoie?: string; dateReception?: string; quantiteNonRecue?: number;
+  codeProduit?: string; description?: string; quantite?: number; prixUnitaire?: number;
+  couleur?: string; epaisseur?: string; typeVerre?: string; longueur?: number;
+  hauteur?: number; notes?: string; details?: any;
 }
 interface Intervention {
   id: string; type: string; datePrevue: string; statut: string;
   equipe?: { nom: string; couleur: string };
+  photos?: Photo[];
+}
+interface Photo {
+  id: string; url: string; type: string; description?: string; createdAt: string;
 }
 interface HistoriqueStatut {
   id: string; ancienStatut: string; nouveauStatut: string; dateChangement: string; commentaire?: string;
@@ -66,32 +52,27 @@ interface Commande {
   id: string; numero: string; reference?: string; typeCommande: string;
   service: string; statut: string; adresse: string; commentaireAdresse?: string;
   client: Client; representant?: Representant; balcons: Balcon[];
-  structuresAchat: StructureAchat[];
-  achatsPhase: AchatPhase[]; // Nouveau
+  structuresAchat: StructureAchat[]; achatsPhase?: AchatPhase[];
   dateEntree: string; datePrevue?: string; dateProduction?: string;
   datePriseMesure?: string; dateLivraison?: string; semainePrevue?: string;
   prixTotal: number; prixVenteMateriaux: number; prixVenteInstallation: number;
   tempsInstallationAuto: number; utiliserCalculAuto: boolean;
-  // Pieds linéaires
   piedsLineairesBarrotin: number; piedsLineairesVerre: number;
   piedsLineairesMur: number; piedsLineairesMainDouble: number;
   piedsLineairesGardexVision: number; piedsLineairesGardexUrbaine: number;
   piedsLineairesGardexOptimum: number; piedsLineairesRampes: number;
   nombrePoteaux: number;
-  // Anciens champs
   tempsEstimeInstallation: number; piedsCarresFibre?: number;
   piedsRampesBarrotin: number; piedsRampesVerre: number;
   piedsRampesMurIntimite: number; piedsRampesMainDouble: number;
   piedsRampesGardexVision: number; piedsRampesGardexVisionUrbaine: number;
   piedsRampesGardexVisionOptimum: number;
-  // Production
   structure: boolean; couleur?: string; couleurPersonnalisee?: string;
   mesure?: string; mesureDonneeLe?: string;
-  plan?: string; planApprobationEnvoyeLe?: string; // Nouveau
+  plan?: string; planApprobationEnvoyeLe?: string;
   envoyeProduction?: string; productionTerminee?: string;
   termine?: string; statutLivraison: string; installation?: string;
   enProduction: boolean; reprise: boolean; ancienneCommandeNumero?: string;
-  // Achats avec nouveaux champs
   achatFibre?: string; dateEnvoieFibre?: string; dateReceptionFibre?: string;
   quantiteNonRecueFibre?: number;
   achatLimons?: string; dateEnvoieLimons?: string; dateReceptionLimons?: string;
@@ -106,18 +87,16 @@ interface Commande {
   quantiteNonRecueAttaches?: number;
   achatPlancherAluminium?: string; dateEnvoiePlancherAluminium?: string;
   dateReceptionPlancherAluminium?: string; quantiteNonRecuePlancherAluminium?: number;
-  // Avertissements
   avertissementClient?: string; avertissementPriseMesure?: string;
-  // Commentaire
   commentaire?: string;
-  // Dates système
   createdAt: string; updatedAt: string;
-  interventions: Intervention[]; historiqueStatuts: HistoriqueStatut[];
+  interventions: Intervention[];
+  historiqueStatuts: HistoriqueStatut[];
   _count: { interventions: number; reprises: number; achats: number };
   config?: { coutHeureInstallation: number; facteurTempsInstallation: number };
 }
 
-// Mappings
+// ---------- MAPPINGS (inchangés) ----------
 const CODE_SYMBOLS: Record<string, { symbol: string; label: string; color: string; bgColor: string }> = {
   COMPLETE: { symbol: "✓", label: "Complété", color: "text-green-700", bgColor: "bg-green-100" },
   ATTENTE_CLIENT: { symbol: "At.C", label: "Attente client", color: "text-orange-700", bgColor: "bg-orange-100" },
@@ -180,6 +159,7 @@ const formatSemaine = (date?: string) => {
   return `Semaine ${week}`;
 };
 
+// ---------- COMPOSANT PRINCIPAL ----------
 export default function CommandeDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -326,12 +306,13 @@ export default function CommandeDetailsPage() {
         </div>
       </SectionCard>
 
-      {/* SECTION: DATES */}
+      {/* SECTION: DATES (inclut date de mesure) */}
       <SectionCard icon={<Calendar />} title="Dates">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <DateField label="Date d'entrée" value={commande.dateEntree} />
           <DateField label="Date production" value={commande.dateProduction} />
           <DateField label="Date prévue" value={commande.datePrevue} highlight />
+          <DateField label="Date mesure" value={commande.datePriseMesure} />
           <DateField label="Semaine prévue" value={commande.semainePrevue || formatSemaine(commande.datePrevue)} isText />
           <DateField label="Mesure donnée le" value={commande.mesureDonneeLe} />
         </div>
@@ -466,7 +447,7 @@ export default function CommandeDetailsPage() {
         )}
       </SectionCard>
 
-      {/* SECTION: BALCONS/PHASES enrichie */}
+      {/* SECTION: BALCONS/PHASES */}
       {commande.balcons && commande.balcons.length > 0 && (
         <SectionCard 
           icon={commande.typeCommande === "COMMERCIAL" ? <Building2 /> : <Layers />} 
@@ -488,7 +469,7 @@ export default function CommandeDetailsPage() {
                   <th className="px-2 py-2 text-center font-semibold">Env. prod</th>
                   <th className="px-2 py-2 text-center font-semibold">Term.</th>
                   <th className="px-2 py-2 text-center font-semibold">Install.</th>
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {commande.balcons.map(b => (
@@ -612,6 +593,30 @@ export default function CommandeDetailsPage() {
         </SectionCard>
       )}
 
+      {/* SECTION PHOTOS (AJOUTÉE) */}
+      {commande.interventions?.some(interv => interv.photos && interv.photos.length > 0) && (
+        <SectionCard icon={<Camera />} title="Photos des interventions">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {commande.interventions.map(interv =>
+              interv.photos?.map(photo => (
+                <div key={photo.id} className="relative group">
+                  <img
+                    src={photo.url}
+                    alt={photo.description || `Photo d'intervention ${interv.type}`}
+                    className="w-full h-32 object-cover rounded-lg shadow-sm"
+                  />
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center rounded-lg p-2 text-center">
+                    <p className="text-white text-xs font-medium">{interv.type}</p>
+                    <p className="text-white text-xs">{new Date(interv.datePrevue).toLocaleDateString('fr-CA')}</p>
+                    {photo.description && <p className="text-white text-xs mt-1 truncate">{photo.description}</p>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </SectionCard>
+      )}
+
       {/* Modal suppression */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -629,7 +634,7 @@ export default function CommandeDetailsPage() {
   );
 }
 
-// Composants auxiliaires
+// ---------- COMPOSANTS AUXILIAIRES ----------
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   const colors: Record<string, string> = {
     green: "from-green-500 to-green-600",

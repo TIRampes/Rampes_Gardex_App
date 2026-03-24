@@ -61,7 +61,7 @@ export default function FormulaireAchatModal({
     setDownloading(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/achats/formulaire', {
+      const res = await fetch('/api/commandes/achats/formulaire', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

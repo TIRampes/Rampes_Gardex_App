@@ -6,22 +6,68 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft, Save, Loader2, Package, User, MapPin, Calendar, DollarSign,
   Ruler, Factory, ShoppingCart, AlertTriangle, FileText, Plus, Trash2,
-  Building2, Layers, ChevronDown, CheckCircle2, Info, Paintbrush,
-  Truck, Wrench, Clock, MessageCircle, RefreshCw, Hash, Send, X
+  Building2, Layers, ChevronDown, CheckCircle2, Paintbrush,
+  Truck, Wrench, Clock, MessageCircle, Send, X
 } from "lucide-react";
 import { useConfig } from "@/app/context/ConfigContext";
-import AddressAutocomplete from "@/app/components/commandes/Addressautocomplete"
+import AddressAutocomplete from "@/app/components/commandes/Addressautocomplete";
 import FormulaireAchatModal from "@/app/components/commandes/FormulaireAchatModal";
-import { TYPES_ACHAT, getTypeAchat, getTypeAchatOptions } from "@/lib/fournisseurs-config";
+import { getTypeAchat } from "@/lib/fournisseurs-config";
 import type { TypeAchatConfig } from "@/lib/fournisseurs-config";
 
-// Types
-interface Client { id: string; nom: string; type: string; adresse: string; telephone: string; cellulaire?: string; emails: string[]; }
-interface Representant { id: string; nom: string; email?: string; telephone?: string; }
+// ---------- TYPES ----------
+interface Client {
+  id: string;
+  nom: string;
+  type: string;
+  adresse: string;
+  telephone: string;
+  personne_Contact: string;
+  emails: string[];
+  communicationTexto: boolean;
+  communicationCourriel: boolean;
+  communicationTelephone: boolean;
+}
 
-// Nouveau type pour AchatPhase (identique à celui utilisé dans la création)
-interface AchatPhase {
+interface Representant {
+  id: string;
+  nom: string;
+  email?: string;
+  telephone?: string;
+}
+
+interface Fournisseur {
+  id: string;
+  nom: string;
+  email?: string;
+  telephone?: string;
+  adresse?: string;
+}
+
+interface Balcon {
   id?: string;
+  nom: string;
+  numeroPhase: number;
+  piedsLineaires: number;
+  poteaux: number;
+  coutBalcon?: number;
+  prixTotal?: number;
+  produit?: boolean;
+  installationTerminee?: boolean;
+  reprise?: boolean;
+  notes?: string;
+  datePrevue?: string;
+  prixVenteInstallation?: number;
+  mesure?: string;
+  plan?: string;
+  planApprobationEnvoyeLe?: string;
+  envoyeProduction?: string;
+  termine?: string;
+  installation?: string;
+}
+
+interface AchatPhase {
+  id: string;
   phaseNumero: number;
   typeAchat: string;
   statut: string;
@@ -41,36 +87,14 @@ interface AchatPhase {
   details?: any;
 }
 
-interface Balcon {
-  id?: string;
-  nom: string;
-  numeroPhase: number;
-  piedsLineaires: number;
-  poteaux: number;
-  coutBalcon: number;
-  prixTotal: number;
-  produit: boolean;
-  installationTerminee: boolean;
-  reprise: boolean;
-  notes?: string;
-  // Nouveaux champs
-  datePrevue?: string;
-  prixVenteInstallation?: number;
-  mesure?: string;
-  plan?: string;
-  planApprobationEnvoyeLe?: string;
-  envoyeProduction?: string;
-  termine?: string;
-  installation?: string;
-}
-
 interface StructureAchat {
-  id?: string;
+  id: string;
   nom: string;
   statutAchat: string;
   dateEnvoie?: string;
   dateReception?: string;
   quantiteNonRecue?: number;
+  phase?: number;
 }
 
 interface Commande {
@@ -124,7 +148,7 @@ interface Commande {
   mesure?: string;
   mesureDonneeLe?: string;
   plan?: string;
-  planApprobationEnvoyeLe?: string; // Nouveau
+  planApprobationEnvoyeLe?: string;
   envoyeProduction?: string;
   productionTerminee?: string;
   termine?: string;
@@ -164,22 +188,23 @@ interface Commande {
   commentaire?: string;
   balcons: Balcon[];
   structuresAchat: StructureAchat[];
-  achatsPhase?: AchatPhase[]; // Nouveau
+  achatsPhase?: AchatPhase[];
 }
 
-// Options de commentaires prédéfinis
-const PREDEFINED_COMMENTS = [
-  "Un bris de production nous oblige à repousser votre commande. Nous faisons tout notre possible pour que votre commande soit prête le plus rapidement possible.",
-  "Dû aux mauvaises conditions météo des derniers jours, nos installations ont été retardées. Nous sommes donc contraints de retarder votre installation.",
-  "Étant donné le retard d'un de nos fournisseurs, nous devons repousser la date de livraison de votre commande. Soyez assuré que dès que notre fournisseur nous livrera, votre commande sera produite en priorité.",
-  "La prise de mesure a été retardée. La nouvelle date sera attribuée selon les délais en vigueur en ce moment.",
-  "Pour des raisons hors de notre contrôle, nous devons déplacer votre installation à une date ultérieure.",
-  "Dossier encore en attente d'une réponse du client.",
-  "Date de délai non respectée",
-  "Autre"
-];
+interface PurchaseItem {
+  id: string;
+  phaseNumero?: number;
+  typeAchat: string;
+  supplierId: string;
+  statut: string;
+  dateEnvoie: string;
+  dateReception: string;
+  quantiteNonRecue: number;
+  formValues: Record<string, any>;
+  notes: string;
+}
 
-// Mappings
+// ---------- CONSTANTES ----------
 const CODE_PRODUCTION_OPTIONS = [
   { value: "", label: "— Sélectionner —", symbol: "", color: "" },
   { value: "COMPLETE", label: "Complété", symbol: "✓", color: "text-green-600" },
@@ -255,16 +280,6 @@ const STATUT_OPTIONS = [
   { value: "ANNULEE", label: "Annulée" },
 ];
 
-const PIEDS_LINEAIRES_FACTEURS = [
-  { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
-  { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
-  { key: "piedsLineairesMur", label: "Mur", facteur: 4 },
-  { key: "piedsLineairesMainDouble", label: "Main double", facteur: 2.25 },
-  { key: "piedsLineairesGardexVision", label: "Gardex Vision", facteur: 1 },
-  { key: "piedsLineairesGardexUrbaine", label: "Gardex Urbaine", facteur: 2 },
-  { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
-];
-
 const TYPE_ACHAT_OPTIONS = [
   { value: "FIBRE", label: "Fibre" },
   { value: "LIMONS", label: "Limons" },
@@ -276,9 +291,36 @@ const TYPE_ACHAT_OPTIONS = [
   { value: "EUROFORGINGS", label: "EuroForgings" },
   { value: "PEINTURE_DJ", label: "Peinture DJ" },
   { value: "VERRE_LEPAGE", label: "Verre Lepage" },
+  { value: "STRUCTURE", label: "Structure d'achat" },
 ];
 
+const PIEDS_LINEAIRES_FACTEURS = [
+  { key: "piedsLineairesBarrotin", label: "Barrotin", facteur: 1.25 },
+  { key: "piedsLineairesVerre", label: "Verre", facteur: 1 },
+  { key: "piedsLineairesMur", label: "Mur", facteur: 4 },
+  { key: "piedsLineairesMainDouble", label: "Main double", facteur: 2.25 },
+  { key: "piedsLineairesGardexVision", label: "Gardex Vision", facteur: 1 },
+  { key: "piedsLineairesGardexUrbaine", label: "Gardex Urbaine", facteur: 2 },
+  { key: "piedsLineairesGardexOptimum", label: "Gardex Optimum", facteur: 0.75 },
+];
+
+const roundToUnit = (val: number) => Math.round(val);
+const DELAI_MESURE = 14;
+
 const formatDateForInput = (date?: string) => date ? new Date(date).toISOString().split("T")[0] : "";
+const formatDateForDisplay = (date?: string) => date ? new Date(date).toLocaleDateString("fr-CA") : "";
+
+// Liste des commentaires prédéfinis pour le changement de date
+const PREDEFINED_COMMENTS = [
+  "Un bris de production nous oblige à repousser votre commande. Nous faisons tout notre possible pour que votre commande soit prête le plus rapidement possible.",
+  "Dû aux mauvaises conditions météo des derniers jours, nos installations ont été retardées. Nous sommes donc contraints de retarder votre installation.",
+  "Étant donné le retard d'un de nos fournisseurs, nous devons repousser la date de livraison de votre commande. Soyez assuré que dès que notre fournisseur nous livrera, votre commande sera produite en priorité.",
+  "La prise de mesure a été retardée. La nouvelle date sera attribuée selon les délais en vigueur en ce moment.",
+  "Pour des raisons hors de notre contrôle, nous devons déplacer votre installation à une date ultérieure.",
+  "Dossier encore en attente d'une réponse du client.",
+  "Date de délai non respectée",
+  "Autre"
+];
 
 export default function EditCommandePage() {
   const router = useRouter();
@@ -288,25 +330,23 @@ export default function EditCommandePage() {
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [representants, setRepresentants] = useState<Representant[]>([]);
+  const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([]);
   const [success, setSuccess] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>("general");
+  const [formulaireModal, setFormulaireModal] = useState<{ isOpen: boolean; config: TypeAchatConfig | null; phaseName?: string }>({ isOpen: false, config: null });
+
+  // États pour le modal de changement de date
+  const [showDateChangeModal, setShowDateChangeModal] = useState(false);
   const [originalDatePrevue, setOriginalDatePrevue] = useState<string | null>(null);
   const [originalCommande, setOriginalCommande] = useState<Commande | null>(null);
-
-  // États pour le modal d'avis de changement de date
-  const [showDateChangeModal, setShowDateChangeModal] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<any>(null);
   const [selectedComments, setSelectedComments] = useState<string[]>([]);
   const [customComment, setCustomComment] = useState("");
-  const [sendToClientSms, setSendToClientSms] = useState(true);
-  const [sendToClientEmail, setSendToClientEmail] = useState(true);
-  const [sendToRepresentantEmail, setSendToRepresentantEmail] = useState(true);
   const [additionalEmails, setAdditionalEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState("");
 
-  // Formulaire
   const [formData, setFormData] = useState({
     numero: "",
     clientId: "",
@@ -396,29 +436,28 @@ export default function EditCommandePage() {
   });
 
   const [balcons, setBalcons] = useState<Balcon[]>([]);
-  const [structuresAchat, setStructuresAchat] = useState<StructureAchat[]>([]);
-  const [achatsPhase, setAchatsPhase] = useState<AchatPhase[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
 
-  // État pour le modal formulaire fournisseur
-  const [formulaireModal, setFormulaireModal] = useState<{ isOpen: boolean; config: TypeAchatConfig | null; phaseName?: string }>({ isOpen: false, config: null });
-
-  // Charger clients, représentants et commande
+  // Charger les listes et la commande
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientsRes, repsRes, commandeRes] = await Promise.all([
+        const [clientsRes, repsRes, fournisseursRes, commandeRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/representants"),
+          fetch("/api/fournisseurs"),
           fetch(`/api/commandes/${params.id}`),
         ]);
 
         if (clientsRes.ok) setClients(await clientsRes.json());
         if (repsRes.ok) setRepresentants(await repsRes.json());
+        if (fournisseursRes.ok) setFournisseurs(await fournisseursRes.json());
 
         if (commandeRes.ok) {
           const c: Commande = await commandeRes.json();
           setOriginalCommande(c);
           setOriginalDatePrevue(c.datePrevue || null);
+
           setFormData({
             numero: c.numero || "",
             clientId: c.clientId || "",
@@ -506,24 +545,69 @@ export default function EditCommandePage() {
             avertissementPriseMesure: c.avertissementPriseMesure || "",
             commentaire: c.commentaire || "",
           });
+
           if (c.balcons) setBalcons(c.balcons);
-          if (c.structuresAchat) setStructuresAchat(c.structuresAchat);
-          if (c.achatsPhase) setAchatsPhase(c.achatsPhase);
+
+          // Transformation des achats existants en purchases unifiés
+          const existingPurchases: PurchaseItem[] = [];
+
+          if (c.achatsPhase) {
+            c.achatsPhase.forEach(ap => {
+              existingPurchases.push({
+                id: ap.id,
+                phaseNumero: ap.phaseNumero,
+                typeAchat: ap.typeAchat,
+                supplierId: "",
+                statut: ap.statut,
+                dateEnvoie: formatDateForInput(ap.dateEnvoie),
+                dateReception: formatDateForInput(ap.dateReception),
+                quantiteNonRecue: ap.quantiteNonRecue || 0,
+                formValues: {
+                  codeProduit: ap.codeProduit,
+                  description: ap.description,
+                  quantite: ap.quantite,
+                  prixUnitaire: ap.prixUnitaire,
+                  couleur: ap.couleur,
+                  epaisseur: ap.epaisseur,
+                  typeVerre: ap.typeVerre,
+                  longueur: ap.longueur,
+                  hauteur: ap.hauteur,
+                },
+                notes: ap.notes || "",
+              });
+            });
+          }
+
+          if (c.structuresAchat) {
+            c.structuresAchat.forEach(sa => {
+              existingPurchases.push({
+                id: sa.id,
+                phaseNumero: sa.phase,
+                typeAchat: "STRUCTURE",
+                supplierId: "",
+                statut: sa.statutAchat,
+                dateEnvoie: formatDateForInput(sa.dateEnvoie),
+                dateReception: formatDateForInput(sa.dateReception),
+                quantiteNonRecue: sa.quantiteNonRecue || 0,
+                formValues: { nom: sa.nom },
+                notes: "",
+              });
+            });
+          }
+
+          setPurchases(existingPurchases);
         }
       } catch (err) {
-        console.error("Erreur:", err);
+        console.error("Erreur chargement:", err);
         setError("Erreur lors du chargement");
       } finally {
         setLoading(false);
       }
     };
-
     if (params.id) fetchData();
   }, [params.id]);
 
   // Calculs
-  const prixTotal = useMemo(() => (formData.prixTotal || 0), [formData.prixTotal]);
-
   const piedsLineairesTotaux = useMemo(() => {
     let total = 0;
     total += (formData.piedsLineairesBarrotin || 0) * 1.25;
@@ -533,7 +617,7 @@ export default function EditCommandePage() {
     total += (formData.piedsLineairesGardexVision || 0) * 1;
     total += (formData.piedsLineairesGardexUrbaine || 0) * 2;
     total += (formData.piedsLineairesGardexOptimum || 0) * 0.75;
-    return Math.round(total);
+    return roundToUnit(total);
   }, [
     formData.piedsLineairesBarrotin,
     formData.piedsLineairesVerre,
@@ -547,7 +631,8 @@ export default function EditCommandePage() {
   const tempsInstallationCalcule = useMemo(() => {
     if (!config) return 0;
     if (formData.prixVenteInstallation <= 0) return 0;
-    return (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
+    const temps = (formData.prixVenteInstallation / config.coutHeureInstallation) * config.facteurTempsInstallation;
+    return Math.round(temps * 10) / 10;
   }, [formData.prixVenteInstallation, config]);
 
   useEffect(() => {
@@ -561,13 +646,16 @@ export default function EditCommandePage() {
       const datePrev = new Date(formData.datePrevue);
       const dateProd = new Date(datePrev);
       dateProd.setDate(dateProd.getDate() - 7);
+      const dateMesure = new Date(datePrev);
+      dateMesure.setDate(dateMesure.getDate() - DELAI_MESURE);
       setFormData(prev => ({
         ...prev,
         dateProduction: dateProd.toISOString().split("T")[0],
+        datePriseMesure: dateMesure.toISOString().split("T")[0],
         dateLivraison: prev.datePrevue,
       }));
     } else {
-      setFormData(prev => ({ ...prev, dateProduction: "", dateLivraison: "" }));
+      setFormData(prev => ({ ...prev, dateProduction: "", datePriseMesure: "", dateLivraison: "" }));
     }
   }, [formData.datePrevue]);
 
@@ -576,57 +664,66 @@ export default function EditCommandePage() {
     setFormData(prev => ({ ...prev, prixVenteMateriaux: materiaux }));
   }, [formData.prixTotal, formData.prixVenteInstallation]);
 
-  // Fonctions pour balcons (avec nouveaux champs)
+  // Générer les balcons si nécessaire (si la commande n'en a pas)
+  useEffect(() => {
+    if (balcons.length > 0) return;
+    const count = formData.typeCommande === "COMMERCIAL" 
+      ? formData.nombreBalcons 
+      : formData.nombrePhases;
+    
+    if (count > 0 && (formData.typeCommande !== "STANDARD")) {
+      const prefix = formData.typeCommande === "COMMERCIAL" ? "Balcon" : 
+                     formData.typeCommande === "MULTI_PHASE" ? "Phase" : "Plan";
+      const newBalcons: Balcon[] = Array.from({ length: count }, (_, i) => ({
+        nom: `${prefix} ${i + 1}`,
+        numeroPhase: i + 1,
+        piedsLineaires: 0,
+        poteaux: 0,
+        datePrevue: "",
+        prixTotal: 0,
+        prixVenteInstallation: 0,
+        mesure: "",
+        plan: "",
+        planApprobationEnvoyeLe: "",
+        envoyeProduction: "",
+        termine: "",
+        installation: "",
+      }));
+      setBalcons(newBalcons);
+    }
+  }, [formData.typeCommande, formData.nombreBalcons, formData.nombrePhases, balcons.length]);
+
+  // Gestion des achats
+  const addPurchase = () => {
+    setPurchases(prev => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        phaseNumero: balcons.length > 0 ? balcons[0].numeroPhase : undefined,
+        typeAchat: "FIBRE",
+        supplierId: "",
+        statut: "A_FAIRE",
+        dateEnvoie: "",
+        dateReception: "",
+        quantiteNonRecue: 0,
+        formValues: {},
+        notes: "",
+      },
+    ]);
+  };
+
+  const updatePurchase = (index: number, field: keyof PurchaseItem, value: any) => {
+    setPurchases(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  };
+
+  const removePurchase = (index: number) => {
+    setPurchases(prev => prev.filter((_, i) => i !== index));
+  };
+
   const updateBalcon = (index: number, field: keyof Balcon, value: any) => {
     setBalcons(prev => prev.map((b, i) => i === index ? { ...b, [field]: value } : b));
   };
 
-  // Fonctions pour structures
-  const addStructure = () => {
-    setStructuresAchat(prev => [
-      ...prev,
-      {
-        nom: `Structure ${prev.length + 1}`,
-        statutAchat: "A_FAIRE",
-        dateEnvoie: "",
-        dateReception: "",
-        quantiteNonRecue: 0,
-      },
-    ]);
-  };
-
-  const updateStructure = (index: number, field: keyof StructureAchat, value: any) => {
-    setStructuresAchat(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
-  };
-
-  const removeStructure = (index: number) => {
-    setStructuresAchat(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Fonctions pour achats par phase
-  const addAchatPhase = () => {
-    setAchatsPhase(prev => [
-      ...prev,
-      {
-        phaseNumero: balcons.length > 0 ? balcons[0].numeroPhase : 1,
-        typeAchat: "FIBRE",
-        statut: "A_FAIRE",
-        quantite: 0,
-        prixUnitaire: 0,
-        quantiteNonRecue: 0,
-      },
-    ]);
-  };
-
-  const updateAchatPhase = (index: number, field: keyof AchatPhase, value: any) => {
-    setAchatsPhase(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
-  };
-
-  const removeAchatPhase = (index: number) => {
-    setAchatsPhase(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Modal et soumission
   const handleAddEmail = () => {
     if (newEmail && /^\S+@\S+\.\S+$/.test(newEmail)) {
       setAdditionalEmails([...additionalEmails, newEmail]);
@@ -645,6 +742,7 @@ export default function EditCommandePage() {
     );
   };
 
+  // Soumission avec détection de changement de date
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -654,10 +752,57 @@ export default function EditCommandePage() {
     if (!formData.clientId) { setError("Le client est obligatoire"); return; }
     if (!formData.adresse.trim()) { setError("L'adresse est obligatoire"); return; }
 
-    if (originalDatePrevue !== formData.datePrevue) {
-      setPendingFormData({ ...formData, balcons, structuresAchat, achatsPhase });
+    // Vérifier si la date prévue a changé
+    const newDatePrevue = formData.datePrevue;
+    if (originalDatePrevue !== newDatePrevue && newDatePrevue) {
+      // Préparer les données à envoyer après le modal
+      const dataToSend = {
+        ...formData,
+        balcons: balcons.length > 0 ? balcons : undefined,
+        achatsPhase: purchases.filter(p => p.typeAchat !== "STRUCTURE").map(p => ({
+          phaseNumero: p.phaseNumero,
+          typeAchat: p.typeAchat,
+          statut: p.statut,
+          dateEnvoie: p.dateEnvoie,
+          dateReception: p.dateReception,
+          quantiteNonRecue: p.quantiteNonRecue,
+          codeProduit: p.formValues?.codeProduit,
+          description: p.formValues?.description,
+          quantite: p.formValues?.quantite,
+          prixUnitaire: p.formValues?.prixUnitaire,
+          couleur: p.formValues?.couleur,
+          epaisseur: p.formValues?.epaisseur,
+          typeVerre: p.formValues?.typeVerre,
+          longueur: p.formValues?.longueur,
+          hauteur: p.formValues?.hauteur,
+          notes: p.notes,
+          details: p.formValues,
+        })),
+        structuresAchat: purchases.filter(p => p.typeAchat === "STRUCTURE").map(p => ({
+          nom: p.formValues?.nom || "Structure",
+          statutAchat: p.statut,
+          dateEnvoie: p.dateEnvoie,
+          dateReception: p.dateReception,
+          quantiteNonRecue: p.quantiteNonRecue,
+          phase: p.phaseNumero,
+        })),
+        representantId: formData.representantId || null,
+        couleur: formData.couleur || null,
+        couleurPersonnalisee: formData.couleur === "AUTRE" ? formData.couleurPersonnalisee : null,
+        mesure: formData.mesure || null,
+        plan: formData.plan || null,
+        planApprobationEnvoyeLe: formData.planApprobationEnvoyeLe || null,
+        envoyeProduction: formData.envoyeProduction || null,
+        productionTerminee: formData.productionTerminee || null,
+        termine: formData.termine || null,
+        installation: formData.installation || null,
+        avertissementClient: formData.avertissementClient || null,
+        avertissementPriseMesure: formData.avertissementPriseMesure || null,
+      };
+      setPendingFormData(dataToSend);
       setShowDateChangeModal(true);
     } else {
+      // Pas de changement de date, sauvegarder directement
       await submitForm(formData);
     }
   };
@@ -665,59 +810,30 @@ export default function EditCommandePage() {
   const submitForm = async (dataToSend: any) => {
     setSaving(true);
     try {
-      const payload = {
-        ...dataToSend,
-        prixTotal: dataToSend.prixTotal,
-        piedsLineairesRampes: piedsLineairesTotaux,
-        balcons: balcons.length > 0 ? balcons : undefined,
-        structuresAchat: structuresAchat.length > 0 ? structuresAchat : undefined,
-        achatsPhase: achatsPhase.length > 0 ? achatsPhase : undefined,
-        representantId: dataToSend.representantId || null,
-        couleur: dataToSend.couleur || null,
-        couleurPersonnalisee: dataToSend.couleur === "AUTRE" ? dataToSend.couleurPersonnalisee : null,
-        mesure: dataToSend.mesure || null,
-        plan: dataToSend.plan || null,
-        planApprobationEnvoyeLe: dataToSend.planApprobationEnvoyeLe || null,
-        envoyeProduction: dataToSend.envoyeProduction || null,
-        productionTerminee: dataToSend.productionTerminee || null,
-        termine: dataToSend.termine || null,
-        installation: dataToSend.installation || null,
-        achatFibre: dataToSend.achatFibre || null,
-        achatLimons: dataToSend.achatLimons || null,
-        achatVerres: dataToSend.achatVerres || null,
-        achatColonnes: dataToSend.achatColonnes || null,
-        achatPeinture: dataToSend.achatPeinture || null,
-        achatAttaches: dataToSend.achatAttaches || null,
-        achatPlancherAluminium: dataToSend.achatPlancherAluminium || null,
-        avertissementClient: dataToSend.avertissementClient || null,
-        avertissementPriseMesure: dataToSend.avertissementPriseMesure || null,
-      };
-
       const res = await fetch(`/api/commandes/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(dataToSend),
       });
-
+      const data = await res.json();
       if (res.ok) {
         setSuccess(true);
-        setTimeout(() => router.replace(`/dashboard/commandes/${params.id}`), 150);
+        setTimeout(() => router.push(`/dashboard/commandes/${params.id}`), 1500);
       } else {
-        const data = await res.json();
         setError(data.error || "Erreur lors de la mise à jour");
         if (data.fieldErrors && Array.isArray(data.fieldErrors)) {
           setFieldErrors(data.fieldErrors);
         }
       }
     } catch (err) {
-      setError("Erreur lors de la mise à jour");
-      setFieldErrors([]);
+      setError("Erreur réseau");
     } finally {
       setSaving(false);
     }
   };
 
   const handleSendNotification = async () => {
+    // Construire le commentaire complet
     let fullComment = selectedComments.join(" ");
     if (customComment.trim()) {
       fullComment += (fullComment ? " " : "") + customComment.trim();
@@ -727,12 +843,28 @@ export default function EditCommandePage() {
     const client = clients.find(c => c.id === formData.clientId);
     const representant = representants.find(r => r.id === formData.representantId);
 
-    const toSms = sendToClientSms && client?.telephone ? [client.telephone] : [];
-    const toEmails = [];
-    if (sendToClientEmail && client?.emails?.length) toEmails.push(...client.emails);
-    if (sendToRepresentantEmail && representant?.email) toEmails.push(representant.email);
+    // Déterminer les destinataires selon les préférences du client
+    const toSms: string[] = [];
+    const toEmails: string[] = [];
+
+    if (client) {
+      if (client.communicationTexto && client.telephone) {
+        toSms.push(client.telephone);
+      }
+      if (client.communicationCourriel && client.emails && client.emails.length) {
+        toEmails.push(...client.emails);
+      }
+    }
+
+    // Ajouter le représentant si demandé (optionnel, on peut l'ajouter toujours si son email est présent)
+    if (representant?.email) {
+      toEmails.push(representant.email);
+    }
+
+    // Ajouter les emails supplémentaires saisis manuellement
     toEmails.push(...additionalEmails);
 
+    // Préparer les données pour l'API de notification
     const notificationData = {
       commande: {
         numero: formData.numero,
@@ -830,38 +962,66 @@ export default function EditCommandePage() {
         <Section icon={<Package />} title="Informations générales" isOpen={activeSection === "general"} onToggle={() => setActiveSection(activeSection === "general" ? null : "general")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Numéro</label>
-              <input type="text" value={formData.numero} onChange={(e) => setFormData({ ...formData, numero: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Numéro
+              </label>
+              <input
+                type="text"
+                value={formData.numero}
+                onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Client</label>
-              <select value={formData.clientId} onChange={(e) => setFormData({ ...formData, clientId: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Client
+              </label>
+              <select
+                value={formData.clientId}
+                onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              >
                 <option value="">— Sélectionner —</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Représentant</label>
-              <select value={formData.representantId} onChange={(e) => setFormData({ ...formData, representantId: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Représentant</label>
+              <select
+                value={formData.representantId}
+                onChange={(e) => setFormData({ ...formData, representantId: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              >
                 <option value="">— Aucun —</option>
                 {representants.map(r => <option key={r.id} value={r.id}>{r.nom}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Statut</label>
-              <select value={formData.statut} onChange={(e) => setFormData({ ...formData, statut: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Référence</label>
+              <input
+                type="text"
+                value={formData.reference}
+                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut</label>
+              <select
+                value={formData.statut}
+                onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              >
                 {STATUT_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Type</label>
-              <select value={formData.typeCommande} onChange={(e) => setFormData({ ...formData, typeCommande: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
-                {TYPE_COMMANDE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Service</label>
-              <select value={formData.service} onChange={(e) => setFormData({ ...formData, service: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Service</label>
+              <select
+                value={formData.service}
+                onChange={(e) => setFormData({ ...formData, service: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              >
                 {SERVICE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
@@ -870,53 +1030,282 @@ export default function EditCommandePage() {
           {/* Couleur */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Couleur</label>
-              <select value={formData.couleur} onChange={(e) => setFormData({ ...formData, couleur: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couleur</label>
+              <select
+                value={formData.couleur}
+                onChange={(e) => setFormData({ ...formData, couleur: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              >
                 {COULEUR_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
             </div>
             {formData.couleur === "AUTRE" && (
               <div>
-                <label className="block text-sm font-medium mb-2">Couleur personnalisée</label>
-                <input type="text" value={formData.couleurPersonnalisee} onChange={(e) => setFormData({ ...formData, couleurPersonnalisee: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Couleur personnalisée</label>
+                <input
+                  type="text"
+                  value={formData.couleurPersonnalisee}
+                  onChange={(e) => setFormData({ ...formData, couleurPersonnalisee: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
               </div>
             )}
+          </div>
+
+          {/* Type de commande */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Type de commande</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {TYPE_COMMANDE_OPTIONS.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, typeCommande: t.value, nombreBalcons: 0, nombrePhases: 0 })}
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    formData.typeCommande === t.value
+                      ? "border-[var(--color-primary)] bg-[var(--color-primary)]/10"
+                      : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                  }`}
+                >
+                  <span className="font-semibold text-gray-900 dark:text-white">{t.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Reprise */}
           <div className="mt-4">
             <label className="flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
-              <input type="checkbox" checked={formData.reprise} onChange={(e) => setFormData({ ...formData, reprise: e.target.checked })} className="w-5 h-5" />
+              <input
+                type="checkbox"
+                checked={formData.reprise}
+                onChange={(e) => setFormData({ ...formData, reprise: e.target.checked })}
+                className="w-5 h-5"
+              />
               <span className="text-sm font-medium text-orange-700">Cette commande est une reprise</span>
             </label>
           </div>
           {formData.reprise && (
             <div className="mt-4">
-              <label className="block text-sm font-medium mb-2">Numéro de l'ancienne commande</label>
-              <input type="text" value={formData.ancienneCommandeNumero} onChange={(e) => setFormData({ ...formData, ancienneCommandeNumero: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ancienne commande</label>
+              <input
+                type="text"
+                value={formData.ancienneCommandeNumero}
+                onChange={(e) => setFormData({ ...formData, ancienneCommandeNumero: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
             </div>
           )}
 
-          {/* Adresse et commentaires */}
+          {/* Nombre de balcons/phases */}
+          {formData.typeCommande === "COMMERCIAL" && (
+            <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
+              <label className="block text-sm font-medium text-purple-700 mb-2">
+                <Building2 className="inline w-4 h-4 mr-1" /> Nombre de balcons
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.nombreBalcons}
+                onChange={(e) => setFormData({ ...formData, nombreBalcons: parseInt(e.target.value) || 0 })}
+                className="w-32 px-4 py-2 bg-white dark:bg-gray-800 border border-purple-300 dark:border-purple-700 rounded-xl"
+              />
+            </div>
+          )}
+
+          {(formData.typeCommande === "MULTI_PHASE" || formData.typeCommande === "MULTIPLAN") && (
+            <div className="mt-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl">
+              <label className="block text-sm font-medium text-orange-700 mb-2">
+                <Layers className="inline w-4 h-4 mr-1" /> 
+                Nombre de {formData.typeCommande === "MULTI_PHASE" ? "phases" : "plans"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={formData.nombrePhases}
+                onChange={(e) => setFormData({ ...formData, nombrePhases: parseInt(e.target.value) || 0 })}
+                className="w-32 px-4 py-2 bg-white dark:bg-gray-800 border border-orange-300 dark:border-orange-700 rounded-xl"
+              />
+            </div>
+          )}
+
+          {/* Tableau des balcons */}
+          {balcons.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="bg-gray-100 dark:bg-gray-700">
+                    <th className="px-2 py-2 text-left">Nom</th>
+                    <th className="px-2 py-2 text-left">Pieds lin.</th>
+                    <th className="px-2 py-2 text-left">Poteaux</th>
+                    <th className="px-2 py-2 text-left">Date prévue</th>
+                    <th className="px-2 py-2 text-left">Prix total</th>
+                    <th className="px-2 py-2 text-left">Prix install</th>
+                    <th className="px-2 py-2 text-left">Mesure</th>
+                    <th className="px-2 py-2 text-left">Plan</th>
+                    <th className="px-2 py-2 text-left">Date envoi plan</th>
+                    <th className="px-2 py-2 text-left">Env. prod</th>
+                    <th className="px-2 py-2 text-left">Term.</th>
+                    <th className="px-2 py-2 text-left">Install.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balcons.map((b, i) => (
+                    <tr key={i} className="border-b border-gray-200 dark:border-gray-700">
+                      <td className="px-2 py-2">
+                        <input
+                          type="text"
+                          value={b.nom}
+                          onChange={(e) => updateBalcon(i, "nom", e.target.value)}
+                          className="w-24 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={b.piedsLineaires}
+                          onChange={(e) => updateBalcon(i, "piedsLineaires", parseInt(e.target.value) || 0)}
+                          className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={b.poteaux}
+                          onChange={(e) => updateBalcon(i, "poteaux", parseInt(e.target.value) || 0)}
+                          className="w-16 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="date"
+                          value={b.datePrevue || ""}
+                          onChange={(e) => updateBalcon(i, "datePrevue", e.target.value)}
+                          className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={b.prixTotal || 0}
+                          onChange={(e) => updateBalcon(i, "prixTotal", parseFloat(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={b.prixVenteInstallation || 0}
+                          onChange={(e) => updateBalcon(i, "prixVenteInstallation", parseFloat(e.target.value) || 0)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <select
+                          value={b.mesure || ""}
+                          onChange={(e) => updateBalcon(i, "mesure", e.target.value)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        >
+                          {CODE_PRODUCTION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select
+                          value={b.plan || ""}
+                          onChange={(e) => updateBalcon(i, "plan", e.target.value)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        >
+                          {CODE_PRODUCTION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="date"
+                          value={b.planApprobationEnvoyeLe || ""}
+                          onChange={(e) => updateBalcon(i, "planApprobationEnvoyeLe", e.target.value)}
+                          className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        />
+                      </td>
+                      <td className="px-2 py-2">
+                        <select
+                          value={b.envoyeProduction || ""}
+                          onChange={(e) => updateBalcon(i, "envoyeProduction", e.target.value)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        >
+                          {CODE_PRODUCTION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select
+                          value={b.termine || ""}
+                          onChange={(e) => updateBalcon(i, "termine", e.target.value)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        >
+                          {CODE_PRODUCTION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select
+                          value={b.installation || ""}
+                          onChange={(e) => updateBalcon(i, "installation", e.target.value)}
+                          className="w-20 px-2 py-1 bg-gray-50 dark:bg-gray-900 border rounded-lg"
+                        >
+                          {CODE_PRODUCTION_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Adresse avec autocomplétion */}
           <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Adresse</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <span className="text-red-500">*</span> Adresse
+            </label>
             <AddressAutocomplete
               value={formData.adresse}
               onChange={(addr) => setFormData({ ...formData, adresse: addr })}
               error={fieldErrors.find(e => e.field === 'adresse')?.message}
             />
           </div>
+
           <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Commentaire adresse</label>
-            <input type="text" value={formData.commentaireAdresse} onChange={(e) => setFormData({ ...formData, commentaireAdresse: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Commentaire adresse</label>
+            <input
+              type="text"
+              value={formData.commentaireAdresse}
+              onChange={(e) => setFormData({ ...formData, commentaireAdresse: e.target.value })}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+            />
           </div>
+
           <div className="mt-4">
-            <label className="block text-sm font-medium mb-2">Commentaire général</label>
-            <textarea value={formData.commentaire} onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })} rows={3} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none" />
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Commentaire général</label>
+            <textarea
+              value={formData.commentaire}
+              onChange={(e) => setFormData({ ...formData, commentaire: e.target.value })}
+              rows={3}
+              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl resize-none"
+            />
           </div>
+
           <div className="mt-4 flex items-center gap-4">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={formData.enProduction} onChange={(e) => setFormData({ ...formData, enProduction: e.target.checked })} className="w-4 h-4" />
+              <input
+                type="checkbox"
+                checked={formData.enProduction}
+                onChange={(e) => setFormData({ ...formData, enProduction: e.target.checked })}
+                className="w-4 h-4"
+              />
               <span className="text-sm">En production</span>
             </label>
           </div>
@@ -924,27 +1313,101 @@ export default function EditCommandePage() {
 
         {/* SECTION 2: DATES ET PRIX */}
         <Section icon={<Calendar />} title="Dates et Prix" isOpen={activeSection === "dates"} onToggle={() => setActiveSection(activeSection === "dates" ? null : "dates")}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div><label className="block text-sm font-medium mb-2">Date entrée</label><input type="date" value={formData.dateEntree} onChange={(e) => setFormData({ ...formData, dateEntree: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date prévue *</label><input type="date" value={formData.datePrevue} onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Date production (auto)</label><input type="date" value={formData.dateProduction} readOnly className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500" /></div>
-            <div><label className="block text-sm font-medium mb-2">Semaine prévue</label><div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-blue-700 dark:text-blue-300 font-semibold">{formData.datePrevue ? `S${Math.ceil(((new Date(formData.datePrevue).getTime() - new Date(new Date(formData.datePrevue).getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7)}` : "—"}</div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date entrée</label>
+              <input
+                type="date"
+                value={formData.dateEntree}
+                onChange={(e) => setFormData({ ...formData, dateEntree: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <span className="text-red-500">*</span> Date prévue
+              </label>
+              <input
+                type="date"
+                value={formData.datePrevue}
+                onChange={(e) => setFormData({ ...formData, datePrevue: e.target.value })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date production (auto)</label>
+              <input
+                type="date"
+                value={formData.dateProduction}
+                readOnly
+                className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date mesure (auto)</label>
+              <input
+                type="date"
+                value={formData.datePriseMesure}
+                readOnly
+                className="w-full px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Semaine prévue</label>
+              <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-blue-700 dark:text-blue-300 font-semibold">
+                {formData.datePrevue ? `S${Math.ceil(((new Date(formData.datePrevue).getTime() - new Date(new Date(formData.datePrevue).getFullYear(), 0, 1).getTime()) / 86400000 + 1) / 7)}` : "—"}
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-            <div><label className="block text-sm font-medium mb-2">Prix total ($)</label><input type="number" step="0.01" value={formData.prixTotal} onChange={(e) => setFormData({ ...formData, prixTotal: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Prix installation ($)</label><input type="number" step="0.01" value={formData.prixVenteInstallation} onChange={(e) => setFormData({ ...formData, prixVenteInstallation: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
-            <div><label className="block text-sm font-medium mb-2">Prix matériaux (auto)</label><div className="px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xl font-bold text-gray-900 dark:text-white">{formData.prixVenteMateriaux.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}</div></div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix total ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.prixTotal}
+                onChange={(e) => setFormData({ ...formData, prixTotal: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix installation ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.prixVenteInstallation}
+                onChange={(e) => setFormData({ ...formData, prixVenteInstallation: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Prix matériaux (auto)</label>
+              <div className="px-4 py-3 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xl font-bold text-gray-900 dark:text-white">
+                {formData.prixVenteMateriaux.toLocaleString("fr-CA", { style: "currency", currency: "CAD" })}
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Temps installation estimé (h)</label>
-              <input type="number" step="0.1" value={formData.tempsEstimeInstallation} onChange={(e) => setFormData({ ...formData, tempsEstimeInstallation: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Temps installation estimé (h)</label>
+              <input
+                type="number"
+                step="0.1"
+                value={formData.tempsEstimeInstallation}
+                onChange={(e) => setFormData({ ...formData, tempsEstimeInstallation: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
             </div>
             <div className="flex items-center pt-8">
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={formData.utiliserCalculAuto} onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })} className="w-4 h-4" />
+                <input
+                  type="checkbox"
+                  checked={formData.utiliserCalculAuto}
+                  onChange={(e) => setFormData({ ...formData, utiliserCalculAuto: e.target.checked })}
+                  className="w-4 h-4"
+                />
                 <span className="text-sm">Calcul automatique</span>
               </label>
             </div>
@@ -956,13 +1419,25 @@ export default function EditCommandePage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {PIEDS_LINEAIRES_FACTEURS.map(f => (
               <div key={f.key}>
-                <label className="block text-sm font-medium mb-2">{f.label} (×{f.facteur})</label>
-                <input type="number" min="0" value={formData[f.key as keyof typeof formData] as number || 0} onChange={(e) => setFormData({ ...formData, [f.key]: parseInt(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{f.label} (×{f.facteur})</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData[f.key as keyof typeof formData] as number || 0}
+                  onChange={(e) => setFormData({ ...formData, [f.key]: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
               </div>
             ))}
             <div>
-              <label className="block text-sm font-medium mb-2">Nombre de poteaux</label>
-              <input type="number" min="0" value={formData.nombrePoteaux} onChange={(e) => setFormData({ ...formData, nombrePoteaux: parseInt(e.target.value) || 0 })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" />
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nombre de poteaux</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.nombrePoteaux}
+                onChange={(e) => setFormData({ ...formData, nombrePoteaux: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+              />
             </div>
           </div>
           <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
@@ -975,25 +1450,43 @@ export default function EditCommandePage() {
 
         {/* SECTION 4: PRODUCTION */}
         <Section icon={<Factory />} title="Production" isOpen={activeSection === "production"} onToggle={() => setActiveSection(activeSection === "production" ? null : "production")}>
-          {/* Étape 1: Mesure */}
+          {/* 1. Mesure */}
           <div className="mb-4">
             <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">① Prise de mesure</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <SymbolSelect label="Mesure" value={formData.mesure} onChange={(v) => setFormData({ ...formData, mesure: v })} options={CODE_PRODUCTION_OPTIONS} />
-              <div><label className="block text-sm font-medium mb-2">Mesure donnée le</label><input type="date" value={formData.mesureDonneeLe} onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mesure donnée le</label>
+                <input
+                  type="date"
+                  value={formData.mesureDonneeLe}
+                  onChange={(e) => setFormData({ ...formData, mesureDonneeLe: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Étape 2: Plan */}
+          {/* 2. Plan & approbation */}
           <div className="mb-4">
             <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">② Plan &amp; approbation</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <SymbolSelect label="Plan" value={formData.plan} onChange={(v) => setFormData({ ...formData, plan: v })} options={CODE_PRODUCTION_OPTIONS} />
-              <div><label className="block text-sm font-medium mb-2">Date envoi approbation</label><input type="date" value={formData.planApprobationEnvoyeLe} onChange={(e) => setFormData({ ...formData, planApprobationEnvoyeLe: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl" /></div>
+              {formData.plan === "APPROBATION_PLAN" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date d'envoi pour approbation</label>
+                  <input
+                    type="date"
+                    value={formData.planApprobationEnvoyeLe}
+                    onChange={(e) => setFormData({ ...formData, planApprobationEnvoyeLe: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Étape 3: Production */}
+          {/* 3. Production */}
           <div className="mb-4">
             <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">③ Production</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1003,13 +1496,17 @@ export default function EditCommandePage() {
             </div>
           </div>
 
-          {/* Étape 4: Livraison & Installation */}
+          {/* 4. Livraison & Installation */}
           <div>
             <p className="text-[0.6875rem] font-semibold text-gray-400 uppercase tracking-wider mb-2">④ Livraison &amp; Installation</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Statut livraison</label>
-                <select value={formData.statutLivraison} onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Statut livraison</label>
+                <select
+                  value={formData.statutLivraison}
+                  onChange={(e) => setFormData({ ...formData, statutLivraison: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+                >
                   {STATUT_LIVRAISON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
@@ -1018,183 +1515,194 @@ export default function EditCommandePage() {
           </div>
         </Section>
 
-        {/* SECTION 5: ACHATS UNIFIÉS */}
+        {/* SECTION 5: ACHATS UNIFIÉE */}
         <Section icon={<ShoppingCart />} title="Achats" isOpen={activeSection === "achats"} onToggle={() => setActiveSection(activeSection === "achats" ? null : "achats")}>
-          {/* Achats globaux avec bouton formulaire */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { key: 'Fibre', statut: 'achatFibre', de: 'dateEnvoieFibre', dr: 'dateReceptionFibre', q: 'quantiteNonRecueFibre' },
-              { key: 'Limons', statut: 'achatLimons', de: 'dateEnvoieLimons', dr: 'dateReceptionLimons', q: 'quantiteNonRecueLimons' },
-              { key: 'Verres', statut: 'achatVerres', de: 'dateEnvoieVerres', dr: 'dateReceptionVerre', q: 'quantiteNonRecueVerres' },
-              { key: 'Colonnes', statut: 'achatColonnes', de: 'dateEnvoieColonnes', dr: 'dateReceptionColonnes', q: 'quantiteNonRecueColonnes' },
-              { key: 'Peinture', statut: 'achatPeinture', de: 'dateEnvoiePeinture', dr: 'dateReceptionPeinture', q: 'quantiteNonRecuePeinture' },
-              { key: 'Attaches', statut: 'achatAttaches', de: 'dateEnvoieAttaches', dr: 'dateReceptionAttaches', q: 'quantiteNonRecueAttaches' },
-              { key: 'Plancher alu.', statut: 'achatPlancherAluminium', de: 'dateEnvoiePlancherAluminium', dr: 'dateReceptionPlancherAluminium', q: 'quantiteNonRecuePlancherAluminium' },
-            ].map(item => {
-              const typeId = item.key.toUpperCase().replace(/[. ]/g, '_').replace('ALU_', 'ALUMINIUM');
-              const typeConfig = getTypeAchat(typeId === 'PLANCHER_ALU_' ? 'PLANCHER_ALUMINIUM' : typeId);
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium">Liste des achats</h4>
+              <button
+                type="button"
+                onClick={addPurchase}
+                className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm"
+              >
+                <Plus size={16} />
+                Ajouter un achat
+              </button>
+            </div>
+
+            {purchases.map((purchase, idx) => {
+              const typeConfig = getTypeAchat(purchase.typeAchat);
+              const phaseOptions = balcons.map(b => ({ value: b.numeroPhase, label: b.nom }));
+              const isStructure = purchase.typeAchat === "STRUCTURE";
               return (
-                <div key={item.key} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-semibold">{item.key}</label>
-                    {typeConfig && (
-                      <button type="button" onClick={() => setFormulaireModal({ isOpen: true, config: typeConfig })} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[0.6875rem] font-medium hover:bg-blue-200">
-                        📄 Formulaire
-                      </button>
-                    )}
+                <div key={purchase.id} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 flex-1">
+                      <div>
+                        <label className="block text-xs text-gray-500">Type d'achat</label>
+                        <select
+                          value={purchase.typeAchat}
+                          onChange={(e) => updatePurchase(idx, "typeAchat", e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                        >
+                          {TYPE_ACHAT_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500">Phase / Balcon / Plan</label>
+                        <select
+                          value={purchase.phaseNumero || ""}
+                          onChange={(e) => updatePurchase(idx, "phaseNumero", parseInt(e.target.value) || undefined)}
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                        >
+                          <option value="">— Global —</option>
+                          {phaseOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {!isStructure && (
+                        <div>
+                          <label className="block text-xs text-gray-500">Fournisseur</label>
+                          <select
+                            value={purchase.supplierId}
+                            onChange={(e) => updatePurchase(idx, "supplierId", e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                          >
+                            <option value="">— Sélectionner —</option>
+                            {fournisseurs.map(f => (
+                              <option key={f.id} value={f.id}>{f.nom}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePurchase(idx)}
+                      className="ml-3 p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <div className="space-y-2">
-                    <select value={(formData as any)[item.statut] || ''} onChange={(e) => setFormData({ ...formData, [item.statut]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-                      {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
-                    </select>
+
+                  {/* Champs communs */}
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
                     <div>
-                      <label className="block text-xs text-gray-500">Date d&apos;envoi</label>
-                      <input type="date" value={(formData as any)[item.de] || ''} onChange={(e) => setFormData({ ...formData, [item.de]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      <label className="block text-xs text-gray-500">Statut</label>
+                      <select
+                        value={purchase.statut}
+                        onChange={(e) => updatePurchase(idx, "statut", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      >
+                        {STATUT_ACHAT_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.symbol} {opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500">Date d'envoi</label>
+                      <input
+                        type="date"
+                        value={purchase.dateEnvoie}
+                        onChange={(e) => updatePurchase(idx, "dateEnvoie", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500">Date de réception</label>
-                      <input type="date" value={(formData as any)[item.dr] || ''} onChange={(e) => setFormData({ ...formData, [item.dr]: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      <input
+                        type="date"
+                        value={purchase.dateReception}
+                        onChange={(e) => updatePurchase(idx, "dateReception", e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500">Quantité non reçue</label>
-                      <input type="number" min="0" value={(formData as any)[item.q] || 0} onChange={(e) => setFormData({ ...formData, [item.q]: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
+                      <input
+                        type="number"
+                        min="0"
+                        value={purchase.quantiteNonRecue}
+                        onChange={(e) => updatePurchase(idx, "quantiteNonRecue", parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
                     </div>
+                  </div>
+
+                  {/* Champs spécifiques */}
+                  {isStructure ? (
+                    <div className="mt-3">
+                      <label className="block text-xs text-gray-500">Nom de la structure</label>
+                      <input
+                        type="text"
+                        value={purchase.formValues?.nom || ""}
+                        onChange={(e) => updatePurchase(idx, "formValues", { ...purchase.formValues, nom: e.target.value })}
+                        placeholder="Nom de la structure"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {typeConfig && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            onClick={() => setFormulaireModal({
+                              isOpen: true,
+                              config: typeConfig,
+                              phaseName: balcons.find(b => b.numeroPhase === purchase.phaseNumero)?.nom,
+                            })}
+                            className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm flex items-center gap-2"
+                          >
+                            <FileText size={16} />
+                            Ouvrir le formulaire d'achat
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="mt-3">
+                    <label className="block text-xs text-gray-500">Notes</label>
+                    <textarea
+                      value={purchase.notes}
+                      onChange={(e) => updatePurchase(idx, "notes", e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm resize-none"
+                    />
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Structures d'achat */}
-          <div className="mt-4">
-            <label className="flex items-center gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-              <input type="checkbox" checked={formData.structure} onChange={(e) => setFormData({ ...formData, structure: e.target.checked })} className="w-5 h-5" />
-              <span className="text-sm font-medium text-purple-700">Ajouter des structures d&apos;achat</span>
-            </label>
-          </div>
-          {formData.structure && (
-            <div className="mt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Structures d&apos;achat</h4>
-                <button type="button" onClick={addStructure} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
-                  <Plus size={16} /> Ajouter
-                </button>
-              </div>
-              {structuresAchat.map((s, i) => (
-                <div key={i} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <input type="text" value={s.nom} onChange={(e) => updateStructure(i, "nom", e.target.value)} placeholder="Nom" className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                    <button type="button" onClick={() => removeStructure(i)} className="ml-2 p-2 text-red-600"><Trash2 size={16} /></button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <select value={s.statutAchat} onChange={(e) => updateStructure(i, "statutAchat", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-                      {STATUT_ACHAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.symbol} {o.label}</option>)}
-                    </select>
-                    <input type="date" value={s.dateEnvoie || ""} onChange={(e) => updateStructure(i, "dateEnvoie", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                    <input type="date" value={s.dateReception || ""} onChange={(e) => updateStructure(i, "dateReception", e.target.value)} className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                    <input type="number" min="0" value={s.quantiteNonRecue || 0} onChange={(e) => updateStructure(i, "quantiteNonRecue", parseInt(e.target.value) || 0)} placeholder="Qté non reçue" className="px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Achats par phase/balcon (pour multi-phase, multiplan, commercial) */}
-          {(formData.typeCommande !== 'STANDARD' && balcons.length > 0) && (
-            <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-semibold text-gray-900 dark:text-white">Achats par {formData.typeCommande === 'MULTI_PHASE' ? 'phase' : formData.typeCommande === 'MULTIPLAN' ? 'plan' : 'balcon'}</h4>
-                <button type="button" onClick={addAchatPhase} className="flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm">
-                  <Plus size={16} /> Ajouter un achat
-                </button>
-              </div>
-
-              {achatsPhase.map((achat, index) => {
-                const phase = balcons.find(b => b.numeroPhase === achat.phaseNumero);
-                const typeConfig = getTypeAchat(achat.typeAchat);
-                return (
-                  <div key={index} className="p-4 mb-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-medium text-sm">Achat #{index + 1}{phase ? ` — ${phase.nom}` : ''}</span>
-                      <div className="flex items-center gap-2">
-                        {typeConfig && (
-                          <button type="button" onClick={() => setFormulaireModal({ isOpen: true, config: typeConfig, phaseName: phase?.nom })} className="px-2 py-1 bg-blue-100 text-blue-700 rounded-lg text-[0.6875rem] font-medium hover:bg-blue-200">
-                            📄 Formulaire
-                          </button>
-                        )}
-                        <button type="button" onClick={() => removeAchatPhase(index)} className="p-2 text-red-600"><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">{formData.typeCommande === 'MULTI_PHASE' ? 'Phase' : formData.typeCommande === 'MULTIPLAN' ? 'Plan' : 'Balcon'}</label>
-                        <select value={achat.phaseNumero} onChange={(e) => updateAchatPhase(index, "phaseNumero", parseInt(e.target.value))} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-                          {balcons.map(b => <option key={b.numeroPhase} value={b.numeroPhase}>{b.nom}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Type d&apos;achat</label>
-                        <select value={achat.typeAchat} onChange={(e) => updateAchatPhase(index, "typeAchat", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-                          {TYPE_ACHAT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Statut</label>
-                        <select value={achat.statut} onChange={(e) => updateAchatPhase(index, "statut", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm">
-                          {STATUT_ACHAT_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.symbol} {opt.label}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Date d&apos;envoi</label>
-                        <input type="date" value={achat.dateEnvoie || ""} onChange={(e) => updateAchatPhase(index, "dateEnvoie", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Date de réception</label>
-                        <input type="date" value={achat.dateReception || ""} onChange={(e) => updateAchatPhase(index, "dateReception", e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">Qté non reçue</label>
-                        <input type="number" min="0" value={achat.quantiteNonRecue || 0} onChange={(e) => updateAchatPhase(index, "quantiteNonRecue", parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm" />
-                      </div>
-                    </div>
-
-                    {achat.notes && (
-                      <div className="mt-2">
-                        <label className="block text-xs text-gray-500 mb-1">Notes</label>
-                        <textarea value={achat.notes || ""} onChange={(e) => updateAchatPhase(index, "notes", e.target.value)} rows={2} className="w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-lg text-sm resize-none" />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </Section>
 
-        {/* MODAL FORMULAIRE FOURNISSEUR */}
-        {formulaireModal.config && (
-          <FormulaireAchatModal
-            isOpen={formulaireModal.isOpen}
-            onClose={() => setFormulaireModal({ isOpen: false, config: null })}
-            config={formulaireModal.config}
-            commandeNumero={formData.numero}
-            phaseName={formulaireModal.phaseName}
-          />
-        )}
-
-        {/* SECTION 7: AVERTISSEMENTS */}
+        {/* SECTION 6: AVERTISSEMENTS */}
         <Section icon={<AlertTriangle />} title="Avertissements" isOpen={activeSection === "avertissements"} onToggle={() => setActiveSection(activeSection === "avertissements" ? null : "avertissements")}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <SymbolSelect label="Avertissement client" value={formData.avertissementClient} onChange={(v) => setFormData({ ...formData, avertissementClient: v })} options={AVERTISSEMENT_CLIENT_OPTIONS} />
-            <SymbolSelect label="Avertissement mesure" value={formData.avertissementPriseMesure} onChange={(v) => setFormData({ ...formData, avertissementPriseMesure: v })} options={AVERTISSEMENT_MESURE_OPTIONS} />
+            <SymbolSelect label="Avertissement prise de mesure" value={formData.avertissementPriseMesure} onChange={(v) => setFormData({ ...formData, avertissementPriseMesure: v })} options={AVERTISSEMENT_MESURE_OPTIONS} />
           </div>
         </Section>
 
-        {/* Boutons */}
+        {/* Boutons de soumission */}
         <div className="flex flex-col sm:flex-row gap-3 pt-4">
-          <button type="button" onClick={() => router.back()} className="flex-1 px-6 py-3.5 rounded-xl font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700">Annuler</button>
-          <button type="submit" disabled={saving} className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-white disabled:opacity-50" style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="flex-1 px-6 py-3.5 rounded-xl font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700"
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
+          >
             {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
             Enregistrer
           </button>
@@ -1224,8 +1732,8 @@ export default function EditCommandePage() {
                 <div><span className="text-gray-500">Couleur:</span> <span>{pendingFormData.couleur === "AUTRE" ? pendingFormData.couleurPersonnalisee : pendingFormData.couleur || "—"}</span></div>
               </div>
               <div className="mt-2 flex gap-4">
-                <div><span className="text-gray-500">Ancienne date:</span> <span className="line-through">{originalDatePrevue ? new Date(originalDatePrevue).toLocaleDateString('fr-CA') : "—"}</span></div>
-                <div><span className="text-gray-500">Nouvelle date:</span> <span className="font-bold text-blue-600">{pendingFormData.datePrevue ? new Date(pendingFormData.datePrevue).toLocaleDateString('fr-CA') : "—"}</span></div>
+                <div><span className="text-gray-500">Ancienne date:</span> <span className="line-through">{formatDateForDisplay(originalDatePrevue || "")}</span></div>
+                <div><span className="text-gray-500">Nouvelle date:</span> <span className="font-bold text-blue-600">{formatDateForDisplay(pendingFormData.datePrevue)}</span></div>
               </div>
             </div>
 
@@ -1270,27 +1778,24 @@ export default function EditCommandePage() {
               />
             </div>
 
-            {/* Destinataires */}
+            {/* Destinataires (basé sur les préférences du client) */}
             <div className="mb-4">
               <label className="block text-sm font-medium mb-2">Envoyer à :</label>
               <div className="space-y-2">
-                {clients.find(c => c.id === pendingFormData.clientId)?.telephone && (
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={sendToClientSms} onChange={(e) => setSendToClientSms(e.target.checked)} />
+                {clients.find(c => c.id === pendingFormData.clientId)?.communicationTexto && (
+                  <div className="flex items-center gap-2">
                     <span className="text-sm">📱 Client (SMS) : {clients.find(c => c.id === pendingFormData.clientId)?.telephone}</span>
-                  </label>
+                  </div>
                 )}
-                {clients.find(c => c.id === pendingFormData.clientId)?.emails?.map((email, idx) => (
-                  <label key={idx} className="flex items-center gap-2">
-                    <input type="checkbox" checked={sendToClientEmail} onChange={(e) => setSendToClientEmail(e.target.checked)} />
-                    <span className="text-sm">📧 Client : {email}</span>
-                  </label>
-                ))}
+                {clients.find(c => c.id === pendingFormData.clientId)?.communicationCourriel && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">📧 Client (email) : {clients.find(c => c.id === pendingFormData.clientId)?.emails?.join(", ")}</span>
+                  </div>
+                )}
                 {representants.find(r => r.id === pendingFormData.representantId)?.email && (
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={sendToRepresentantEmail} onChange={(e) => setSendToRepresentantEmail(e.target.checked)} />
+                  <div className="flex items-center gap-2">
                     <span className="text-sm">📧 Représentant : {representants.find(r => r.id === pendingFormData.representantId)?.email}</span>
-                  </label>
+                  </div>
                 )}
                 {additionalEmails.map((email, idx) => (
                   <div key={idx} className="flex items-center gap-2">
@@ -1303,7 +1808,7 @@ export default function EditCommandePage() {
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="Ajouter un email"
+                    placeholder="Ajouter un email supplémentaire"
                     className="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
                   />
                   <button onClick={handleAddEmail} className="px-3 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm">Ajouter</button>
@@ -1329,17 +1834,40 @@ export default function EditCommandePage() {
           </div>
         </div>
       )}
+
+      {/* Modal formulaire fournisseur */}
+      {formulaireModal.config && (
+        <FormulaireAchatModal
+          isOpen={formulaireModal.isOpen}
+          onClose={() => setFormulaireModal({ isOpen: false, config: null })}
+          config={formulaireModal.config}
+          commandeNumero={formData.numero}
+          phaseName={formulaireModal.phaseName}
+        />
+      )}
     </div>
   );
 }
 
 // Composants auxiliaires
-function Section({ icon, title, isOpen, onToggle, children }: { icon: React.ReactNode; title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }) {
+function Section({ icon, title, isOpen, onToggle, children }: {
+  icon: React.ReactNode;
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <button type="button" onClick={onToggle} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[var(--color-primary)]/10 rounded-xl flex items-center justify-center text-[var(--color-primary)]">{icon}</div>
+          <div className="w-10 h-10 bg-[var(--color-primary)]/10 rounded-xl flex items-center justify-center text-[var(--color-primary)]">
+            {icon}
+          </div>
           <h3 className="font-semibold text-gray-900 dark:text-white">{title}</h3>
         </div>
         <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
@@ -1349,12 +1877,25 @@ function Section({ icon, title, isOpen, onToggle, children }: { icon: React.Reac
   );
 }
 
-function SymbolSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string; symbol: string; color?: string }[] }) {
+function SymbolSelect({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string; symbol: string; color?: string }[];
+}) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-2">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
-        {options.map(o => <option key={o.value} value={o.value}>{o.symbol ? `${o.symbol} - ${o.label}` : o.label}</option>)}
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
+      >
+        {options.map(o => (
+          <option key={o.value} value={o.value}>
+            {o.symbol ? `${o.symbol} - ${o.label}` : o.label}
+          </option>
+        ))}
       </select>
     </div>
   );

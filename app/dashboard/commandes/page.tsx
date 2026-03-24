@@ -6,11 +6,12 @@ import {
   Plus, Search, Filter, Package, Truck, Wrench, Clock, AlertTriangle,
   ChevronDown, MoreHorizontal, Eye, Edit, Trash2, Calendar, Building2,
   CheckCircle2, XCircle, Loader2, TrendingUp, Box, Ruler, Layers,
-  MessageCircle, User, Users, FilterX, Settings, Save, X, Lock
+  MessageCircle, User, Users, FilterX, Settings, Save, X
 } from "lucide-react";
 import { useConfig } from "@/app/context/ConfigContext";
+import { useAuth } from "@/app/hooks/useAuth"; // Hook d'authentification
 
-// Types
+// Types (inchangés)
 interface Client { id: string; nom: string; type: string; telephone: string; personne_Contact: string; }
 interface Representant { id: string; nom: string; }
 interface Balcon { id: string; nom: string; numeroPhase: number; piedsLineaires: number; poteaux: number; }
@@ -53,7 +54,7 @@ interface Stats {
   reprises: number;
 }
 
-// Mappings
+// Mappings (inchangés)
 const CODE_SYMBOLS: Record<string, { symbol: string; color: string }> = {
   COMPLETE: { symbol: "✓", color: "text-green-600" },
   ATTENTE_CLIENT: { symbol: "At.C", color: "text-orange-600" },
@@ -136,6 +137,7 @@ const CouleurBadge = ({ couleur }: { couleur: string | null }) => {
 export default function CommandesPage() {
   const router = useRouter();
   const { config, refreshConfig } = useConfig();
+  const { user } = useAuth(); // Récupère l'utilisateur connecté
   const [commandes, setCommandes] = useState<Commande[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,11 +152,6 @@ export default function CommandesPage() {
   const [showClientMenu, setShowClientMenu] = useState(false);
   const clientContainerRef = useRef<HTMLDivElement>(null);
 
-  // États pour le modal de mot de passe
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordInput, setPasswordInput] = useState("");
-  const [passwordError, setPasswordError] = useState(false);
-
   // États pour le modal de configuration
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configForm, setConfigForm] = useState({
@@ -168,6 +165,9 @@ export default function CommandesPage() {
     facteurGardexUrbaine: 2,
     facteurGardexOptimum: 0.75,
   });
+
+  // Vérification du rôle pour accès paramètres
+  const canAccessSettings = user?.role === "ADMIN" || user?.role === "GESTIONNAIRE";
 
   // Remplir le formulaire quand la config est chargée
   useEffect(() => {
@@ -192,7 +192,6 @@ export default function CommandesPage() {
     fetchClients();
   }, [search, filters]);
 
-  // Mettre à jour le champ de recherche client quand le filtre change (par exemple après reset)
   useEffect(() => {
     if (filters.clientId) {
       const client = clients.find(c => c.id === filters.clientId);
@@ -202,7 +201,6 @@ export default function CommandesPage() {
     }
   }, [filters.clientId, clients]);
 
-  // Fermer le menu client en cliquant à l'extérieur
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showClientMenu && clientContainerRef.current && !clientContainerRef.current.contains(event.target as Node)) {
@@ -267,19 +265,6 @@ export default function CommandesPage() {
     setSearch("");
   };
 
-  // Gestion du mot de passe
-  const handlePasswordSubmit = () => {
-    const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
-    if (passwordInput === ADMIN_PASSWORD) {
-      setPasswordError(false);
-      setShowPasswordModal(false);
-      setPasswordInput("");
-      setShowConfigModal(true);
-    } else {
-      setPasswordError(true);
-    }
-  };
-
   const saveConfig = async () => {
     try {
       const facteurs = {
@@ -301,7 +286,7 @@ export default function CommandesPage() {
         }),
       });
       setShowConfigModal(false);
-      await refreshConfig(); // met à jour le contexte global
+      await refreshConfig();
     } catch (error) {
       console.error("Erreur sauvegarde config:", error);
     }
@@ -309,21 +294,23 @@ export default function CommandesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header avec bouton paramètres */}
+      {/* Header avec bouton paramètres conditionnel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Commandes</h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm">Gestion et suivi</p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={() => setShowPasswordModal(true)}
-            className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
-            style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
-          >
-            <Settings size={20} />
-            <span>Paramètres</span>
-          </button>
+          {canAccessSettings && (
+            <button
+              onClick={() => setShowConfigModal(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
+              style={{ background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))" }}
+            >
+              <Settings size={20} />
+              <span>Paramètres</span>
+            </button>
+          )}
           <button
             onClick={() => router.push("/dashboard/commandes/nouveau")}
             className="flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-white shadow-lg hover:shadow-xl transition"
@@ -335,7 +322,7 @@ export default function CommandesPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards (inchangé) */}
       {stats && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -347,7 +334,6 @@ export default function CommandesPage() {
             <StatCard icon={<CheckCircle2 size={20} />} label="Complétées" value={stats.completees} color="emerald" />
           </div>
 
-          {/* Stats par service */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <ServiceStat label="Installation" value={stats.parService.INSTALLATION || 0} color="red" />
             <ServiceStat label="Livraison" value={stats.parService.LIVRAISON || 0} color="blue" />
@@ -357,7 +343,7 @@ export default function CommandesPage() {
         </>
       )}
 
-      {/* Search & Filters */}
+      {/* Search & Filters (inchangé) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -397,7 +383,6 @@ export default function CommandesPage() {
           )}
         </div>
 
-        {/* Filtres déroulants */}
         {showFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <select
@@ -441,7 +426,6 @@ export default function CommandesPage() {
               ))}
             </select>
 
-            {/* Filtre client avec recherche par saisie */}
             <div className="relative" ref={clientContainerRef}>
               <input
                 type="text"
@@ -449,7 +433,6 @@ export default function CommandesPage() {
                 onChange={(e) => {
                   setClientSearch(e.target.value);
                   if (e.target.value === "") {
-                    // Si on efface, on retire le filtre client
                     setFilters({ ...filters, clientId: "" });
                   }
                 }}
@@ -495,7 +478,7 @@ export default function CommandesPage() {
         )}
       </div>
 
-      {/* Liste des commandes */}
+      {/* Liste des commandes (inchangée) */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-auto max-h-[calc(100vh-280px)]">
         {loading ? (
           <div className="flex items-center justify-center py-20">
@@ -531,7 +514,6 @@ export default function CommandesPage() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prévue</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Prod.</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300">Mesure</th>
-                {/* Colonne Statut supprimée, remplacée par Référence */}
                 <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Référence</th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-600 dark:text-gray-300">Actions</th>
               </tr>
@@ -611,7 +593,6 @@ export default function CommandesPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.dateProduction)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formatDate(c.datePriseMesure)}</td>
-                    {/* Nouvelle cellule pour la référence */}
                     <td className="px-4 py-3 text-center font-medium text-gray-900 dark:text-white">
                       {c.reference || "—"}
                     </td>
@@ -655,47 +636,7 @@ export default function CommandesPage() {
         )}
       </div>
 
-      {/* Modal de mot de passe */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <Lock className="w-6 h-6 text-[var(--color-primary)]" />
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Accès restreint</h3>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Veuillez entrer le mot de passe pour accéder aux paramètres.
-            </p>
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Mot de passe"
-              className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl mb-2"
-              onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
-            />
-            {passwordError && (
-              <p className="text-sm text-red-600 mb-2">Mot de passe incorrect</p>
-            )}
-            <div className="flex gap-3 mt-2">
-              <button
-                onClick={() => { setShowPasswordModal(false); setPasswordInput(""); setPasswordError(false); }}
-                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl font-medium"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handlePasswordSubmit}
-                className="flex-1 px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl font-medium"
-              >
-                Valider
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Paramètres */}
+      {/* Modal Paramètres (inchangé) */}
       {showConfigModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
@@ -840,7 +781,7 @@ export default function CommandesPage() {
   );
 }
 
-// Composants auxiliaires
+// Composants auxiliaires (inchangés)
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   const colors: Record<string, string> = {
     blue: "from-blue-500 to-blue-600",
