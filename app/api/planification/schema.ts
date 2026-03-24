@@ -35,7 +35,7 @@ export const STATUT_PLANIF_MAP: Record<string, { label: string; couleur: string 
   ANNULEE: { label: 'Annulée', couleur: 'bg-red-100 text-red-800' },
 };
 
-export const TYPE_COMMANDE_COULEUR: Record<string, string> = {
+export const TYPE_COMMANDE_COLORS: Record<string, string> = {
   STANDARD: 'bg-slate-100 text-slate-700',
   COMMERCIAL: 'bg-purple-100 text-purple-700',
   MULTIPLAN: 'bg-blue-100 text-blue-700',
