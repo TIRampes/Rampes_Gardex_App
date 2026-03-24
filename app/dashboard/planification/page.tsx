@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { usePlanification, useNonPlanifiees, useEquipes, useVehicules, useChauffeurs } from '@/app/hooks/usePlanification';
+import { usePlanification, useNonPlanifiees, useVehicules, useChauffeurs } from '@/app/hooks/usePlanification';
 import type { PlanificationView, CommandeNonPlanifiee } from '@/app/api/planification/schema';
 import {
   MONTH_NAMES, DAY_NAMES_SHORT, SERVICE_COULEUR, SERVICE_TEXT, TYPE_COMMANDE_COULEUR,
@@ -9,6 +9,7 @@ import {
   getProdStatusColor, getAchatStatusColor, getSymbol, getServiceBg, getServiceLabel,
   getWeekNumber, needsEquipe, needsChauffeur, needsMesureur,
 } from '@/app/api/planification/schema';
+import { useEquipes } from '@/app/hooks/useEquipes';
 
 export default function PlanificationPage() {
   const { planifications, stats, loading, charger, creer, modifier, envoyerAvis } = usePlanification();
