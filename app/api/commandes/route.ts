@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
         commentaire: rest.commentaire || null,
 
         // CORRECTION DU NOM DE LA RELATION : balcons (au pluriel)
-        balcon: balcons && balcons.length > 0 ? {
+        balcons: balcons && balcons.length > 0 ? {
           create: balcons.map((b, i) => ({
             nom: b.nom,
             numeroPhase: b.numeroPhase || i + 1,
