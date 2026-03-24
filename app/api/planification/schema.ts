@@ -26,6 +26,11 @@ export const SERVICE_TEXT: Record<string, string> = {
   MESURE: 'text-white',
 };
 
+export const COULEURS_EQUIPES = [
+  'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 
+  'bg-rose-500', 'bg-indigo-500', 'bg-orange-500', 'bg-slate-500'
+] as const;
+
 export const STATUT_PLANIF_MAP: Record<string, { label: string; couleur: string }> = {
   PLANIFIEE: { label: 'Planifiée', couleur: 'bg-purple-100 text-purple-800' },
   CONFIRMEE: { label: 'Confirmée', couleur: 'bg-blue-100 text-blue-800' },
