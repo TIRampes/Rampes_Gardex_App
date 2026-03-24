@@ -70,18 +70,29 @@ export async function POST(request: NextRequest) {
     if (!piece) return NextResponse.json({ error: 'Pièce non trouvée' }, { status: 404 })
 
     let quantiteApres = piece.quantite
+    let inventaireEmplacement1Apres = piece.inventaireEmplacement1
+    let partiPeintureApres = piece.partiPeinture
 
-    // Calculer la nouvelle quantité
+    // Calcul des nouvelles valeurs selon le type de transaction
     switch (type) {
       case 'ENTREE':
         quantiteApres += quantite
+        inventaireEmplacement1Apres += quantite
         break
       case 'SORTIE':
+        quantiteApres = Math.max(0, quantiteApres - quantite)
+        inventaireEmplacement1Apres = Math.max(0, inventaireEmplacement1Apres - quantite)
+        break
       case 'SORTIE_PEINTURE':
         quantiteApres = Math.max(0, quantiteApres - quantite)
+        inventaireEmplacement1Apres = Math.max(0, inventaireEmplacement1Apres - quantite)
+        partiPeintureApres += quantite
         break
       case 'AJUSTEMENT':
         quantiteApres = quantite
+        inventaireEmplacement1Apres = quantite
+        // Nota : on ne touche pas à inventaireEmplacement2 pour ne pas perdre de données.
+        // L'utilisateur pourra ajuster manuellement si nécessaire.
         break
     }
 
@@ -103,10 +114,9 @@ export async function POST(request: NextRequest) {
         where: { id: produitId },
         data: {
           quantite: quantiteApres,
+          inventaireEmplacement1: inventaireEmplacement1Apres,
+          partiPeinture: partiPeintureApres,
           dateDerniereTransaction: new Date(),
-          ...(type === 'SORTIE_PEINTURE'
-            ? { partiPeinture: piece.partiPeinture + quantite }
-            : {}),
         },
       }),
     ])

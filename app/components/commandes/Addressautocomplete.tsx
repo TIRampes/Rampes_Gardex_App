@@ -1,6 +1,6 @@
 // ╔══════════════════════════════════════════════════════════╗
 // ║  FICHIER: components/AddressAutocomplete.tsx              ║
-// ║  NOUVEAU — copier dans components/                        ║
+// ║  Description: Composant pour la saisie d'adresse avec auto-complétion  ║
 // ║  Utilise NEXT_PUBLIC_GOOGLE_MAPS_API_KEY du .env           ║
 // ╚══════════════════════════════════════════════════════════╝
 

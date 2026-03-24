@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePieces, useFournisseurs, useUnites, useCategories, useTransactions } from '@/app/hooks/useInventaire';
 import type { Piece, FournisseurInv, UniteInv, CategorieInv, Transaction, VueInventaire } from '@/app/api/inventaire/PieceSchema';
 import SlidePanel from '@/app/components/inventaire/Slidepanel';
@@ -27,6 +27,7 @@ function InventaireContent() {
   const [showPiecesModal, setShowPiecesModal] = useState(false);
   const [showFournisseursModal, setShowFournisseursModal] = useState(false);
   const [showUnitesModal, setShowUnitesModal] = useState(false);
+  const [recherchePiecesModal, setRecherchePiecesModal] = useState(''); // Recherche dans modal Pièces
 
   // === ÉTATS SLIDE PANELS (create/edit) ===
   const [slidePiece, setSlidePiece] = useState<{ ouvert: boolean; piece: Piece | null }>({ ouvert: false, piece: null });
@@ -45,6 +46,19 @@ function InventaireContent() {
   type TypeTransaction = 'ENTREE' | 'SORTIE' | 'AJUSTEMENT' | 'SORTIE_PEINTURE';
   const [pieceSelectionnee, setPieceSelectionnee] = useState<Piece | null>(null);
   const [transaction, setTransaction] = useState<{ type: TypeTransaction; quantite: number }>({ type: 'ENTREE', quantite: 0 });
+  const [piecePeinteSelectionnee, setPiecePeinteSelectionnee] = useState<Piece | null>(null); // Pour Sortie-Peinture
+
+  // === ÉTAT COMMANDES DE PEINTURE EN ATTENTE DE RÉCEPTION ===
+  interface CommandePeinture {
+    id: number;
+    produitPeintId: string;
+    code: string;
+    description: string;
+    quantite: number;
+    dateDepart: Date;
+    ordre: number;
+  }
+  const [commandesPeinture, setCommandesPeinture] = useState<CommandePeinture[]>([]);
 
   // === ÉTAT CONFIRM ===
   const [confirm, setConfirm] = useState<{ ouvert: boolean; titre: string; message: string; onConfirm: () => void }>({
@@ -75,64 +89,105 @@ function InventaireContent() {
     chargerTransactions();
   }, [chargerPieces, chargerFournisseurs, chargerUnites, chargerCategories, chargerTransactions]);
 
+  // === Mettre à jour la pièce sélectionnée quand la liste des pièces change (pour garder l'objet à jour) ===
+  useEffect(() => {
+    if (pieceSelectionnee) {
+      const updatedPiece = pieces.find(p => p.id === pieceSelectionnee.id);
+      if (updatedPiece) setPieceSelectionnee(updatedPiece);
+      else setPieceSelectionnee(null);
+    }
+  }, [pieces, pieceSelectionnee]);
+
   // === HELPERS ===
-  const formaterDate = (dateStr: string | null | undefined) => {
+  const formaterDate = useCallback((dateStr: string | null | undefined) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
-  };
+  }, []);
 
-  const getCouleurStock = (inventaire: number, pointCommande: number) => {
+  const getCouleurStock = useCallback((inventaire: number, pointCommande: number) => {
     if (pointCommande === 0) return 'bg-white';
     if (inventaire <= 0) return 'bg-red-100';
     if (inventaire <= pointCommande) return 'bg-yellow-100';
     return 'bg-green-100';
-  };
+  }, []);
 
-  const getCouleurPointCommande = (inventaire: number, pointCommande: number) => {
+  const getCouleurPointCommande = useCallback((inventaire: number, pointCommande: number) => {
     if (pointCommande === 0) return 'text-slate-600';
     if (inventaire <= pointCommande) return 'text-red-600 font-bold';
     return 'text-green-600';
-  };
+  }, []);
 
-  const getTypeLabel = (type: string) => {
+  const getTypeLabel = useCallback((type: string) => {
     const map: Record<string, string> = {
       ENTREE: 'Entrée', SORTIE: 'Sortie', AJUSTEMENT: 'Mise à jour',
       SORTIE_PEINTURE: 'Sortie-Peinture', TRANSFERT: 'Transfert', RETOUR: 'Retour',
     };
     return map[type] || type;
-  };
+  }, []);
 
-  // === FILTRAGE LOCAL ===
-  const piecesFiltrees = pieces.filter((piece) => {
-    const matchRecherche = !recherche ||
-      piece.code.toLowerCase().includes(recherche.toLowerCase()) ||
-      piece.nom.toLowerCase().includes(recherche.toLowerCase());
-    const matchCategorie = !filtreCategorie || piece.categoriePieceId === filtreCategorie;
-    const matchFournisseur = !filtreFournisseur || piece.fournisseurId === filtreFournisseur;
-    const matchPointCommande = !filtrePointCommande || (piece.quantite <= piece.seuilMin && piece.seuilMin > 0);
-    return matchRecherche && matchCategorie && matchFournisseur && matchPointCommande;
-  });
+  // === FILTRAGE LOCAL (mémorisé) ===
+  const piecesFiltrees = useMemo(() => {
+    return pieces.filter((piece) => {
+      const matchRecherche = !recherche ||
+        piece.code.toLowerCase().includes(recherche.toLowerCase()) ||
+        piece.nom.toLowerCase().includes(recherche.toLowerCase());
+      const matchCategorie = !filtreCategorie || piece.categoriePieceId === filtreCategorie;
+      const matchFournisseur = !filtreFournisseur || piece.fournisseurId === filtreFournisseur;
+      const matchPointCommande = !filtrePointCommande || (piece.quantite <= piece.seuilMin && piece.seuilMin > 0);
+      return matchRecherche && matchCategorie && matchFournisseur && matchPointCommande;
+    });
+  }, [pieces, recherche, filtreCategorie, filtreFournisseur, filtrePointCommande]);
 
-  const transactionsFiltrees = transactions.filter((trans) => {
-    const matchRecherche = !rechercheTransaction ||
-      trans.produit?.code.toLowerCase().includes(rechercheTransaction.toLowerCase()) ||
-      trans.produit?.nom.toLowerCase().includes(rechercheTransaction.toLowerCase());
-    const matchDate = !dateTransaction || trans.createdAt >= dateTransaction;
-    return matchRecherche && matchDate;
-  });
+  const transactionsFiltrees = useMemo(() => {
+    return transactions.filter((trans) => {
+      const matchRecherche = !rechercheTransaction ||
+        trans.produit?.code.toLowerCase().includes(rechercheTransaction.toLowerCase()) ||
+        trans.produit?.nom.toLowerCase().includes(rechercheTransaction.toLowerCase());
+      const matchDate = !dateTransaction || trans.createdAt >= dateTransaction;
+      return matchRecherche && matchDate;
+    });
+  }, [transactions, rechercheTransaction, dateTransaction]);
 
-  // === ACTIONS CRUD ===
-  const ouvrirAjouterPiece = () => {
+  // Liste des pièces pour la sélection (avec filtre recherchePiece)
+  const piecesPourSelection = useMemo(() => {
+    return pieces.filter((p) =>
+      !recherchePiece ||
+      p.code.toLowerCase().includes(recherchePiece.toLowerCase()) ||
+      p.nom.toLowerCase().includes(recherchePiece.toLowerCase())
+    );
+  }, [pieces, recherchePiece]);
+
+  // Liste des pièces non peintes (celles qu'on peut envoyer à la peinture)
+  const piecesNonPeintes = useMemo(() => {
+    return piecesPourSelection.filter(p => !p.piecePeinte);
+  }, [piecesPourSelection]);
+
+  // Pour Sortie-Peinture : liste des pièces peintes qui correspondent à la pièce non peinte sélectionnée
+  const piecesPeintesAssociees = useMemo(() => {
+    if (!pieceSelectionnee || !pieceSelectionnee.code) return [];
+    return pieces.filter(p => p.piecePeinte && p.codePieceNonPeinte === pieceSelectionnee.code);
+  }, [pieces, pieceSelectionnee]);
+
+  // Liste des pièces pour le modal (avec recherche)
+  const piecesModalFiltrees = useMemo(() => {
+    return pieces.filter(p =>
+      p.code.toLowerCase().includes(recherchePiecesModal.toLowerCase()) ||
+      p.nom.toLowerCase().includes(recherchePiecesModal.toLowerCase())
+    );
+  }, [pieces, recherchePiecesModal]);
+
+  // === ACTIONS CRUD (mémorisées) ===
+  const ouvrirAjouterPiece = useCallback(() => {
     setFormPiece({
       code: '', nom: '', description: '', couleur: '', categoriePieceId: '', uniteId: '',
       fournisseurId: '', seuilMin: 0, prixUnitaire: undefined,
       piecePeinte: false, codePieceNonPeinte: '', emplacement: '', emplacement2: '',
     });
     setSlidePiece({ ouvert: true, piece: null });
-  };
+  }, []);
 
-  const ouvrirModifierPiece = (piece: Piece) => {
+  const ouvrirModifierPiece = useCallback((piece: Piece) => {
     setFormPiece({
       code: piece.code, nom: piece.nom, description: piece.description || '',
       couleur: piece.couleur || '', categoriePieceId: piece.categoriePieceId || '',
@@ -142,9 +197,9 @@ function InventaireContent() {
       emplacement: piece.emplacement || '', emplacement2: piece.emplacement2 || '',
     });
     setSlidePiece({ ouvert: true, piece });
-  };
+  }, []);
 
-  const sauvegarderPiece = async () => {
+  const sauvegarderPiece = useCallback(async () => {
     try {
       if (slidePiece.piece) {
         await modifierPiece(slidePiece.piece.id, formPiece);
@@ -158,22 +213,22 @@ function InventaireContent() {
     } catch (e: any) {
       toast(e.message || 'Erreur lors de la sauvegarde', 'error');
     }
-  };
+  }, [formPiece, slidePiece.piece, modifierPiece, creerPiece, chargerPieces, toast]);
 
-  const ouvrirAjouterFournisseur = () => {
+  const ouvrirAjouterFournisseur = useCallback(() => {
     setFormFournisseur({ nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '' });
     setSlideFournisseur({ ouvert: true, fournisseur: null });
-  };
+  }, []);
 
-  const ouvrirModifierFournisseur = (f: FournisseurInv) => {
+  const ouvrirModifierFournisseur = useCallback((f: FournisseurInv) => {
     setFormFournisseur({
       nom: f.nom, contact: f.contact || '', telephone: f.telephone || '',
       email: f.email || '', adresse: f.adresse || '', notes: f.notes || '',
     });
     setSlideFournisseur({ ouvert: true, fournisseur: f });
-  };
+  }, []);
 
-  const sauvegarderFournisseur = async () => {
+  const sauvegarderFournisseur = useCallback(async () => {
     try {
       if (slideFournisseur.fournisseur) {
         await modifierFournisseur(slideFournisseur.fournisseur.id, formFournisseur);
@@ -187,9 +242,9 @@ function InventaireContent() {
     } catch (e: any) {
       toast(e.message || 'Erreur lors de la sauvegarde', 'error');
     }
-  };
+  }, [formFournisseur, slideFournisseur.fournisseur, modifierFournisseur, creerFournisseur, chargerFournisseurs, toast]);
 
-  const confirmerSuppression = (type: string, id: string, nom: string) => {
+  const confirmerSuppression = useCallback((type: string, id: string, nom: string) => {
     setConfirm({
       ouvert: true,
       titre: `Supprimer ${type}`,
@@ -213,32 +268,99 @@ function InventaireContent() {
         setConfirm({ ouvert: false, titre: '', message: '', onConfirm: () => {} });
       },
     });
-  };
+  }, [supprimerPiece, supprimerFournisseur, supprimerUnite, chargerPieces, chargerFournisseurs, chargerUnites, toast]);
 
-  const enregistrerTransaction = async () => {
+  const enregistrerTransaction = useCallback(async () => {
     if (!pieceSelectionnee || transaction.quantite <= 0) {
       toast('Veuillez sélectionner une pièce et entrer une quantité valide', 'error');
       return;
     }
+
+    // Gestion spéciale pour Sortie-Peinture
+    if (transaction.type === 'SORTIE_PEINTURE') {
+      if (!piecePeinteSelectionnee) {
+        toast('Veuillez sélectionner la pièce de couleur', 'error');
+        return;
+      }
+
+      // Créer la transaction pour la pièce non peinte (sortie vers peinture)
+      try {
+        await creerTransaction({
+          produitId: pieceSelectionnee.id,
+          type: 'SORTIE_PEINTURE',
+          quantite: transaction.quantite,
+          notes: `Envoi à la peinture pour ${piecePeinteSelectionnee.code}`,
+          emplacement: 'Magasin',
+        });
+        toast(`Sortie-Peinture enregistrée pour ${pieceSelectionnee.code}`);
+
+        // Ajouter une commande de réception pour la pièce peinte
+        const newCommande: CommandePeinture = {
+          id: Date.now(),
+          produitPeintId: piecePeinteSelectionnee.id,
+          code: piecePeinteSelectionnee.code,
+          description: piecePeinteSelectionnee.nom,
+          quantite: transaction.quantite,
+          dateDepart: new Date(),
+          ordre: Date.now(),
+        };
+        setCommandesPeinture(prev => [...prev, newCommande]);
+
+        // Réinitialiser la sélection de la pièce peinte
+        setPiecePeinteSelectionnee(null);
+      } catch (e: any) {
+        toast(e.message || 'Erreur lors de la transaction', 'error');
+        return;
+      }
+    } else {
+      // Transaction normale (Entrée, Sortie, Ajustement)
+      try {
+        await creerTransaction({
+          produitId: pieceSelectionnee.id,
+          type: transaction.type,
+          quantite: transaction.quantite,
+          notes: '',
+          emplacement: 'Magasin',
+        });
+        toast(`${getTypeLabel(transaction.type)} enregistrée avec succès`);
+      } catch (e: any) {
+        toast(e.message || 'Erreur lors de la transaction', 'error');
+        return;
+      }
+    }
+
+    // Recharger les données
+    chargerPieces();
+    chargerTransactions();
+
+    // Ne pas réinitialiser la pièce sélectionnée pour pouvoir vérifier l'effet
+    setTransaction({ type: 'ENTREE', quantite: 0 });
+  }, [pieceSelectionnee, transaction, piecePeinteSelectionnee, creerTransaction, chargerPieces, chargerTransactions, toast, getTypeLabel]);
+
+  const recevoirCommandePeinture = useCallback(async (commande: CommandePeinture) => {
     try {
+      // Créer une transaction d'entrée pour la pièce peinte
       await creerTransaction({
-        produitId: pieceSelectionnee.id,
-        type: transaction.type,
-        quantite: transaction.quantite,
-        notes: '',
-        emplacement: '',
+        produitId: commande.produitPeintId,
+        type: 'ENTREE',
+        quantite: commande.quantite,
+        notes: `Réception de peinture - commande du ${commande.dateDepart.toLocaleDateString()}`,
+        emplacement: 'Magasin',
       });
-      toast(`${getTypeLabel(transaction.type)} enregistrée avec succès`);
-      setTransaction({ type: 'ENTREE', quantite: 0 });
-      setPieceSelectionnee(null);
+      toast(`Réception de ${commande.code} (${commande.quantite}) enregistrée`);
+
+      // Retirer la commande de la liste
+      setCommandesPeinture(prev => prev.filter(c => c.id !== commande.id));
+
+      // Recharger les données
       chargerPieces();
       chargerTransactions();
     } catch (e: any) {
-      toast(e.message || 'Erreur lors de la transaction', 'error');
+      toast(e.message || 'Erreur lors de la réception', 'error');
     }
-  };
+  }, [creerTransaction, chargerPieces, chargerTransactions, toast]);
 
-  const ajouterUniteInline = async () => {
+  const ajouterUniteInline = useCallback(async () => {
     if (!nouvelleUnite.unite) {
       toast("Veuillez entrer le nom de l'unité", 'error');
       return;
@@ -251,22 +373,22 @@ function InventaireContent() {
     } catch (e: any) {
       toast(e.message || "Erreur lors de l'ajout", 'error');
     }
-  };
+  }, [nouvelleUnite, creerUnite, chargerUnites, toast]);
 
-  const toggleAchatFait = async (piece: Piece) => {
+  const toggleAchatFait = useCallback(async (piece: Piece) => {
     try {
       await modifierPiece(piece.id, { achatFait: !piece.achatFait });
       chargerPieces();
     } catch (e: any) {
       toast(e.message || 'Erreur', 'error');
     }
-  };
+  }, [modifierPiece, chargerPieces, toast]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║         VUE LISTE DES PIÈCES EN INVENTAIRE          ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const VueListeInventaire = () => (
+  const VueListeInventaire = useMemo(() => (
     <div className="space-y-[1rem]">
       <h2 className="text-[1.5rem] font-bold text-center text-slate-800 underline">Liste des pièces en inventaire</h2>
 
@@ -338,7 +460,7 @@ function InventaireContent() {
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700 underline hidden md:table-cell">Parti peinture</th>
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700 underline">Point commande</th>
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700">Achat fait</th>
-              </tr>
+               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loadingPieces ? (
@@ -379,13 +501,17 @@ function InventaireContent() {
         </div>
       </div>
     </div>
-  );
+  ), [
+    loadingPieces, piecesFiltrees, categories, fournisseurs, recherche, filtreCategorie,
+    filtreFournisseur, filtrePointCommande, getCouleurStock, getCouleurPointCommande,
+    ouvrirModifierPiece, toggleAchatFait
+  ]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║              VUE ENTRÉES / SORTIES                   ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const VueEntreesSorties = () => (
+  const VueEntreesSorties = useMemo(() => (
     <div className="space-y-[1.5rem]">
       <h2 className="text-[1.5rem] font-bold text-center text-slate-800 underline">Entrée / Sortie d&apos;inventaire</h2>
 
@@ -432,17 +558,15 @@ function InventaireContent() {
               onChange={(e) => {
                 const p = pieces.find((p) => p.id === e.target.value);
                 setPieceSelectionnee(p || null);
+                // Réinitialiser la sélection de pièce peinte si la pièce change
+                setPiecePeinteSelectionnee(null);
               }}
               className="w-full px-[1rem] py-[0.75rem] border border-slate-300 rounded-lg bg-white text-[0.875rem]"
             >
               <option value="">Sélectionner...</option>
-              {pieces
-                .filter((p) => !recherchePiece ||
-                  p.code.toLowerCase().includes(recherchePiece.toLowerCase()) ||
-                  p.nom.toLowerCase().includes(recherchePiece.toLowerCase()))
-                .map((piece) => (
-                  <option key={piece.id} value={piece.id}>{piece.code}</option>
-                ))}
+              {piecesNonPeintes.map((piece) => (
+                <option key={piece.id} value={piece.id}>{piece.code}</option>
+              ))}
             </select>
             {pieceSelectionnee && (
               <div className="mt-[0.5rem] p-[0.5rem] bg-white rounded border text-[0.875rem]">
@@ -484,34 +608,78 @@ function InventaireContent() {
             Enregistrer {getTypeLabel(transaction.type)}
           </button>
         </div>
+
+        {/* Champ supplémentaire pour Sortie-Peinture : choix de la pièce peinte */}
+        {transaction.type === 'SORTIE_PEINTURE' && pieceSelectionnee && (
+          <div className="mt-4">
+            <label className="block text-[0.875rem] font-semibold text-slate-700 mb-[0.5rem]">Pièce de couleur (pièce peinte à réceptionner)</label>
+            <select
+              value={piecePeinteSelectionnee?.id || ''}
+              onChange={(e) => {
+                const p = piecesPeintesAssociees.find(p => p.id === e.target.value);
+                setPiecePeinteSelectionnee(p || null);
+              }}
+              className="w-full px-[1rem] py-[0.75rem] border border-slate-300 rounded-lg bg-white text-[0.875rem]"
+            >
+              <option value="">Sélectionner...</option>
+              {piecesPeintesAssociees.map((p) => (
+                <option key={p.id} value={p.id}>{p.code} - {p.nom}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
-      {/* Section réception commande */}
+      {/* Section réception commande (dynamique) */}
       <div className="bg-red-100 rounded-xl p-[1.5rem] border border-red-300">
         <h3 className="text-[1.25rem] font-bold text-center text-slate-800 mb-[1rem] underline">Réceptionner une commande</h3>
-        <table className="w-full text-[0.875rem]">
-          <thead>
-            <tr className="border-b-2 border-slate-300">
-              <th className="px-[1rem] py-[0.5rem] text-left font-semibold underline">Code</th>
-              <th className="px-[1rem] py-[0.5rem] text-left font-semibold underline">Description</th>
-              <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline">Qté</th>
-              <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline"># Ordre</th>
-              <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline">Date de départ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td colSpan={5} className="px-[1rem] py-[1.5rem] text-center text-slate-500 text-[0.8125rem]">Aucune commande en attente de réception</td></tr>
-          </tbody>
-        </table>
+        {commandesPeinture.length === 0 ? (
+          <p className="text-center text-slate-500 text-[0.8125rem]">Aucune commande en attente de réception</p>
+        ) : (
+          <table className="w-full text-[0.875rem]">
+            <thead>
+              <tr className="border-b-2 border-slate-300">
+                <th className="px-[1rem] py-[0.5rem] text-left font-semibold underline">Code</th>
+                <th className="px-[1rem] py-[0.5rem] text-left font-semibold underline">Description</th>
+                <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline">Qté</th>
+                <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline"># Ordre</th>
+                <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline">Date de départ</th>
+                <th className="px-[1rem] py-[0.5rem] text-center font-semibold underline">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {commandesPeinture.map((cmd) => (
+                <tr key={cmd.id} className="border-b border-slate-200">
+                  <td className="px-[1rem] py-[0.5rem]">{cmd.code}</td>
+                  <td className="px-[1rem] py-[0.5rem]">{cmd.description}</td>
+                  <td className="px-[1rem] py-[0.5rem] text-center">{cmd.quantite}</td>
+                  <td className="px-[1rem] py-[0.5rem] text-center">{cmd.ordre}</td>
+                  <td className="px-[1rem] py-[0.5rem] text-center">{cmd.dateDepart.toLocaleDateString('fr-CA')}</td>
+                  <td className="px-[1rem] py-[0.5rem] text-center">
+                    <button
+                      onClick={() => recevoirCommandePeinture(cmd)}
+                      className="text-blue-600 hover:underline text-[0.8125rem]"
+                    >
+                      Réceptionner
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
-  );
+  ), [
+    recherchePiece, piecesNonPeintes, pieceSelectionnee, transaction, piecePeinteSelectionnee,
+    piecesPeintesAssociees, commandesPeinture, enregistrerTransaction, getTypeLabel, recevoirCommandePeinture
+  ]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║                VUE TRANSACTIONS                      ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const VueTransactions = () => (
+  const VueTransactions = useMemo(() => (
     <div className="space-y-[1rem]">
       <h2 className="text-[1.5rem] font-bold text-center text-slate-800 underline">Transaction d&apos;inventaire</h2>
 
@@ -582,15 +750,14 @@ function InventaireContent() {
         </table>
       </div>
     </div>
-  );
+  ), [transactionsFiltrees, getTypeLabel, formaterDate]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║               MODAL PIÈCES (DÉTAILLÉE)               ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const PiecesModal = () => {
+  const PiecesModal = useMemo(() => {
     if (!showPiecesModal) return null;
-    const piecesAPeinturer = pieces.filter((p) => p.piecePeinte);
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[1rem]">
@@ -601,6 +768,8 @@ function InventaireContent() {
               <label className="text-slate-700 text-[0.875rem]">Recherche par code:</label>
               <input
                 type="text"
+                value={recherchePiecesModal}
+                onChange={(e) => setRecherchePiecesModal(e.target.value)}
                 className="px-[1rem] py-[0.5rem] border rounded-lg flex-1 max-w-[25rem] text-[0.875rem]"
                 placeholder="Rechercher..."
               />
@@ -622,7 +791,7 @@ function InventaireContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {pieces.map((piece) => (
+                {piecesModalFiltrees.map((piece) => (
                   <tr key={piece.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => { setShowPiecesModal(false); ouvrirModifierPiece(piece); }}>
                     <td className="px-[0.75rem] py-[0.5rem]">
                       <p className="font-medium">{piece.code}</p>
@@ -691,13 +860,13 @@ function InventaireContent() {
         </div>
       </div>
     );
-  };
+  }, [showPiecesModal, piecesModalFiltrees, ouvrirModifierPiece, ouvrirAjouterPiece, confirmerSuppression, getCouleurStock, formaterDate]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║              MODAL FOURNISSEURS                      ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const FournisseursModal = () => {
+  const FournisseursModal = useMemo(() => {
     if (!showFournisseursModal) return null;
 
     return (
@@ -762,13 +931,13 @@ function InventaireContent() {
         </div>
       </div>
     );
-  };
+  }, [showFournisseursModal, fournisseurs, ouvrirModifierFournisseur, ouvrirAjouterFournisseur, confirmerSuppression]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║                 MODAL UNITÉS                         ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const UnitesModal = () => {
+  const UnitesModal = useMemo(() => {
     if (!showUnitesModal) return null;
 
     return (
@@ -856,13 +1025,13 @@ function InventaireContent() {
         </div>
       </div>
     );
-  };
+  }, [showUnitesModal, unites, nouvelleUnite, ajouterUniteInline, confirmerSuppression]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║            SLIDE PANEL - PIÈCE                       ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const SlidePieceForm = () => (
+  const SlidePieceForm = useMemo(() => (
     <SlidePanel
       ouvert={slidePiece.ouvert}
       onFermer={() => setSlidePiece({ ouvert: false, piece: null })}
@@ -1007,13 +1176,13 @@ function InventaireContent() {
         </button>
       </div>
     </SlidePanel>
-  );
+  ), [slidePiece, formPiece, categories, fournisseurs, unites, sauvegarderPiece]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║          SLIDE PANEL - FOURNISSEUR                   ║
   // ╚══════════════════════════════════════════════════════╝
 
-  const SlideFournisseurForm = () => (
+  const SlideFournisseurForm = useMemo(() => (
     <SlidePanel
       ouvert={slideFournisseur.ouvert}
       onFermer={() => setSlideFournisseur({ ouvert: false, fournisseur: null })}
@@ -1091,7 +1260,7 @@ function InventaireContent() {
         </button>
       </div>
     </SlidePanel>
-  );
+  ), [slideFournisseur, formFournisseur, sauvegarderFournisseur]);
 
   // ╔══════════════════════════════════════════════════════╗
   // ║              RENDU PRINCIPAL                         ║
@@ -1100,13 +1269,13 @@ function InventaireContent() {
   return (
     <div className="space-y-[1.5rem]">
       {/* Modals */}
-      <PiecesModal />
-      <FournisseursModal />
-      <UnitesModal />
+      {PiecesModal}
+      {FournisseursModal}
+      {UnitesModal}
 
       {/* Slide Panels */}
-      <SlidePieceForm />
-      <SlideFournisseurForm />
+      {SlidePieceForm}
+      {SlideFournisseurForm}
 
       {/* Confirm Dialog */}
       <ConfirmDialog
@@ -1119,10 +1288,9 @@ function InventaireContent() {
         danger
       />
 
-      {/* Header avec navigation (identique à App.js) */}
+      {/* Header avec navigation */}
       <div className="bg-slate-800 rounded-2xl p-[1rem] flex flex-wrap items-center justify-between gap-[0.75rem]">
         <div className="flex items-center gap-[1rem] flex-wrap">
-          {/* Boutons de navigation principale */}
           <div className="flex gap-[0.5rem]">
             <button
               onClick={() => setVueActive('liste')}
@@ -1153,7 +1321,6 @@ function InventaireContent() {
           <h1 className="text-[1.5rem] font-bold text-white ml-[1rem]">Inventaire</h1>
         </div>
 
-        {/* Boutons de droite */}
         <div className="flex items-center gap-[0.5rem] flex-wrap">
           <button
             onClick={() => setShowPiecesModal(true)}
@@ -1176,10 +1343,10 @@ function InventaireContent() {
         </div>
       </div>
 
-      {/* Contenu selon la vue active (DOUBLON CORRIGÉ) */}
-      {vueActive === 'liste' && <VueListeInventaire />}
-      {vueActive === 'entrees-sorties' && <VueEntreesSorties />}
-      {vueActive === 'transactions' && <VueTransactions />}
+      {/* Contenu selon la vue active */}
+      {vueActive === 'liste' && VueListeInventaire}
+      {vueActive === 'entrees-sorties' && VueEntreesSorties}
+      {vueActive === 'transactions' && VueTransactions}
     </div>
   );
 }

@@ -42,7 +42,7 @@ const TOUS_LES_MENUS = [
   { id: "rentabilite",    name: "Rentabilité",       href: "/dashboard/rentabilite",      icon: TrendingUp },
   { id: "attentes",       name: "Attentes",          href: "/dashboard/attentes",         icon: Clock },
   { id: "nonconformites", name: "Non-conformités",   href: "/dashboard/non_conformite",   icon: AlertTriangle },
-  { id: "multilogements", name: "Multi-logements",   href: "/dashboard/multi_logements",  icon: Building2 },
+  { id: "multilogements", name: "Multi-logements",   href: "/dashboard/multilogements",  icon: Building2 },
   { id: "commissions",    name: "Commissions",       href: "/dashboard/commissions",      icon: ClipboardList },
   { id: "reprises",       name: "Reprises",          href: "/dashboard/reprises",         icon: RotateCcw },
 ];
