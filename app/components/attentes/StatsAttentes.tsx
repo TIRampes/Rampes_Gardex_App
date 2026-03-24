@@ -1,6 +1,4 @@
 // components/attentes/StatsAttentes.tsx
-import { Card, CardContent } from '@/app/components/ui/Card';
-import { Icon } from '@/app/components/icons/Icon';
 
 interface StatsAttentesProps {
   totalAttentes: number;

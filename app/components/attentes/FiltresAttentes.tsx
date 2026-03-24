@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/app/components/ui/Button';
-import { Icon } from '@/app/components/icons/Icon';
 import { Representant } from '@prisma/client';
+import { Mail,X,ChevronDown, } from 'lucide-react';
 
 interface FiltresAttentesProps {
   representants: Representant[];
@@ -37,11 +37,12 @@ export default function FiltresAttentes({
               <span key={repId} className="flex items-center gap-1 bg-slate-200 px-3 py-1 rounded-lg text-sm">
                 {rep.nom}
                 <button onClick={() => onToggleRepresentant(repId)} className="hover:text-red-600">
-                  <Icon name="X" size={14} />
+                  <X size={14} />
                 </button>
               </span>
             ) : null;
-          })}
+          })
+}
 
           <div className="relative">
             <button
@@ -49,7 +50,7 @@ export default function FiltresAttentes({
               className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50"
             >
               <span className="text-sm text-slate-600">Filtrer par représentant</span>
-              <Icon name="ChevronDown" size={16} />
+              <ChevronDown size={16} />
             </button>
 
             {dropdownOpen && (
@@ -84,12 +85,12 @@ export default function FiltresAttentes({
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
           <input type="checkbox" className="w-4 h-4 rounded" />
-          <Icon name="Mail" size={14} />
+          <Mail size={14} />
           Envoi auto. chaque lundi
         </label>
 
         <Button variant="default" size="sm" onClick={() => {}} className="bg-teal-500 hover:bg-teal-600 text-white">
-          <Icon name="Mail" size={18} className="mr-2" />
+          <Mail size={18} className="mr-2" />
           Envoyer les attentes
         </Button>
       </div>

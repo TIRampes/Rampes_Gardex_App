@@ -3,7 +3,7 @@
 
 import { Commande, Representant } from '@prisma/client';
 import { getStatutCouleur, getServiceCouleur, formatDateCourte } from '@/lib/utils';
-import { Icon } from '@/app/components/icons/Icon';
+import { Inbox} from 'lucide-react';
 
 interface CommandeWithRep extends Commande {
   representant: Representant | null;
@@ -102,7 +102,7 @@ export default function TableauAttentes({ commandes, onRowClick, onEnvoyerClick 
         </table>
         {commandes.length === 0 && (
           <div className="p-12 text-center">
-            <Icon name="Inbox" size={48} className="mx-auto mb-4 text-slate-300" />
+            <Inbox size={48} className="mx-auto mb-4 text-slate-300" />
             <p className="text-slate-500">Aucune commande en attente</p>
           </div>
         )}
