@@ -35,12 +35,12 @@ export const STATUT_PLANIF_MAP: Record<string, { label: string; couleur: string 
   ANNULEE: { label: 'Annulée', couleur: 'bg-red-100 text-red-800' },
 };
 
-export const TYPE_COMMANDE_COLORS: Record<string, string> = {
-  STANDARD: 'bg-slate-100 text-slate-700',
-  COMMERCIAL: 'bg-purple-100 text-purple-700',
-  MULTIPLAN: 'bg-blue-100 text-blue-700',
-  MULTI_PHASE: 'bg-orange-100 text-orange-700',
-};
+export const TYPE_COMMANDE_COLORS = {
+  STANDARD: { bg: 'bg-slate-100', text: 'text-slate-700' },
+  COMMERCIAL: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  MULTIPLAN: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  MULTI_PHASE: { bg: 'bg-orange-100', text: 'text-orange-700' },
+} as const;
 
 export const STATUS_PROD_COULEUR: Record<string, string> = {
   COMPLETE: 'bg-green-500 text-white', ATTENTE_CLIENT: 'bg-orange-400 text-white',

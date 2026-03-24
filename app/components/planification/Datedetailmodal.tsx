@@ -61,8 +61,8 @@ export default function DateDetailModal({
               const tempsH = cmd.tempsEstimeInstallation || 0;
               const depasse = depasseJournee(tempsH);
               const couleur = cmd.equipeCouleur || "bg-slate-400";
-              const typeColors = TYPE_COMMANDE_COLORS[cmd.typeCommande] ?? TYPE_COMMANDE_COLORS.STANDARD;
-
+             const typeColors = TYPE_COMMANDE_COLORS[cmd.typeCommande as keyof typeof TYPE_COMMANDE_COLORS] 
+                                 || TYPE_COMMANDE_COLORS.STANDARD;
               return (
                 <div key={cmd.id} className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
                   {/* En-tête commande */}
