@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePlanification, useNonPlanifiees, useVehicules, useChauffeurs } from '@/app/hooks/usePlanification';
 import type { PlanificationView, CommandeNonPlanifiee } from '@/app/api/planification/schema';
 import {
-  MONTH_NAMES, DAY_NAMES_SHORT, SERVICE_COULEUR, SERVICE_TEXT, TYPE_COMMANDE_COULEUR,
+  MONTH_NAMES, DAY_NAMES_SHORT, SERVICE_COULEUR, SERVICE_TEXT, TYPE_COMMANDE_COLORS,
   formatDateKey, getDaysInMonth, calculerJoursNecessaires, depasseJournee,
   getProdStatusColor, getAchatStatusColor, getSymbol, getServiceBg, getServiceLabel,
   getWeekNumber, needsEquipe, needsChauffeur, needsMesureur,
@@ -169,7 +169,7 @@ export default function PlanificationPage() {
                     <div className="flex items-center gap-[0.5rem] mb-[0.375rem] flex-wrap">
                       <span className="font-mono font-bold text-[1.125rem] text-slate-900">{p.commandeNumero}</span>
                       <span className={`px-[0.5rem] py-[0.125rem] ${getServiceBg(p.service)} ${SERVICE_TEXT[p.service] || 'text-white'} text-[0.6875rem] font-bold rounded`}>{getServiceLabel(p.service).toUpperCase()}</span>
-                      {p.typeCommande && p.typeCommande !== 'STANDARD' && <span className={`px-[0.5rem] py-[0.125rem] text-[0.6875rem] font-semibold rounded ${TYPE_COMMANDE_COULEUR[p.typeCommande] || 'bg-slate-100 text-slate-600'}`}>{p.typeCommande}</span>}
+                      {p.typeCommande && p.typeCommande !== 'STANDARD' && <span className={`px-[0.5rem] py-[0.125rem] text-[0.6875rem] font-semibold rounded ${TYPE_COMMANDE_COLORS[p.typeCommande] || 'bg-slate-100 text-slate-600'}`}>{p.typeCommande}</span>}
                       {p.reprise && <span className="px-[0.375rem] py-[0.125rem] bg-orange-500 text-white text-[0.6875rem] font-bold rounded">Reprise</span>}
                     </div>
                     <p className="font-bold text-[1.0625rem] text-slate-900">{p.clientNom}</p>
