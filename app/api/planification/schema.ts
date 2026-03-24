@@ -7,6 +7,7 @@ import { z } from 'zod';
 export const STATUT_PLANIF_ENUM = ['PLANIFIEE', 'CONFIRMEE', 'EN_COURS', 'COMPLETEE', 'REPORTEE', 'ANNULEE'] as const;
 export const SERVICE_ENUM = ['INSTALLATION', 'LIVRAISON', 'CUEILLETTE', 'TRANSPORT', 'MESURE'] as const;
 export const HEURES_PAR_JOUR = 8;
+export const HEURES_MAX_JOURNEE = 12;
 export const MONTH_NAMES = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 export const DAY_NAMES_SHORT = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'];
 
