@@ -1,121 +1,133 @@
-// ╔══════════════════════════════════════════════════════════╗
-// ║  FICHIER: app/api/achats/envoyer/route.ts                 ║
-// ║  NOUVEAU — envoie le formulaire par email via MS Graph     ║
-// ╚══════════════════════════════════════════════════════════╝
+import { NextRequest, NextResponse } from "next/server";
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
 
-import { NextRequest, NextResponse } from 'next/server';
-
-async function getGraphToken(): Promise<string> {
-  const tenantId = process.env.AZURE_TENANT_ID;
-  const clientId = process.env.AZURE_CLIENT_ID;
-  const clientSecret = process.env.AZURE_CLIENT_SECRET;
-
-  if (!tenantId || !clientId || !clientSecret) {
-    throw new Error('Variables Azure manquantes (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)');
-  }
-
-  const res = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      scope: 'https://graph.microsoft.com/.default',
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!res.ok) throw new Error('Échec obtention token Azure');
-  const data = await res.json();
-  return data.access_token;
-}
+export const runtime = "nodejs"; // ⚡️ indispensable pour PDFKit
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { typeAchat, fournisseur, formValues, lignes, commandeNumero, phaseName } = body;
+    const data = await request.json();
+    const { fournisseur, commandeNumero, typeAchat } = data;
 
     if (!fournisseur?.email) {
-      return NextResponse.json({ error: 'Email fournisseur manquant' }, { status: 400 });
+      return NextResponse.json({ error: "Email fournisseur manquant" }, { status: 400 });
     }
 
-    // 1. Générer le PDF en appelant notre propre API
-    const pdfRes = await fetch(new URL('/api/commandes/achats/formulaire', request.url).toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ typeAchat, fournisseur, formValues, lignes, commandeNumero, phaseName }),
+    // Chemins vers polices et logo
+    const regularFontPath = path.join(process.cwd(), "public/fonts/Roboto-Regular.ttf");
+    const boldFontPath = path.join(process.cwd(), "public/fonts/Roboto-Bold.ttf");
+    const logoPath = path.join(process.cwd(), "public/images/logo-gardex.png");
+
+    if (!fs.existsSync(regularFontPath) || !fs.existsSync(boldFontPath)) {
+      throw new Error("Polices manquantes dans /public/fonts");
+    }
+    if (!fs.existsSync(logoPath)) {
+      throw new Error("Logo manquant dans /public/images");
+    }
+
+    // Génération PDF
+    const chunks: Buffer[] = [];
+    const doc = new PDFDocument({
+      autoFirstPage: false,
+      font: regularFontPath, // ⚡️ éviter Helvetica
     });
 
-    if (!pdfRes.ok) {
-      return NextResponse.json({ error: 'Erreur génération PDF' }, { status: 500 });
-    }
+    doc.registerFont("R", regularFontPath);
+    doc.registerFont("B", boldFontPath);
 
-    const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer());
-    const pdfBase64 = pdfBuffer.toString('base64');
+    doc.addPage({ size: "LETTER", margin: 40 });
 
-    // 2. Envoyer via Microsoft Graph
-    const token = await getGraphToken();
+    // Logo
+    doc.image(logoPath, doc.page.width - 150, 20, { width: 120 });
+
+    // Titre
+    doc.font("B").fontSize(18).text("BON DE COMMANDE", 40, 50);
+    doc.moveDown(2);
+
+    // Infos commande
+    doc.font("R").fontSize(12);
+    doc.text(`Commande: ${commandeNumero}`);
+    doc.text(`Fournisseur: ${fournisseur.nom || ""}`);
+    doc.text(`Type d'achat: ${typeAchat || ""}`);
+    doc.moveDown();
+
+    // Lignes
+    data.lignes?.forEach((l: any, i: number) => {
+      doc.text(`${i + 1} - Produit: ${l.produit || ""} | Qté: ${l.quantite || 1}`);
+    });
+
+    doc.end();
+
+    // Attendre fin
+    const pdfBuffer: Buffer = await new Promise((resolve, reject) => {
+      const buffers: Buffer[] = [];
+      doc.on("data", buffers.push.bind(buffers));
+      doc.on("end", () => resolve(Buffer.concat(buffers)));
+      doc.on("error", reject);
+    });
+
+    // Conversion en base64 pour Graph API
+    const pdfBase64 = pdfBuffer.toString("base64");
+
+    // Auth Azure
+    const tokenRes = await fetch(
+      `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.AZURE_CLIENT_ID!,
+          client_secret: process.env.AZURE_CLIENT_SECRET!,
+          scope: "https://graph.microsoft.com/.default",
+          grant_type: "client_credentials",
+        }),
+      }
+    );
+
+    const tokenData = await tokenRes.json();
+    const token = tokenData.access_token;
     const mailFrom = process.env.AZURE_MAIL_FROM;
 
-    if (!mailFrom) {
-      return NextResponse.json({ error: 'AZURE_MAIL_FROM non configuré' }, { status: 500 });
-    }
-
-    const fileName = `Commande_${typeAchat}_${commandeNumero}${phaseName ? `_${phaseName}` : ''}.pdf`;
-
-    // Construire le body HTML du courriel
-    const htmlBody = `
-      <div style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #1a2332;">Bon de commande — Rampes Gardex</h2>
-        <p>Bonjour,</p>
-        <p>Veuillez trouver ci-joint notre bon de commande pour: <strong>${typeAchat}</strong></p>
-        <table style="margin: 16px 0; border-collapse: collapse;">
-          <tr><td style="padding: 4px 12px 4px 0; color: #666;">Commande:</td><td style="font-weight: bold;">${commandeNumero}</td></tr>
-          ${phaseName ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Phase:</td><td>${phaseName}</td></tr>` : ''}
-          ${formValues.dateCommande || formValues.date ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Date:</td><td>${formValues.dateCommande || formValues.date}</td></tr>` : ''}
-          ${formValues.dateLivraison ? `<tr><td style="padding: 4px 12px 4px 0; color: #666;">Livraison souhaitée:</td><td>${formValues.dateLivraison}</td></tr>` : ''}
-        </table>
-        <p>Merci de confirmer la réception et les délais de livraison.</p>
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #999;">Rampes Gardex Inc.<br/>2200 rue Albert-Dion, Lévis, QC G7A 5M9<br/>Tél: 418-831-1330</p>
-      </div>
-    `;
-
-    const emailPayload = {
-      message: {
-        subject: `Bon de commande ${typeAchat} — ${commandeNumero}${phaseName ? ` (${phaseName})` : ''} — Rampes Gardex`,
-        body: { contentType: 'HTML', content: htmlBody },
-        toRecipients: [{ emailAddress: { address: fournisseur.email } }],
-        attachments: [
-          {
-            '@odata.type': '#microsoft.graph.fileAttachment',
-            name: fileName,
-            contentType: 'application/pdf',
-            contentBytes: pdfBase64,
-          },
-        ],
-      },
-      saveToSentItems: true,
-    };
-
+    // Envoi mail via Microsoft Graph
     const graphRes = await fetch(`https://graph.microsoft.com/v1.0/users/${mailFrom}/sendMail`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(emailPayload),
+      body: JSON.stringify({
+        message: {
+          subject: `Bon de commande ${typeAchat} — ${commandeNumero}`,
+          body: {
+            contentType: "HTML",
+            content: `
+              <p>Bonjour,</p>
+              <p>Veuillez trouver ci-joint le bon de commande <b>#${commandeNumero}</b>.</p>
+              <p>Cordialement,<br/>Rampes Gardex</p>
+            `,
+          },
+          toRecipients: [{ emailAddress: { address: fournisseur.email } }],
+          attachments: [
+            {
+              "@odata.type": "#microsoft.graph.fileAttachment",
+              name: `Commande_${commandeNumero}.pdf`,
+              contentType: "application/pdf",
+              contentBytes: pdfBase64,
+            },
+          ],
+        },
+      }),
     });
 
     if (!graphRes.ok) {
-      const err = await graphRes.text();
-      console.error('Graph sendMail error:', err);
-      return NextResponse.json({ error: 'Erreur envoi email Microsoft Graph' }, { status: 500 });
+      const txt = await graphRes.text();
+      throw new Error(`Graph error: ${txt}`);
     }
 
-    return NextResponse.json({ message: `Email envoyé à ${fournisseur.email}` });
-  } catch (error: any) {
-    console.error('Erreur envoi email:', error);
-    return NextResponse.json({ error: error.message || 'Erreur serveur' }, { status: 500 });
+    return NextResponse.json({ success: true, message: "Email envoyé avec le PDF" });
+  } catch (e: any) {
+    console.error("ENVOI ERROR", e);
+    return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }

@@ -94,7 +94,7 @@ export default function FormulaireAchatModal({
     setSending(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/achats/envoyer', {
+      const res = await fetch('/api/commandes/achats/envoyer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
