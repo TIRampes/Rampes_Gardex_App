@@ -43,16 +43,15 @@ const ACCESS: Record<Role, string[]> = {
 
   // Accès limité
   EMPLOYE:      ['dashboard', 'clients'],
-  INSTALLATEUR: ['dashboard', 'clients', 'interventions'],
-  MESUREUR:     ['dashboard', 'clients', 'interventions'],
-  CHAUFFEUR:    ['dashboard', 'clients', 'interventions', 'cueillettes'],
+  INSTALLATEUR: ['dashboard','interventions'],
+  MESUREUR:     ['dashboard', 'clients', 'interventions', 'planification','commandes'],
+  CHAUFFEUR:    ['dashboard', 'interventions'],
   PRODUCTEUR:   ['dashboard', 'clients', 'production', 'inventaire'],
 
   // Représentant — tout SAUF non-conformités et paramètres
   REPRESENTANT: [
-    'dashboard', 'clients', 'commandes', 'production', 'planification',
-    'interventions', 'cueillettes', 'inventaire', 'achats',
-    'attentes', 'multilogements', 'reprises', 'rapports',
+    'dashboard', 'clients', 'commandes','planification',
+    'interventions', 'cueillettes','attentes', 'multilogements', 'reprises',
   ],
 
   // Client — juste le dashboard
