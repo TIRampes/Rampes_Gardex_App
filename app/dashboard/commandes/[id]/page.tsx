@@ -478,8 +478,12 @@ export default function CommandeDetailsPage() {
                     <td className="px-2 py-2 text-right">{b.piedsLineaires}</td>
                     <td className="px-2 py-2 text-right">{b.poteaux}</td>
                     <td className="px-2 py-2">{formatDate(b.datePrevue)}</td>
-                    <td className="px-2 py-2 text-right">{b.prixTotal?.toFixed(2) ?? "0.00"} $</td>
-                    <td className="px-2 py-2 text-right">{b.prixVenteInstallation?.toFixed(2) ?? "0.00"} $</td>
+                   <td className="px-2 py-2 text-right">
+  {(Number(b.prixTotal ?? 0)).toFixed(2)} $
+</td>
+<td className="px-2 py-2 text-right">
+  {(Number(b.prixVenteInstallation ?? 0)).toFixed(2)} $
+</td>
                     <td className="px-2 py-2 text-center"><CodeBadge code={b.mesure} /></td>
                     <td className="px-2 py-2 text-center"><CodeBadge code={b.plan} /></td>
                     <td className="px-2 py-2">{formatDate(b.planApprobationEnvoyeLe)}</td>
