@@ -7,10 +7,33 @@ function toDate(val: unknown): Date | null {
   if (!val) return null;
   if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
   if (typeof val === "string") {
+    if (val.trim() === "") return null;
     const d = new Date(val);
     return isNaN(d.getTime()) ? null : d;
   }
   return null;
+}
+
+// ─── Nettoyage : convertir "" en null pour les champs enum/optionnels ───
+// C'est LA correction principale — le frontend envoie "" pour les selects vides
+// mais Zod attend null ou une valeur d'enum valide, pas une chaîne vide.
+function cleanEmptyStrings(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(cleanEmptyStrings);
+  if (typeof obj === "object" && !(obj instanceof Date)) {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (typeof value === "string" && value.trim() === "") {
+        cleaned[key] = null;
+      } else if (typeof value === "object" && value !== null && !(value instanceof Date)) {
+        cleaned[key] = cleanEmptyStrings(value);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+    return cleaned;
+  }
+  return obj;
 }
 
 // GET - Liste toutes les commandes avec filtres et stats
@@ -118,11 +141,37 @@ export async function GET(request: NextRequest) {
 // POST - Créer une nouvelle commande
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const rawBody = await request.json();
+
+    // ═══════════════════════════════════════════════════════════
+    // CORRECTION PRINCIPALE : Nettoyer les "" → null AVANT Zod
+    // Le frontend envoie "" pour les selects vides (couleur, mesure,
+    // achatFibre, avertissementClient, etc.) mais Zod attend null
+    // ou une valeur d'enum valide — pas une chaîne vide.
+    // ═══════════════════════════════════════════════════════════
+    const body = cleanEmptyStrings(rawBody);
+
+    // Garder les champs obligatoires qui ne doivent PAS être null
+    // (cleanEmptyStrings les a mis à null si vides)
+    if (body.numero === null) body.numero = "";
+    if (body.clientId === null) body.clientId = "";
+    if (body.adresse === null) body.adresse = "";
 
     const validation = commandeSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: "Données invalides", details: validation.error.flatten() }, { status: 400 });
+      const flattened = validation.error.flatten();
+      console.error("Zod validation errors:", JSON.stringify(flattened, null, 2));
+
+      // Construire les erreurs par champ pour le frontend
+      const fieldErrors = validation.error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      }));
+
+      return NextResponse.json(
+        { error: "Données invalides", details: flattened, fieldErrors },
+        { status: 400 }
+      );
     }
 
     const data = validation.data;
@@ -215,8 +264,6 @@ export async function POST(request: NextRequest) {
         piedsLineairesEstime: rest.piedsLineairesEstime ?? null,
         piedsLineairesReels: rest.piedsLineairesReels ?? null,
         structure: rest.structure,
-        
-        // CORRECTION DES NOMS DE COLONNES (Basé sur ton prismasCHEMA.txt)
         mesure: rest.mesure || null,
         mesureDonneeLe: toDate(rest.mesureDonneeLe),
         plan: rest.plan || null,
@@ -226,7 +273,6 @@ export async function POST(request: NextRequest) {
         termine: rest.termine || null,
         statutLivraison: rest.statutLivraison || "N_A",
         installation: rest.installation || null,
-
         achatFibre: rest.achatFibre || null,
         dateEnvoieFibre: toDate(rest.dateEnvoieFibre),
         dateReceptionFibre: toDate(rest.dateReceptionFibre),
@@ -264,7 +310,6 @@ export async function POST(request: NextRequest) {
         formulaireComplete: rest.formulaireComplete,
         commentaire: rest.commentaire || null,
 
-        // CORRECTION DU NOM DE LA RELATION : balcons (au pluriel)
         balcons: balcons && balcons.length > 0 ? {
           create: balcons.map((b, i) => ({
             nom: b.nom,
@@ -278,7 +323,7 @@ export async function POST(request: NextRequest) {
             reprise: b.reprise || false,
             notes: b.notes || null,
             datePrevue: toDate(b.datePrevue),
-            prixVenteInstallation: b.prixVenteInstallation,
+            prixVenteInstallation: b.prixVenteInstallation ?? null,
             mesure: b.mesure || null,
             plan: b.plan || null,
             planApprobationEnvoyeLe: toDate(b.planApprobationEnvoyeLe),
@@ -340,6 +385,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(commande, { status: 201 });
   } catch (error) {
     console.error("Erreur POST commande:", error);
-    return NextResponse.json({ error: "Erreur lors de la création" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Erreur lors de la création", details: String(error) },
+      { status: 500 }
+    );
   }
 }
