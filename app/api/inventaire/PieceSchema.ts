@@ -70,6 +70,10 @@ export const FournisseurSchema = z.object({
   email: z.string().nullable().optional(),
   adresse: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  typeAchat: z.enum(['FIBRE','LIMONS','VERRES','COLONNES','PEINTURE','ATTACHES','PLANCHER_ALUMINIUM','AUTRE']).nullable().optional(),
+  formulaireNom: z.string().nullable().optional(),
+  formulaireMime: z.string().nullable().optional(),
+  formulaireData: z.instanceof(Buffer).nullable().optional(),
   actif: z.boolean().default(true),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -88,6 +92,7 @@ export const FournisseurFormSchema = z.object({
   email: z.string().optional().default(''),
   adresse: z.string().optional().default(''),
   notes: z.string().optional().default(''),
+  typeAchat: z.enum(['FIBRE','LIMONS','VERRES','COLONNES','PEINTURE','ATTACHES','PLANCHER_ALUMINIUM','AUTRE']).nullable().optional(),
   actif: z.boolean().default(true),
 });
 export type FournisseurForm = z.input<typeof FournisseurFormSchema>;

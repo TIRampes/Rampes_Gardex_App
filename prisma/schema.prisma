@@ -451,25 +451,27 @@ model User {
 // 05. FOURNISSEUR (CORRIGÉ : plus de doublon)
 // ============================================
 model Fournisseur {
-  id        String   @id @default(cuid())
-  nom       String   @db.VarChar(255)
-  contact   String?  @db.VarChar(255)
-  telephone String?  @db.VarChar(20)
-  email     String?  @db.VarChar(255)
-  adresse   String?  @db.Text
-  notes     String?  @db.Text
-  actif     Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String     @id @default(cuid())
+  nom            String     @db.VarChar(255)
+  contact        String?    @db.VarChar(255)
+  telephone      String?    @db.VarChar(20)
+  email          String?    @db.VarChar(255)
+  adresse        String?    @db.Text
+  notes          String?    @db.Text
+  actif          Boolean    @default(true)
+  // Nouveaux champs
+  typeAchat      TypeAchat? // Énumération existante
+  formulaireNom  String?    @db.VarChar(255)
+  formulaireMime String?    @db.VarChar(100)
+  formulaireData Bytes?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  // 🔹 Fournisseur principal
+  // Relations existantes
   produitsPrincipaux Produit[]
-
-  // 🔹 Relation many-to-many
-  produits FournisseurProduit[]
-
-  achats Achat[]
-  delais DelaiLivraison[]
+  produits           FournisseurProduit[]
+  achats             Achat[]
+  delais             DelaiLivraison[]
 
   @@index([nom])
   @@index([actif])

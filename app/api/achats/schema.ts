@@ -95,6 +95,7 @@ export const FournisseurCreateSchema = z.object({
   email: z.string().email('Email invalide').nullable().optional().or(z.literal('')),
   adresse: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  typeAchat: z.enum(TYPE_ACHAT_ENUM).nullable().optional(),
 });
 export type FournisseurCreate = z.input<typeof FournisseurCreateSchema>;
 export const FournisseurUpdateSchema = FournisseurCreateSchema.partial();

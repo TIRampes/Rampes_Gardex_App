@@ -4,13 +4,30 @@ import { FournisseurUpdateSchema } from '@/app/api/achats/schema';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-// PUT /api/achats/fournisseurs/[id]
 export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const body = await request.json();
-    const parsed = FournisseurUpdateSchema.safeParse(body);
+    const formData = await request.formData();
 
+    const nom = formData.get('nom') as string | null;
+    const contact = formData.get('contact') as string | null;
+    const telephone = formData.get('telephone') as string | null;
+    const email = formData.get('email') as string | null;
+    const adresse = formData.get('adresse') as string | null;
+    const notes = formData.get('notes') as string | null;
+    const typeAchat = formData.get('typeAchat') as string | null;
+    const file = formData.get('formulaire') as File | null;
+    const supprimerFormulaire = formData.get('supprimerFormulaire') === 'true';
+
+    const parsed = FournisseurUpdateSchema.safeParse({
+      nom,
+      contact,
+      telephone,
+      email,
+      adresse,
+      notes,
+      typeAchat: typeAchat || undefined,
+    });
     if (!parsed.success) {
       return NextResponse.json({ error: 'Données invalides', details: parsed.error.flatten() }, { status: 400 });
     }
@@ -18,14 +35,25 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const existing = await prisma.fournisseur.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 });
 
-    const data = parsed.data;
-    const updateData: Record<string, unknown> = {};
-    if (data.nom !== undefined) updateData.nom = data.nom;
-    if (data.contact !== undefined) updateData.contact = data.contact || null;
-    if (data.telephone !== undefined) updateData.telephone = data.telephone || null;
-    if (data.email !== undefined) updateData.email = data.email || null;
-    if (data.adresse !== undefined) updateData.adresse = data.adresse || null;
-    if (data.notes !== undefined) updateData.notes = data.notes || null;
+    const updateData: any = {};
+    if (parsed.data.nom !== undefined) updateData.nom = parsed.data.nom;
+    if (parsed.data.contact !== undefined) updateData.contact = parsed.data.contact || null;
+    if (parsed.data.telephone !== undefined) updateData.telephone = parsed.data.telephone || null;
+    if (parsed.data.email !== undefined) updateData.email = parsed.data.email || null;
+    if (parsed.data.adresse !== undefined) updateData.adresse = parsed.data.adresse || null;
+    if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes || null;
+    if (parsed.data.typeAchat !== undefined) updateData.typeAchat = parsed.data.typeAchat || null;
+
+    if (file && file.size > 0) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      updateData.formulaireNom = file.name;
+      updateData.formulaireMime = file.type;
+      updateData.formulaireData = buffer;
+    } else if (supprimerFormulaire) {
+      updateData.formulaireNom = null;
+      updateData.formulaireMime = null;
+      updateData.formulaireData = null;
+    }
 
     const fournisseur = await prisma.fournisseur.update({ where: { id }, data: updateData });
     return NextResponse.json(fournisseur);
@@ -35,7 +63,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/achats/fournisseurs/[id] — désactive (soft delete) si a des achats, sinon supprime
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;

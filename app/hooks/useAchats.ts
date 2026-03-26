@@ -1,7 +1,7 @@
-'use client';
+// app/hooks/useAchats.ts
 
 import { useState, useCallback } from 'react';
-import type { AchatCommandeView, StatsAchats, UpdateAchatsCommande, FournisseurCreate, FournisseurUpdate, DelaisConfig } from '@/app/api/achats/schema';
+import type { AchatCommandeView, StatsAchats, UpdateAchatsCommande, DelaisConfig } from '@/app/api/achats/schema';
 
 async function apiFetch<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -56,6 +56,10 @@ export interface FournisseurView {
   adresse: string | null;
   notes: string | null;
   actif: boolean;
+  typeAchat: string | null;
+  formulaireNom: string | null;
+  formulaireMime: string | null;
+  _count?: { achats: number };
 }
 
 export function useFournisseurs() {
@@ -71,12 +75,64 @@ export function useFournisseurs() {
     setLoading(false);
   }, []);
 
-  const creer = useCallback(async (data: FournisseurCreate) => {
-    await apiFetch('/api/achats/fournisseurs', { method: 'POST', body: JSON.stringify(data) });
+  // Création avec FormData
+  const creer = useCallback(async (data: {
+    nom: string;
+    contact?: string | null;
+    telephone?: string | null;
+    email?: string | null;
+    adresse?: string | null;
+    notes?: string | null;
+    typeAchat?: string | null;
+    formulaire?: File | null;
+  }) => {
+    const formData = new FormData();
+    formData.append('nom', data.nom);
+    if (data.contact) formData.append('contact', data.contact);
+    if (data.telephone) formData.append('telephone', data.telephone);
+    if (data.email) formData.append('email', data.email);
+    if (data.adresse) formData.append('adresse', data.adresse);
+    if (data.notes) formData.append('notes', data.notes);
+    if (data.typeAchat) formData.append('typeAchat', data.typeAchat);
+    if (data.formulaire) formData.append('formulaire', data.formulaire);
+
+    const res = await fetch('/api/achats/fournisseurs', { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(err.error || `Erreur ${res.status}`);
+    }
+    return res.json();
   }, []);
 
-  const modifier = useCallback(async (id: string, data: FournisseurUpdate) => {
-    await apiFetch(`/api/achats/fournisseurs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  // Modification avec FormData
+  const modifier = useCallback(async (id: string, data: {
+    nom?: string;
+    contact?: string | null;
+    telephone?: string | null;
+    email?: string | null;
+    adresse?: string | null;
+    notes?: string | null;
+    typeAchat?: string | null;
+    formulaire?: File | null;
+    supprimerFormulaire?: boolean;
+  }) => {
+    const formData = new FormData();
+    if (data.nom !== undefined) formData.append('nom', data.nom);
+    if (data.contact !== undefined) formData.append('contact', data.contact || '');
+    if (data.telephone !== undefined) formData.append('telephone', data.telephone || '');
+    if (data.email !== undefined) formData.append('email', data.email || '');
+    if (data.adresse !== undefined) formData.append('adresse', data.adresse || '');
+    if (data.notes !== undefined) formData.append('notes', data.notes || '');
+    if (data.typeAchat !== undefined) formData.append('typeAchat', data.typeAchat || '');
+    if (data.formulaire) formData.append('formulaire', data.formulaire);
+    if (data.supprimerFormulaire) formData.append('supprimerFormulaire', 'true');
+
+    const res = await fetch(`/api/achats/fournisseurs/${id}`, { method: 'PUT', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Erreur réseau' }));
+      throw new Error(err.error || `Erreur ${res.status}`);
+    }
+    return res.json();
   }, []);
 
   const supprimer = useCallback(async (id: string) => {

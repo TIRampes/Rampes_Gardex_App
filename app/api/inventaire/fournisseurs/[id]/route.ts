@@ -1,96 +1,108 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { FournisseurFormSchema } from '@/app/api/inventaire/PieceSchema'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { FournisseurFormSchema } from '@/app/api/inventaire/PieceSchema';
 
-// Helper pour extraire l'id depuis le pathname
 function getIdFromPath(pathname: string) {
-  const parts = pathname.split('/')
-  return parts[parts.length - 1]
+  const parts = pathname.split('/');
+  return parts[parts.length - 1];
 }
 
-// GET /api/inventaire/fournisseurs/[id]
 export async function GET(request: NextRequest) {
   try {
-    const id = getIdFromPath(request.nextUrl.pathname)
-
+    const id = getIdFromPath(request.nextUrl.pathname);
     const fournisseur = await prisma.fournisseur.findUnique({
       where: { id },
       include: {
         _count: { select: { produitsPrincipaux: true, produits: true, achats: true } },
       },
-    })
-
+    });
     if (!fournisseur) {
-      return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 })
+      return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 });
     }
-
-    return NextResponse.json(fournisseur)
+    return NextResponse.json(fournisseur);
   } catch (error) {
-    console.error('GET /api/inventaire/fournisseurs/[id] erreur:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    console.error('GET /api/inventaire/fournisseurs/[id] erreur:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
 
-// PUT /api/inventaire/fournisseurs/[id]
 export async function PUT(request: NextRequest) {
   try {
-    const id = getIdFromPath(request.nextUrl.pathname)
-    const body = await request.json()
-    const parsed = FournisseurFormSchema.partial().safeParse(body)
+    const id = getIdFromPath(request.nextUrl.pathname);
+    const formData = await request.formData();
 
+    const nom = formData.get('nom') as string | null;
+    const contact = formData.get('contact') as string | null;
+    const telephone = formData.get('telephone') as string | null;
+    const email = formData.get('email') as string | null;
+    const adresse = formData.get('adresse') as string | null;
+    const notes = formData.get('notes') as string | null;
+    const typeAchat = formData.get('typeAchat') as string | null;
+    const file = formData.get('formulaire') as File | null;
+    const supprimerFormulaire = formData.get('supprimerFormulaire') === 'true';
+
+    const parsed = FournisseurFormSchema.partial().safeParse({
+      nom,
+      contact,
+      telephone,
+      email,
+      adresse,
+      notes,
+      typeAchat: typeAchat || undefined,
+    });
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Données invalides', details: parsed.error.flatten() },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Données invalides', details: parsed.error.flatten() }, { status: 400 });
     }
 
-    const fournisseur = await prisma.fournisseur.update({
-      where: { id },
-      data: parsed.data,
-      include: {
-        _count: { select: { produitsPrincipaux: true, produits: true, achats: true } },
-      },
-    })
+    const existing = await prisma.fournisseur.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 });
 
-    return NextResponse.json(fournisseur)
+    const updateData: any = {};
+    if (parsed.data.nom !== undefined) updateData.nom = parsed.data.nom;
+    if (parsed.data.contact !== undefined) updateData.contact = parsed.data.contact || null;
+    if (parsed.data.telephone !== undefined) updateData.telephone = parsed.data.telephone || null;
+    if (parsed.data.email !== undefined) updateData.email = parsed.data.email || null;
+    if (parsed.data.adresse !== undefined) updateData.adresse = parsed.data.adresse || null;
+    if (parsed.data.notes !== undefined) updateData.notes = parsed.data.notes || null;
+    if (parsed.data.typeAchat !== undefined) updateData.typeAchat = parsed.data.typeAchat || null;
+
+    if (file && file.size > 0) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      updateData.formulaireNom = file.name;
+      updateData.formulaireMime = file.type;
+      updateData.formulaireData = buffer;
+    } else if (supprimerFormulaire) {
+      updateData.formulaireNom = null;
+      updateData.formulaireMime = null;
+      updateData.formulaireData = null;
+    }
+
+    const fournisseur = await prisma.fournisseur.update({ where: { id }, data: updateData });
+    return NextResponse.json(fournisseur);
   } catch (error) {
-    console.error('PUT /api/inventaire/fournisseurs/[id] erreur:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    console.error('PUT /api/inventaire/fournisseurs/[id] erreur:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }
 
-// DELETE /api/inventaire/fournisseurs/[id]
 export async function DELETE(request: NextRequest) {
   try {
-    const id = getIdFromPath(request.nextUrl.pathname)
-
+    const id = getIdFromPath(request.nextUrl.pathname);
     const fournisseur = await prisma.fournisseur.findUnique({
       where: { id },
-      include: {
-        _count: { select: { produitsPrincipaux: true, achats: true } },
-      },
-    })
-
-    if (!fournisseur) {
-      return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 })
-    }
+      include: { _count: { select: { produitsPrincipaux: true, achats: true } } },
+    });
+    if (!fournisseur) return NextResponse.json({ error: 'Fournisseur non trouvé' }, { status: 404 });
 
     if (fournisseur._count.produitsPrincipaux > 0 || fournisseur._count.achats > 0) {
-      await prisma.fournisseur.update({
-        where: { id },
-        data: { actif: false },
-      })
-      return NextResponse.json({
-        message: 'Fournisseur désactivé (relations existantes)',
-        desactivee: true,
-      })
+      await prisma.fournisseur.update({ where: { id }, data: { actif: false } });
+      return NextResponse.json({ message: 'Fournisseur désactivé (relations existantes)', desactivee: true });
     }
 
-    await prisma.fournisseur.delete({ where: { id } })
-    return NextResponse.json({ message: 'Fournisseur supprimé' })
+    await prisma.fournisseur.delete({ where: { id } });
+    return NextResponse.json({ message: 'Fournisseur supprimé' });
   } catch (error) {
-    console.error('DELETE /api/inventaire/fournisseurs/[id] erreur:', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    console.error('DELETE /api/inventaire/fournisseurs/[id] erreur:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }

@@ -6,6 +6,9 @@ import type { Piece, FournisseurInv, UniteInv, CategorieInv, Transaction, VueInv
 import SlidePanel from '@/app/components/inventaire/Slidepanel';
 import { KebabMenu, ConfirmDialog, ToastProvider, useToast } from '@/app/components/inventaire/Shareui';
 
+// Liste des types d'achat (identique à celle du module achats)
+const TYPE_ACHAT_LIST = ['FIBRE', 'LIMONS', 'VERRES', 'COLONNES', 'PEINTURE', 'ATTACHES', 'PLANCHER_ALUMINIUM', 'AUTRE'] as const;
+
 // ╔══════════════════════════════════════════════════════╗
 // ║           PAGE INVENTAIRE - RAMPES GARDEX            ║
 // ╚══════════════════════════════════════════════════════╝
@@ -75,9 +78,11 @@ function InventaireContent() {
     piecePeinte: false, codePieceNonPeinte: '', emplacement: '', emplacement2: '',
   });
 
-  // === FORMULAIRE FOURNISSEUR ===
+  // === FORMULAIRE FOURNISSEUR (avec nouveaux champs) ===
   const [formFournisseur, setFormFournisseur] = useState({
     nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '',
+    typeAchat: '', formulaireFile: null as File | null,
+    supprimerFormulaire: false, formulaireNom: '', formulaireMime: '',
   });
 
   // === CHARGEMENT INITIAL ===
@@ -216,7 +221,11 @@ function InventaireContent() {
   }, [formPiece, slidePiece.piece, modifierPiece, creerPiece, chargerPieces, toast]);
 
   const ouvrirAjouterFournisseur = useCallback(() => {
-    setFormFournisseur({ nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '' });
+    setFormFournisseur({
+      nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '',
+      typeAchat: '', formulaireFile: null, supprimerFormulaire: false,
+      formulaireNom: '', formulaireMime: '',
+    });
     setSlideFournisseur({ ouvert: true, fournisseur: null });
   }, []);
 
@@ -224,6 +233,8 @@ function InventaireContent() {
     setFormFournisseur({
       nom: f.nom, contact: f.contact || '', telephone: f.telephone || '',
       email: f.email || '', adresse: f.adresse || '', notes: f.notes || '',
+      typeAchat: f.typeAchat || '', formulaireFile: null, supprimerFormulaire: false,
+      formulaireNom: f.formulaireNom || '', formulaireMime: f.formulaireMime || '',
     });
     setSlideFournisseur({ ouvert: true, fournisseur: f });
   }, []);
@@ -231,10 +242,29 @@ function InventaireContent() {
   const sauvegarderFournisseur = useCallback(async () => {
     try {
       if (slideFournisseur.fournisseur) {
-        await modifierFournisseur(slideFournisseur.fournisseur.id, formFournisseur);
+        await modifierFournisseur(slideFournisseur.fournisseur.id, {
+          nom: formFournisseur.nom,
+          contact: formFournisseur.contact,
+          telephone: formFournisseur.telephone,
+          email: formFournisseur.email,
+          adresse: formFournisseur.adresse,
+          notes: formFournisseur.notes,
+          typeAchat: formFournisseur.typeAchat,
+          formulaire: formFournisseur.formulaireFile,
+          supprimerFormulaire: formFournisseur.supprimerFormulaire,
+        });
         toast('Fournisseur modifié avec succès');
       } else {
-        await creerFournisseur({ ...formFournisseur, actif: true });
+        await creerFournisseur({
+          nom: formFournisseur.nom,
+          contact: formFournisseur.contact,
+          telephone: formFournisseur.telephone,
+          email: formFournisseur.email,
+          adresse: formFournisseur.adresse,
+          notes: formFournisseur.notes,
+          typeAchat: formFournisseur.typeAchat,
+          formulaire: formFournisseur.formulaireFile,
+        });
         toast('Fournisseur ajouté avec succès');
       }
       setSlideFournisseur({ ouvert: false, fournisseur: null });
@@ -460,7 +490,7 @@ function InventaireContent() {
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700 underline hidden md:table-cell">Parti peinture</th>
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700 underline">Point commande</th>
                 <th className="px-[1rem] py-[0.75rem] text-center font-semibold text-slate-700">Achat fait</th>
-               </tr>
+                </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loadingPieces ? (
@@ -883,9 +913,10 @@ function InventaireContent() {
                   <th className="px-[0.75rem] py-[0.5rem] text-left font-semibold underline">Fournisseur</th>
                   <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Adresse</th>
                   <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Contact</th>
-                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline"># Téléphone</th>
-                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Email du contact</th>
-                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline hidden lg:table-cell">Notes</th>
+                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Téléphone</th>
+                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Email</th>
+                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Type d'achat</th>
+                  <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold underline">Formulaire</th>
                   <th className="px-[0.75rem] py-[0.5rem] text-center font-semibold w-[3rem]"></th>
                 </tr>
               </thead>
@@ -901,7 +932,19 @@ function InventaireContent() {
                     <td className="px-[0.75rem] py-[0.5rem] text-center">{f.contact || '-'}</td>
                     <td className="px-[0.75rem] py-[0.5rem] text-center">{f.telephone || '-'}</td>
                     <td className="px-[0.75rem] py-[0.5rem] text-center text-[0.75rem]">{f.email || '-'}</td>
-                    <td className="px-[0.75rem] py-[0.5rem] text-center text-[0.75rem] hidden lg:table-cell">{f.notes || '-'}</td>
+                    <td className="px-[0.75rem] py-[0.5rem] text-center">{f.typeAchat || '-'}</td>
+                    <td className="px-[0.75rem] py-[0.5rem] text-center">
+                      {f.formulaireNom ? (
+                        <a
+                          href={`/api/inventaire/fournisseurs/${f.id}/formulaire`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline text-sm"
+                        >
+                          📎 {f.formulaireNom.length > 20 ? f.formulaireNom.substring(0, 20) + '…' : f.formulaireNom}
+                        </a>
+                      ) : '-'}
+                    </td>
                     <td className="px-[0.75rem] py-[0.5rem]" onClick={(e) => e.stopPropagation()}>
                       <KebabMenu actions={[
                         { label: 'Modifier', icone: '✏️', onClick: () => { setShowFournisseursModal(false); ouvrirModifierFournisseur(f); } },
@@ -1242,6 +1285,48 @@ function InventaireContent() {
             className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.875rem]"
             rows={3}
           />
+        </div>
+        <div className="col-span-2">
+          <label className="block text-[0.875rem] font-semibold text-slate-700 mb-[0.25rem]">Type d'achat</label>
+          <select
+            value={formFournisseur.typeAchat}
+            onChange={(e) => setFormFournisseur({ ...formFournisseur, typeAchat: e.target.value })}
+            className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.875rem]"
+          >
+            <option value="">-- Sélectionner --</option>
+            {TYPE_ACHAT_LIST.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-[0.875rem] font-semibold text-slate-700 mb-[0.25rem]">Formulaire de commande (PDF, Word, Excel)</label>
+          <input
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx"
+            onChange={(e) => setFormFournisseur({ ...formFournisseur, formulaireFile: e.target.files?.[0] || null })}
+            className="w-full text-[0.875rem]"
+          />
+          {formFournisseur.formulaireNom && (
+            <div className="mt-2 flex items-center gap-2 text-sm">
+              <span className="text-slate-600">Fichier actuel :</span>
+              <a
+                href={`/api/inventaire/fournisseurs/${slideFournisseur.fournisseur?.id}/formulaire`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 underline"
+              >
+                {formFournisseur.formulaireNom}
+              </a>
+              <button
+                type="button"
+                onClick={() => setFormFournisseur({ ...formFournisseur, supprimerFormulaire: true })}
+                className="text-red-500 text-xs"
+              >
+                Supprimer
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

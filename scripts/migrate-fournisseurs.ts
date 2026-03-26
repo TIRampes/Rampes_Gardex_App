@@ -1,11 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TypeAchat } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { parse } from 'csv-parse';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-// Charger les variables d'environnement depuis le fichier .env
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,12 +12,27 @@ const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 
+// Liste des types d'achat à assigner aléatoirement (sans FIBRE ni AUTRE si vous préférez)
+const typesAchatPossibles: TypeAchat[] = [
+  TypeAchat.LIMONS,
+  TypeAchat.VERRES,
+  TypeAchat.COLONNES,
+  TypeAchat.PEINTURE,
+  TypeAchat.ATTACHES,
+  TypeAchat.PLANCHER_ALUMINIUM,
+];
+
+function getRandomTypeAchat(): TypeAchat {
+  const randomIndex = Math.floor(Math.random() * typesAchatPossibles.length);
+  return typesAchatPossibles[randomIndex];
+}
+
 async function main() {
   const filePath = path.join(__dirname, '..', 'data', 'Logistique_Fournisseur.csv');
   console.log(`📁 Lecture du fichier : ${filePath}`);
 
   if (!fs.existsSync(filePath)) {
-    console.error('❌ Fichier CSV introuvable. Vérifie que "Logistique_Fournisseur.csv" est bien dans le dossier "data" à la racine.');
+    console.error('❌ Fichier CSV introuvable.');
     process.exit(1);
   }
 
@@ -67,6 +81,10 @@ async function main() {
       adresse,
       notes: row.Transport_Fournisseur?.trim() || null,
       actif: true,
+      typeAchat: getRandomTypeAchat(),
+      formulaireNom: null,
+      formulaireMime: null,
+      formulaireData: null,
     };
 
     const existing = await prisma.fournisseur.findFirst({
@@ -81,7 +99,7 @@ async function main() {
 
     try {
       await prisma.fournisseur.create({ data });
-      console.log(`✅ Fournisseur créé : ${data.nom}`);
+      console.log(`✅ Fournisseur créé : ${data.nom} (type: ${data.typeAchat})`);
       imported++;
     } catch (error) {
       console.error(`❌ Erreur pour ${data.nom} :`, error);

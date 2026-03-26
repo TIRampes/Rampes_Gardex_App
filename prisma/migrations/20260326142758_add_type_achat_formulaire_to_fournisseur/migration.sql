@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `fournisseurs` ADD COLUMN `formulaireData` LONGBLOB NULL,
+    ADD COLUMN `formulaireMime` VARCHAR(100) NULL,
+    ADD COLUMN `formulaireNom` VARCHAR(255) NULL,
+    ADD COLUMN `typeAchat` ENUM('FIBRE', 'LIMONS', 'VERRES', 'COLONNES', 'PEINTURE', 'ATTACHES', 'PLANCHER_ALUMINIUM', 'AUTRE') NULL;

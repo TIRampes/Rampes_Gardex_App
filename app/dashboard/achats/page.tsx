@@ -1,19 +1,164 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { useAchats, useFournisseurs, useDelais } from '@/app/hooks/useAchats';
 import type { AchatCommandeView, AchatTypeView, UpdateAchatsCommande, DelaiLivraison, RuptureStock, DelaisConfig } from '@/app/api/achats/schema';
 import type { FournisseurView } from '@/app/hooks/useAchats';
 import {
-  ACHAT_TYPES, STATUT_ACHAT_ENUM, STATUT_ACHAT_MAP,
+  ACHAT_TYPES, STATUT_ACHAT_ENUM, STATUT_ACHAT_MAP, TYPE_ACHAT_ENUM,
   getStatutAchatInfo, getStatutGlobalInfo, getServiceCouleur,
   formaterDate, formaterDateCourte, calculerDateLivraison,
 } from '@/app/api/achats/schema';
 
-// ╔══════════════════════════════════════════════════════╗
-// ║           PAGE ACHATS — RAMPES GARDEX                 ║
-// ╚══════════════════════════════════════════════════════╝
+// ═══════════════════════════════════════════════════════════════════════════
+// Composant FournisseurModal (extra pour optimiser la saisie)
+// ═══════════════════════════════════════════════════════════════════════════
+interface FournisseurModalProps {
+  show: boolean;
+  fournisseur: (Partial<FournisseurView> & { formulaireFile?: File | null; supprimerFormulaire?: boolean }) | null;
+  onClose: () => void;
+  onSave: (data: any) => Promise<void>;
+}
 
+const FournisseurModal = memo(function FournisseurModal({ show, fournisseur, onClose, onSave }: FournisseurModalProps) {
+  const [localData, setLocalData] = useState(fournisseur);
+
+  // Synchroniser quand le fournisseur change (ouverture du modal)
+  useEffect(() => {
+    setLocalData(fournisseur);
+  }, [fournisseur]);
+
+  const handleChange = useCallback((key: string, value: any) => {
+    setLocalData(prev => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!localData) return;
+    await onSave(localData);
+  }, [localData, onSave]);
+
+  if (!show || !localData) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[1rem]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[40rem] max-h-[90vh] overflow-y-auto">
+        <div className="p-[1.25rem] bg-slate-800 text-white rounded-t-2xl">
+          <h2 className="text-[1.125rem] font-bold">{localData.id ? 'Modifier le fournisseur' : 'Ajouter un fournisseur'}</h2>
+        </div>
+        <div className="p-[1.5rem] grid grid-cols-2 gap-[1rem]">
+          <div className="col-span-2">
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Nom *</label>
+            <input
+              type="text"
+              value={localData.nom || ''}
+              onChange={(e) => handleChange('nom', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Adresse</label>
+            <input
+              type="text"
+              value={localData.adresse || ''}
+              onChange={(e) => handleChange('adresse', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div>
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Téléphone</label>
+            <input
+              type="tel"
+              value={localData.telephone || ''}
+              onChange={(e) => handleChange('telephone', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div>
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Contact</label>
+            <input
+              type="text"
+              value={localData.contact || ''}
+              onChange={(e) => handleChange('contact', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div>
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Email</label>
+            <input
+              type="email"
+              value={localData.email || ''}
+              onChange={(e) => handleChange('email', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div>
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Notes</label>
+            <input
+              type="text"
+              value={localData.notes || ''}
+              onChange={(e) => handleChange('notes', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Type d'achat</label>
+            <select
+              value={localData.typeAchat || ''}
+              onChange={(e) => handleChange('typeAchat', e.target.value)}
+              className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"
+            >
+              <option value="">-- Sélectionner --</option>
+              {TYPE_ACHAT_ENUM.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Formulaire de commande (PDF, Word, Excel)</label>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx"
+              onChange={(e) => handleChange('formulaireFile', e.target.files?.[0] || null)}
+              className="w-full text-[0.8125rem]"
+            />
+            {localData.formulaireNom && (
+              <div className="mt-2 flex items-center gap-2 text-sm">
+                <span className="text-slate-600">Fichier actuel :</span>
+                <a
+                  href={`/api/achats/fournisseurs/${localData.id}/formulaire`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  {localData.formulaireNom}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleChange('supprimerFormulaire', true)}
+                  className="text-red-500 text-xs"
+                >
+                  Supprimer
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="p-[1rem] border-t flex justify-end gap-[0.75rem]">
+          <button onClick={onClose} className="px-[1.5rem] py-[0.5rem] border rounded-lg hover:bg-slate-50 text-[0.875rem]">
+            Annuler
+          </button>
+          <button onClick={handleSave} className="px-[1.5rem] py-[0.5rem] bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg text-[0.875rem]">
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE PRINCIPALE
+// ═══════════════════════════════════════════════════════════════════════════
 export default function AchatsPage() {
   const { actifs, historique, stats, loading, charger, mettreAJourAchats, validerLivraison } = useAchats();
   const { fournisseurs, charger: chargerFournisseurs, creer: creerFournisseur, modifier: modifierFournisseur, supprimer: supprimerFournisseur } = useFournisseurs();
@@ -34,7 +179,7 @@ export default function AchatsPage() {
 
   // Modals fournisseurs
   const [showFournisseurForm, setShowFournisseurForm] = useState(false);
-  const [fournisseurEdition, setFournisseurEdition] = useState<Partial<FournisseurView> | null>(null);
+  const [fournisseurEdition, setFournisseurEdition] = useState<Partial<FournisseurView> & { formulaireFile?: File | null; supprimerFormulaire?: boolean } | null>(null);
   const [rechercheFournisseur, setRechercheFournisseur] = useState('');
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
 
@@ -55,7 +200,7 @@ export default function AchatsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3500); return () => clearTimeout(t); } }, [toast]);
 
-  // Chargement
+  // Chargement initial
   useEffect(() => { charger(); chargerFournisseurs(); chargerDelais(); }, [charger, chargerFournisseurs, chargerDelais]);
   useEffect(() => {
     if (delaisConfig) {
@@ -65,7 +210,7 @@ export default function AchatsPage() {
     }
   }, [delaisConfig]);
 
-  // Filtrage
+  // Filtrage achats
   const achatsFiltres = actifs.filter((a) => {
     const mr = !recherche || a.commandeNumero.toLowerCase().includes(recherche.toLowerCase()) || a.clientNom.toLowerCase().includes(recherche.toLowerCase());
     const ms = !filtreService || a.service === filtreService;
@@ -100,15 +245,42 @@ export default function AchatsPage() {
   };
 
   // === HANDLERS FOURNISSEURS ===
-  const handleSauvegarderFournisseur = async () => {
-    if (!fournisseurEdition) return;
+  const handleSauvegarderFournisseur = useCallback(async (data: any) => {
     try {
-      const fd = { nom: fournisseurEdition.nom || '', contact: fournisseurEdition.contact || null, telephone: fournisseurEdition.telephone || null, email: fournisseurEdition.email || null, adresse: fournisseurEdition.adresse || null, notes: fournisseurEdition.notes || null };
-      if (fournisseurEdition.id) { await modifierFournisseur(fournisseurEdition.id, fd); setToast({ message: 'Fournisseur modifié', type: 'success' }); }
-      else { await creerFournisseur(fd); setToast({ message: 'Fournisseur ajouté', type: 'success' }); }
-      setShowFournisseurForm(false); setFournisseurEdition(null); chargerFournisseurs();
-    } catch (e: any) { setToast({ message: e.message, type: 'error' }); }
-  };
+      if (data.id) {
+        await modifierFournisseur(data.id, {
+          nom: data.nom,
+          contact: data.contact,
+          telephone: data.telephone,
+          email: data.email,
+          adresse: data.adresse,
+          notes: data.notes,
+          typeAchat: data.typeAchat,
+          formulaire: data.formulaireFile,
+          supprimerFormulaire: data.supprimerFormulaire,
+        });
+        setToast({ message: 'Fournisseur modifié', type: 'success' });
+      } else {
+        await creerFournisseur({
+          nom: data.nom,
+          contact: data.contact,
+          telephone: data.telephone,
+          email: data.email,
+          adresse: data.adresse,
+          notes: data.notes,
+          typeAchat: data.typeAchat,
+          formulaire: data.formulaireFile,
+        });
+        setToast({ message: 'Fournisseur ajouté', type: 'success' });
+      }
+      setShowFournisseurForm(false);
+      setFournisseurEdition(null);
+      chargerFournisseurs();
+    } catch (e: any) {
+      setToast({ message: e.message, type: 'error' });
+    }
+  }, [creerFournisseur, modifierFournisseur, chargerFournisseurs]);
+
   const handleSupprimerFournisseur = async (id: string) => {
     try { await supprimerFournisseur(id); setToast({ message: 'Fournisseur supprimé', type: 'success' }); chargerFournisseurs(); }
     catch (e: any) { setToast({ message: e.message, type: 'error' }); }
@@ -213,7 +385,11 @@ export default function AchatsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data.length === 0 ? (<tr><td colSpan={12} className="px-[1rem] py-[3rem] text-center text-slate-400">Aucun achat trouvé</td></tr>) : data.map((a, i) => (
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={12} className="px-[1rem] py-[3rem] text-center text-slate-400">Aucun achat trouvé</td>
+              </tr>
+            ) : data.map((a, i) => (
               <tr key={a.id} className={`hover:bg-blue-50 cursor-pointer ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`} onClick={() => { setAchatDetail(a); setShowDetail(true); }}>
                 <td className="px-[0.75rem] py-[0.75rem]"><p className="font-bold text-slate-800 text-[0.9375rem]">{a.commandeNumero}</p></td>
                 <td className="px-[0.75rem] py-[0.75rem]">
@@ -270,7 +446,9 @@ export default function AchatsPage() {
                       <td className="px-[1rem] py-[0.75rem] text-center text-[0.8125rem]">{ac.actif ? formaterDateCourte(ac.dateEnvoie) : '—'}</td>
                       <td className="px-[1rem] py-[0.75rem] text-center text-[0.8125rem]">{ac.actif ? formaterDateCourte(ac.dateReception) : '—'}</td>
                       <td className="px-[1rem] py-[0.75rem] text-center">{ac.quantiteNonRecue ? <span className="text-red-600 font-bold">{ac.quantiteNonRecue}</span> : '—'}</td>
-                    </tr>); })}</tbody></table>
+                    </tr>
+                  ); })}</tbody>
+                </table>
               </div>
             </div>
             {a.commentaire && <div className="bg-amber-50 rounded-xl p-[1rem] border border-amber-200"><h4 className="font-semibold text-amber-800 mb-[0.25rem] text-[0.875rem]">📝 Notes</h4><p className="text-[0.8125rem] text-slate-700 whitespace-pre-line">{a.commentaire}</p></div>}
@@ -448,39 +626,24 @@ export default function AchatsPage() {
     );
   };
 
-  // ═══════════════════════════════════════
-  // MODAL FOURNISSEUR
-  // ═══════════════════════════════════════
-  const FournisseurModal = () => {
-    if (!showFournisseurForm || !fournisseurEdition) return null;
-    const f = fournisseurEdition; const set = (k: string, v: string) => setFournisseurEdition({ ...f, [k]: v });
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[1rem]">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[40rem] max-h-[90vh] overflow-y-auto">
-          <div className="p-[1.25rem] bg-slate-800 text-white rounded-t-2xl"><h2 className="text-[1.125rem] font-bold">{f.id ? 'Modifier le fournisseur' : 'Ajouter un fournisseur'}</h2></div>
-          <div className="p-[1.5rem] grid grid-cols-2 gap-[1rem]">
-            <div className="col-span-2"><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Nom *</label><input type="text" value={f.nom || ''} onChange={(e) => set('nom', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-            <div className="col-span-2"><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Adresse</label><input type="text" value={f.adresse || ''} onChange={(e) => set('adresse', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-            <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Téléphone</label><input type="tel" value={f.telephone || ''} onChange={(e) => set('telephone', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-            <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Contact</label><input type="text" value={f.contact || ''} onChange={(e) => set('contact', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-            <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Email</label><input type="email" value={f.email || ''} onChange={(e) => set('email', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-            <div><label className="block text-[0.8125rem] font-semibold mb-[0.25rem]">Notes</label><input type="text" value={f.notes || ''} onChange={(e) => set('notes', e.target.value)} className="w-full px-[0.75rem] py-[0.5rem] border rounded-lg text-[0.8125rem]"/></div>
-          </div>
-          <div className="p-[1rem] border-t flex justify-end gap-[0.75rem]">
-            <button onClick={() => { setShowFournisseurForm(false); setFournisseurEdition(null); }} className="px-[1.5rem] py-[0.5rem] border rounded-lg hover:bg-slate-50 text-[0.875rem]">Annuler</button>
-            <button onClick={handleSauvegarderFournisseur} className="px-[1.5rem] py-[0.5rem] bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg text-[0.875rem]">Enregistrer</button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // ╔══════════════════════════════════════════════════════╗
   // ║                  RENDU PRINCIPAL                      ║
   // ╚══════════════════════════════════════════════════════╝
   return (
     <div className="space-y-[1rem]">
-      <DetailModal/><EditionModal/><ConfirmLivraisonModal/><ConfirmDeleteModal/><ConfirmEnvoiDelaisModal/><ModifierDelaisModal/><ModifierRupturesModal/><FournisseurModal/>
+      <DetailModal/>
+      <EditionModal/>
+      <ConfirmLivraisonModal/>
+      <ConfirmDeleteModal/>
+      <ConfirmEnvoiDelaisModal/>
+      <ModifierDelaisModal/>
+      <ModifierRupturesModal/>
+      <FournisseurModal
+        show={showFournisseurForm}
+        fournisseur={fournisseurEdition}
+        onClose={() => { setShowFournisseurForm(false); setFournisseurEdition(null); }}
+        onSave={handleSauvegarderFournisseur}
+      />
 
       {toast && <div className={`fixed bottom-[1rem] right-[1rem] z-[70] px-[1rem] py-[0.75rem] rounded-lg shadow-lg text-white text-[0.875rem] font-medium ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'}`}>{toast.type === 'success' ? '✓' : '✕'} {toast.message}</div>}
 
@@ -591,12 +754,23 @@ export default function AchatsPage() {
       {onglet === 'fournisseurs' && (<>
         <div className="flex items-center justify-between gap-[1rem] flex-wrap">
           <input type="text" value={rechercheFournisseur} onChange={(e) => setRechercheFournisseur(e.target.value)} className="px-[1rem] py-[0.5rem] border border-slate-300 rounded-lg w-full max-w-[25rem] text-[0.8125rem]" placeholder="Rechercher un fournisseur..."/>
-          <button onClick={() => { setFournisseurEdition({ nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '' }); setShowFournisseurForm(true); }} className="px-[1.25rem] py-[0.5rem] bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 font-semibold rounded-lg flex items-center gap-[0.375rem] shadow text-[0.875rem] whitespace-nowrap">+ Ajouter un fournisseur</button>
+          <button onClick={() => { setFournisseurEdition({ nom: '', contact: '', telephone: '', email: '', adresse: '', notes: '', typeAchat: '', formulaireFile: null, supprimerFormulaire: false }); setShowFournisseurForm(true); }} className="px-[1.25rem] py-[0.5rem] bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 font-semibold rounded-lg flex items-center gap-[0.375rem] shadow text-[0.875rem] whitespace-nowrap">+ Ajouter un fournisseur</button>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-[0.8125rem]">
-              <thead className="bg-slate-800 text-black/50"><tr><th className="px-[1rem] py-[0.75rem] text-left">Fournisseur</th><th className="px-[1rem] py-[0.75rem] text-left hidden md:table-cell">Adresse</th><th className="px-[1rem] py-[0.75rem] text-center">Téléphone</th><th className="px-[1rem] py-[0.75rem] text-center hidden lg:table-cell">Contact</th><th className="px-[1rem] py-[0.75rem] text-center hidden lg:table-cell">Email</th><th className="px-[1rem] py-[0.75rem] text-center w-[8rem]">Actions</th></tr></thead>
+              <thead className="bg-slate-800 text-black/50">
+                <tr>
+                  <th className="px-[1rem] py-[0.75rem] text-left">Fournisseur</th>
+                  <th className="px-[1rem] py-[0.75rem] text-left hidden md:table-cell">Adresse</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center">Téléphone</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center hidden lg:table-cell">Contact</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center hidden lg:table-cell">Email</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center">Type d'achat</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center">Formulaire</th>
+                  <th className="px-[1rem] py-[0.75rem] text-center w-[8rem]">Actions</th>
+                </tr>
+              </thead>
               <tbody className="divide-y divide-slate-100">
                 {fournisseurs.filter((f) => !rechercheFournisseur || f.nom.toLowerCase().includes(rechercheFournisseur.toLowerCase())).map((f, i) => (
                   <tr key={f.id} className={`hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-sky-50'}`}>
@@ -605,10 +779,25 @@ export default function AchatsPage() {
                     <td className="px-[1rem] py-[0.75rem] text-center">{f.telephone || '—'}</td>
                     <td className="px-[1rem] py-[0.75rem] text-center hidden lg:table-cell">{f.contact || '—'}</td>
                     <td className="px-[1rem] py-[0.75rem] text-center text-[0.75rem] hidden lg:table-cell">{f.email || '—'}</td>
-                    <td className="px-[1rem] py-[0.75rem] text-center"><div className="flex gap-[0.25rem] justify-center">
-                      <button onClick={() => { setFournisseurEdition({ ...f }); setShowFournisseurForm(true); }} className="px-[0.75rem] py-[0.25rem] bg-blue-500 text-white text-[0.75rem] rounded">Modifier</button>
-                      <button onClick={() => setShowConfirmDelete(f.id)} className="px-[0.75rem] py-[0.25rem] bg-red-500 text-white text-[0.75rem] rounded">Supprimer</button>
-                    </div></td>
+                    <td className="px-[1rem] py-[0.75rem] text-center">{f.typeAchat || '—'}</td>
+                    <td className="px-[1rem] py-[0.75rem] text-center">
+                      {f.formulaireNom ? (
+                        <a
+                          href={`/api/achats/fournisseurs/${f.id}/formulaire`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 underline text-sm"
+                        >
+                          📎 {f.formulaireNom.length > 20 ? f.formulaireNom.substring(0, 20) + '…' : f.formulaireNom}
+                        </a>
+                      ) : '—'}
+                    </td>
+                    <td className="px-[1rem] py-[0.75rem] text-center">
+                      <div className="flex gap-[0.25rem] justify-center">
+                        <button onClick={() => { setFournisseurEdition({ ...f, formulaireFile: null, supprimerFormulaire: false }); setShowFournisseurForm(true); }} className="px-[0.75rem] py-[0.25rem] bg-blue-500 text-white text-[0.75rem] rounded">Modifier</button>
+                        <button onClick={() => setShowConfirmDelete(f.id)} className="px-[0.75rem] py-[0.25rem] bg-red-500 text-white text-[0.75rem] rounded">Supprimer</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
