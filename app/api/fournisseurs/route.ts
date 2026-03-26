@@ -2,21 +2,6 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// Mapping entre les types d'achat (frontend) et les catégories de produits en base
-const TYPE_ACHAT_TO_CATEGORIES: Record<string, string[]> = {
-  FIBRE: ["Fibre", "FIBRE"],
-  LIMONS: ["Limon", "Limons", "LIMONS"],
-  VERRES: ["Verre", "Verres", "VERRES"],
-  COLONNES: ["Colonne", "Colonnes", "COLONNES"],
-  PEINTURE: ["Peinture", "PEINTURE"],
-  ATTACHES: ["Attache", "Attaches", "ATTACHES"],
-  PLANCHER_ALUMINIUM: ["Plancher aluminium", "Plancher", "PLANCHER_ALUMINIUM"],
-  EUROFORGINGS: ["EuroForgings", "EUROFORGINGS"],
-  PEINTURE_DJ: ["Peinture DJ", "PEINTURE_DJ"],
-  VERRE_LEPAGE: ["Verre Lepage", "VERRE_LEPAGE"],
-  STRUCTURE: ["Structure", "STRUCTURE"],
-};
-
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -28,57 +13,42 @@ export async function GET(request: NextRequest) {
       where.actif = actif === "true";
     }
 
-    // Si typeAchat est fourni, filtrer les fournisseurs qui ont des produits de ce type
-    if (typeAchat && TYPE_ACHAT_TO_CATEGORIES[typeAchat]) {
-      const categories = TYPE_ACHAT_TO_CATEGORIES[typeAchat];
-      // Sous-requête: fournisseur doit avoir au moins un produit dans ces catégories
-      where.produits = {
-        some: {
-          produit: {
-            categoriePiece: {
-              nom: {
-                in: categories,
-              },
-            },
-          },
-        },
-      };
+    // Filtrer directement par le champ typeAchat du Fournisseur
+    if (typeAchat) {
+      where.typeAchat = typeAchat;
     }
 
     const fournisseurs = await prisma.fournisseur.findMany({
       where,
-      orderBy: {
-        nom: "asc",
-      },
+      orderBy: { nom: "asc" },
       select: {
         id: true,
         nom: true,
         email: true,
         telephone: true,
         adresse: true,
+        contact: true,
+        typeAchat: true,
+        formulaireNom: true,    // Nom du fichier formulaire
+        formulaireMime: true,   // MIME type
+        // formulaireData n'est PAS inclus ici (trop lourd) — on le sert via /api/fournisseurs/[id]/formulaire
       },
     });
 
     return NextResponse.json(fournisseurs);
   } catch (error) {
-    console.error("Erreur lors de la récupération des fournisseurs:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la récupération des fournisseurs" },
-      { status: 500 }
-    );
+    console.error("Erreur GET fournisseurs:", error);
+    return NextResponse.json({ error: "Erreur lors de la récupération" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { nom, email, telephone, adresse, contact, notes } = body;
+    const { nom, email, telephone, adresse, contact, notes, typeAchat } = body;
 
     if (!nom) {
-      return NextResponse.json(
-        { error: "Le nom du fournisseur est obligatoire" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Le nom est obligatoire" }, { status: 400 });
     }
 
     const newFournisseur = await prisma.fournisseur.create({
@@ -89,16 +59,14 @@ export async function POST(request: NextRequest) {
         adresse: adresse || null,
         contact: contact || null,
         notes: notes || null,
+        typeAchat: typeAchat || null,
         actif: true,
       },
     });
 
     return NextResponse.json(newFournisseur, { status: 201 });
   } catch (error) {
-    console.error("Erreur lors de la création du fournisseur:", error);
-    return NextResponse.json(
-      { error: "Erreur lors de la création du fournisseur" },
-      { status: 500 }
-    );
+    console.error("Erreur POST fournisseur:", error);
+    return NextResponse.json({ error: "Erreur lors de la création" }, { status: 500 });
   }
 }

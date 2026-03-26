@@ -7,68 +7,25 @@ export const StatutCommande = z.enum(["ACTIVE", "EN_ATTENTE", "COMPLETEE", "ANNU
 export const TypeActivite = z.enum(["INSTALLATION", "LIVRAISON", "CUEILLETTE", "TRANSPORT"]);
 
 export const CodeProduction = z.enum([
-  "COMPLETE",
-  "ATTENTE_CLIENT",
-  "NON_APPLICABLE",
-  "PARTIEL",
-  "DOSSIER_MESUREUR",
-  "MODIFICATION",
-  "ATTENTE_CAROL_CONFIRM",
-  "ATTENTE_CAROL_MESURE",
-  "BACK_ORDER",
-  "ATTENTE_REPRESENTANT",
-  "APPROBATION_PLAN",
+  "COMPLETE", "ATTENTE_CLIENT", "NON_APPLICABLE", "PARTIEL",
+  "DOSSIER_MESUREUR", "MODIFICATION", "ATTENTE_CAROL_CONFIRM",
+  "ATTENTE_CAROL_MESURE", "BACK_ORDER", "ATTENTE_REPRESENTANT", "APPROBATION_PLAN",
 ]);
 
-export const StatutAchat = z.enum([
-  "A_FAIRE",
-  "FAIT",
-  "RECEPTIONNE",
-  "PRET_A_RAMASSER",
-  "BACK_ORDER",
-]);
-
-export const AvertissementClient = z.enum([
-  "CONF_REP",
-  "CONF_CLIENT",
-  "ATT_REP_CLIENT",
-]);
-
-export const AvertissementMesure = z.enum([
-  "PRESENCE_CLIENT",
-  "PRESENCE_REPRESENTANT",
-]);
-
-export const Couleur = z.enum([
-  "NOIR",
-  "BLANC",
-  "BRUN_COMMERCIALE",
-  "GRIS_CHARBON",
-  "ARGILE",
-  "SPECIALE",
-  "GRIS_METALLIQUE",
-  "AUTRE",
-]);
-
+export const StatutAchat = z.enum(["A_FAIRE", "FAIT", "RECEPTIONNE", "PRET_A_RAMASSER", "BACK_ORDER"]);
+export const AvertissementClient = z.enum(["CONF_REP", "CONF_CLIENT", "ATT_REP_CLIENT"]);
+export const AvertissementMesure = z.enum(["PRESENCE_CLIENT", "PRESENCE_REPRESENTANT"]);
+export const Couleur = z.enum(["NOIR", "BLANC", "BRUN_COMMERCIALE", "GRIS_CHARBON", "ARGILE", "SPECIALE", "GRIS_METALLIQUE", "AUTRE"]);
 export const StatutLivraison = z.enum(["N_A", "LIVRE"]);
 
 export const TypeAchatPhase = z.enum([
-  "FIBRE",
-  "LIMONS",
-  "VERRES",
-  "COLONNES",
-  "PEINTURE",
-  "ATTACHES",
-  "PLANCHER_ALUMINIUM",
-  "EUROFORGINGS",
-  "PEINTURE_DJ",
-  "VERRE_LEPAGE",
+  "FIBRE", "LIMONS", "VERRES", "COLONNES", "PEINTURE", "ATTACHES",
+  "PLANCHER_ALUMINIUM", "EUROFORGINGS", "PEINTURE_DJ", "VERRE_LEPAGE", "AUTRE",
 ]);
 
 // ═══════════════════════════════════════════════════════════════
-// MAPPINGS (labels, couleurs, symboles)
+// MAPPINGS
 // ═══════════════════════════════════════════════════════════════
-
 export const COULEUR_LABELS: Record<string, { label: string; color: string; bgColor: string }> = {
   NOIR: { label: "Noir", color: "text-gray-900", bgColor: "bg-gray-200" },
   BLANC: { label: "Blanc", color: "text-gray-700", bgColor: "bg-gray-100" },
@@ -114,13 +71,9 @@ export const AVERTISSEMENT_MESURE_SYMBOLS: Record<string, { symbol: string; labe
 };
 
 export const PIEDS_LINEAIRES_FACTEURS: Record<string, number> = {
-  piedsLineairesBarrotin: 1.25,
-  piedsLineairesVerre: 1,
-  piedsLineairesMur: 4,
-  piedsLineairesMainDouble: 2.25,
-  piedsLineairesGardexVision: 1,
-  piedsLineairesGardexUrbaine: 2,
-  piedsLineairesGardexOptimum: 0.75,
+  piedsLineairesBarrotin: 1.25, piedsLineairesVerre: 1, piedsLineairesMur: 4,
+  piedsLineairesMainDouble: 2.25, piedsLineairesGardexVision: 1,
+  piedsLineairesGardexUrbaine: 2, piedsLineairesGardexOptimum: 0.75,
 };
 
 export const ACTIVITE_COULEURS: Record<string, { bg: string; text: string; border: string }> = {
@@ -152,10 +105,15 @@ export const STATUT_COMMANDE_LABELS: Record<string, { label: string; color: stri
 };
 
 export const ACTIVITE_COULEURS_BORD: Record<string, string> = {
-  INSTALLATION: "bg-red-500",
-  LIVRAISON: "bg-blue-500",
-  CUEILLETTE: "bg-yellow-500",
-  TRANSPORT: "bg-green-500",
+  INSTALLATION: "bg-red-500", LIVRAISON: "bg-blue-500",
+  CUEILLETTE: "bg-yellow-500", TRANSPORT: "bg-green-500",
+};
+
+export const TYPE_ACHAT_LABELS: Record<string, string> = {
+  FIBRE: "Fibre", LIMONS: "Limons", VERRES: "Verres", COLONNES: "Colonnes",
+  PEINTURE: "Peinture", ATTACHES: "Attaches", PLANCHER_ALUMINIUM: "Plancher aluminium",
+  EUROFORGINGS: "EuroForgings", PEINTURE_DJ: "Peinture DJ", VERRE_LEPAGE: "Verre Lepage",
+  AUTRE: "Autre", STRUCTURE: "Structure d'achat",
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -169,10 +127,6 @@ export const achatDetailSchema = z.object({
   quantiteNonRecue: z.coerce.number().optional().nullable(),
 });
 
-// ─── Balcon Schema ──────────────────────────────────────────
-// CORRECTION : z.coerce.number() pour tous les champs numériques
-// car Prisma renvoie les Decimal comme des strings ("0", "45.00")
-// et les notes peuvent être null
 export const balconSchema = z.object({
   id: z.string().optional(),
   nom: z.string().min(1, "Le nom est obligatoire"),
@@ -195,7 +149,6 @@ export const balconSchema = z.object({
   installation: CodeProduction.optional().nullable(),
 });
 
-// ─── Structure Achat Schema ─────────────────────────────────
 export const structureAchatSchema = z.object({
   id: z.string().optional(),
   nom: z.string().min(1, "Le nom est obligatoire"),
@@ -206,11 +159,11 @@ export const structureAchatSchema = z.object({
   phase: z.coerce.number().optional().nullable(),
 });
 
-// ─── Achat Phase Schema ─────────────────────────────────────
+// ─── Achat Phase Schema — MISE À JOUR avec fournisseurId ────
 export const achatPhaseSchema = z.object({
   id: z.string().optional(),
   phaseNumero: z.coerce.number(),
-  typeAchat: TypeAchatPhase,
+  typeAchat: z.string().min(1),  // Plus permissif que l'enum pour accepter STRUCTURE, AUTRE, etc.
   statut: StatutAchat.default("A_FAIRE"),
   dateEnvoie: z.string().or(z.date()).optional().nullable(),
   dateReception: z.string().or(z.date()).optional().nullable(),
@@ -225,12 +178,12 @@ export const achatPhaseSchema = z.object({
   longueur: z.coerce.number().optional().nullable(),
   hauteur: z.coerce.number().optional().nullable(),
   notes: z.string().optional().nullable(),
+  // Stocké dans le JSON details côté Prisma
   details: z.any().optional().nullable(),
 });
 
 // ─── Commande Schema ────────────────────────────────────────
 export const commandeSchema = z.object({
-  // Informations générales
   numero: z.string().min(1, "Le numéro est obligatoire"),
   clientId: z.string().min(1, "Le client est obligatoire"),
   representantId: z.string().optional().nullable(),
@@ -240,39 +193,25 @@ export const commandeSchema = z.object({
   statut: StatutCommande.default("ACTIVE"),
   adresse: z.string().min(1, "L'adresse est obligatoire"),
   commentaireAdresse: z.string().optional().nullable(),
-
-  // Couleur
   couleur: Couleur.optional().nullable(),
   couleurPersonnalisee: z.string().optional().nullable(),
-
-  // Reprise
   reprise: z.boolean().default(false),
   ancienneCommandeNumero: z.string().optional().nullable(),
-
-  // Commercial / Multiphase / Multiplan
   nombreBalcons: z.coerce.number().optional().nullable(),
   nombrePhases: z.coerce.number().optional().nullable(),
   piedsLineairesEstime: z.coerce.number().optional().nullable(),
   piedsLineairesReels: z.coerce.number().optional().nullable(),
-
-  // Dates
   dateEntree: z.string().or(z.date()).optional(),
   datePrevue: z.string().or(z.date()).optional().nullable(),
   dateProduction: z.string().or(z.date()).optional().nullable(),
   datePriseMesure: z.string().or(z.date()).optional().nullable(),
   dateLivraison: z.string().or(z.date()).optional().nullable(),
   semainePrevue: z.string().optional().nullable(),
-
-  // Prix — z.coerce pour accepter string ou number
   prixVenteMateriaux: z.coerce.number().default(0),
   prixVenteInstallation: z.coerce.number().default(0),
   prixTotal: z.coerce.number().default(0),
-
-  // Temps d'installation auto
   tempsInstallationAuto: z.coerce.number().default(0),
   utiliserCalculAuto: z.boolean().default(false),
-
-  // Pieds linéaires par type — z.coerce pour accepter string ou number
   piedsLineairesBarrotin: z.coerce.number().default(0),
   piedsLineairesVerre: z.coerce.number().default(0),
   piedsLineairesMur: z.coerce.number().default(0),
@@ -282,8 +221,6 @@ export const commandeSchema = z.object({
   piedsLineairesGardexOptimum: z.coerce.number().default(0),
   piedsLineairesRampes: z.coerce.number().default(0),
   nombrePoteaux: z.coerce.number().default(0),
-
-  // Anciens champs pour compatibilité
   tempsEstimeInstallation: z.coerce.number().default(0),
   piedsCarresFibre: z.coerce.number().optional().nullable(),
   piedsRampesBarrotin: z.coerce.number().default(0),
@@ -293,8 +230,6 @@ export const commandeSchema = z.object({
   piedsRampesGardexVision: z.coerce.number().default(0),
   piedsRampesGardexVisionUrbaine: z.coerce.number().default(0),
   piedsRampesGardexVisionOptimum: z.coerce.number().default(0),
-
-  // Production
   structure: z.boolean().default(false),
   mesure: CodeProduction.optional().nullable(),
   mesureDonneeLe: z.string().or(z.date()).optional().nullable(),
@@ -303,64 +238,44 @@ export const commandeSchema = z.object({
   envoyeProduction: CodeProduction.optional().nullable(),
   productionTerminee: CodeProduction.optional().nullable(),
   termine: CodeProduction.optional().nullable(),
-
-  // Statut livraison
   statutLivraison: StatutLivraison.default("N_A"),
-
-  // Installation
   installation: CodeProduction.optional().nullable(),
-
-  // Achats — z.coerce.number() pour les quantités
   achatFibre: StatutAchat.optional().nullable(),
   dateEnvoieFibre: z.string().or(z.date()).optional().nullable(),
   dateReceptionFibre: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecueFibre: z.coerce.number().optional().nullable(),
-
   achatLimons: StatutAchat.optional().nullable(),
   dateEnvoieLimons: z.string().or(z.date()).optional().nullable(),
   dateReceptionLimons: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecueLimons: z.coerce.number().optional().nullable(),
-
   achatVerres: StatutAchat.optional().nullable(),
   dateEnvoieVerres: z.string().or(z.date()).optional().nullable(),
   dateReceptionVerre: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecueVerres: z.coerce.number().optional().nullable(),
-
   achatColonnes: StatutAchat.optional().nullable(),
   dateEnvoieColonnes: z.string().or(z.date()).optional().nullable(),
   dateReceptionColonnes: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecueColonnes: z.coerce.number().optional().nullable(),
-
   achatPeinture: StatutAchat.optional().nullable(),
   dateEnvoiePeinture: z.string().or(z.date()).optional().nullable(),
   dateReceptionPeinture: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecuePeinture: z.coerce.number().optional().nullable(),
-
   achatAttaches: StatutAchat.optional().nullable(),
   dateEnvoieAttaches: z.string().or(z.date()).optional().nullable(),
   dateReceptionAttaches: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecueAttaches: z.coerce.number().optional().nullable(),
-
   achatPlancherAluminium: StatutAchat.optional().nullable(),
   dateEnvoiePlancherAluminium: z.string().or(z.date()).optional().nullable(),
   dateReceptionPlancherAluminium: z.string().or(z.date()).optional().nullable(),
   quantiteNonRecuePlancherAluminium: z.coerce.number().optional().nullable(),
-
-  // Avertissements
   avertissementClient: AvertissementClient.optional().nullable(),
   dateAvertissement: z.string().or(z.date()).optional().nullable(),
   avertissementPriseMesure: AvertissementMesure.optional().nullable(),
   dateAvertissementPriseMesure: z.string().or(z.date()).optional().nullable(),
-
-  // Flags
   enProduction: z.boolean().default(false),
   clientPresent: z.boolean().default(false),
   formulaireComplete: z.boolean().default(false),
-
-  // Commentaire
   commentaire: z.string().optional().nullable(),
-
-  // Relations
   balcons: z.array(balconSchema).optional(),
   structuresAchat: z.array(structureAchatSchema).optional(),
   achatsPhase: z.array(achatPhaseSchema).optional(),
@@ -371,7 +286,6 @@ export type BalconInput = z.infer<typeof balconSchema>;
 export type StructureAchatInput = z.infer<typeof structureAchatSchema>;
 export type AchatPhaseInput = z.infer<typeof achatPhaseSchema>;
 
-// Types pour les statistiques
 export interface CommandeStats {
   total: number;
   parStatut: Record<string, number>;
@@ -392,47 +306,25 @@ export interface CommandeStats {
 export function calculateDates(
   dateProduction: Date | null,
   achatsAvecDelais: Array<{ delaiFournisseur: number }> = []
-): {
-  datePrevue: Date | null;
-  dateProduction: Date | null;
-  semainePrevue: string | null;
-} {
+): { datePrevue: Date | null; dateProduction: Date | null; semainePrevue: string | null } {
   if (!dateProduction) return { datePrevue: null, dateProduction: null, semainePrevue: null };
-
-  const delaiMax = achatsAvecDelais.length > 0
-    ? Math.max(...achatsAvecDelais.map(a => a.delaiFournisseur))
-    : 0;
-
+  const delaiMax = achatsAvecDelais.length > 0 ? Math.max(...achatsAvecDelais.map(a => a.delaiFournisseur)) : 0;
   const datePrevue = new Date(dateProduction);
-  if (delaiMax > 0) {
-    datePrevue.setDate(datePrevue.getDate() + delaiMax);
-  }
-
+  if (delaiMax > 0) datePrevue.setDate(datePrevue.getDate() + delaiMax);
   const dateProd = new Date(datePrevue);
   dateProd.setDate(dateProd.getDate() - 7);
-
-  const semainePrevue = formatSemaine(datePrevue);
-
-  return { datePrevue, dateProduction: dateProd, semainePrevue };
+  return { datePrevue, dateProduction: dateProd, semainePrevue: formatSemaine(datePrevue) };
 }
 
-export function calculateTempsInstallationAuto(
-  coutTotalInstallation: number,
-  coutHeure: number = 160,
-  facteur: number = 0.7
-): number {
-  if (coutTotalInstallation <= 0 || coutHeure <= 0) return 0;
-  return (coutTotalInstallation / coutHeure) * facteur;
+export function calculateTempsInstallationAuto(cout: number, coutH: number = 160, facteur: number = 0.7): number {
+  if (cout <= 0 || coutH <= 0) return 0;
+  return (cout / coutH) * facteur;
 }
 
-export function calculatePiedsLineairesTotaux(
-  valeurs: Record<string, number>
-): number {
+export function calculatePiedsLineairesTotaux(valeurs: Record<string, number>): number {
   let total = 0;
   for (const [key, facteur] of Object.entries(PIEDS_LINEAIRES_FACTEURS)) {
-    if (valeurs[key]) {
-      total += valeurs[key] * facteur;
-    }
+    if (valeurs[key]) total += valeurs[key] * facteur;
   }
   return Math.round(total);
 }
@@ -447,7 +339,5 @@ export function getWeekNumber(date: Date): number {
 
 export function formatSemaine(date: Date | null): string {
   if (!date) return "—";
-  const week = getWeekNumber(new Date(date));
-  const year = new Date(date).getFullYear();
-  return `S${week} ${year}`;
+  return `S${getWeekNumber(new Date(date))} ${new Date(date).getFullYear()}`;
 }
