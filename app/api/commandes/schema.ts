@@ -20,7 +20,7 @@ export const StatutLivraison = z.enum(["N_A", "LIVRE"]);
 
 export const TypeAchatPhase = z.enum([
   "FIBRE", "LIMONS", "VERRES", "COLONNES", "PEINTURE", "ATTACHES",
-  "PLANCHER_ALUMINIUM", "EUROFORGINGS", "PEINTURE_DJ", "VERRE_LEPAGE", "AUTRE",
+  "PLANCHER_ALUMINIUM", "PEINTURE_DJ", "VERRE_LEPAGE", "AUTRE",
 ]);
 
 // ═══════════════════════════════════════════════════════════════
