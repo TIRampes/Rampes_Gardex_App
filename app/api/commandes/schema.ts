@@ -111,8 +111,7 @@ export const ACTIVITE_COULEURS_BORD: Record<string, string> = {
 
 export const TYPE_ACHAT_LABELS: Record<string, string> = {
   FIBRE: "Fibre", LIMONS: "Limons", VERRES: "Verres", COLONNES: "Colonnes",
-  PEINTURE: "Peinture", ATTACHES: "Attaches", PLANCHER_ALUMINIUM: "Plancher aluminium",
-  EUROFORGINGS: "EuroForgings", PEINTURE_DJ: "Peinture DJ", VERRE_LEPAGE: "Verre Lepage",
+  PEINTURE: "Peinture", ATTACHES: "Attaches", PLANCHER_ALUMINIUM: "Plancher aluminium", PEINTURE_DJ: "Peinture DJ", VERRE_LEPAGE: "Verre Lepage",
   AUTRE: "Autre", STRUCTURE: "Structure d'achat",
 };
 
